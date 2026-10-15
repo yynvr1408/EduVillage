@@ -92,6 +92,52 @@ def test_deleting_a_course_with_lessons_archives_it_instead_of_destroying_it(tea
     assert body["course"]["status"] == "archived"
 
 
+def test_force_delete_permanently_removes_an_already_archived_course_with_history(teacher, published_course, student):
+    tclient, _ = teacher
+    sclient, _ = student
+    sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+
+    # First delete archives it (it has an enrollment).
+    first = tclient.delete(f"/api/v1/courses/{published_course['id']}")
+    assert first.json()["deleted"] is False
+    assert first.json()["course"]["status"] == "archived"
+
+    # A second, explicit force delete on the now-archived course actually removes it.
+    second = tclient.delete(f"/api/v1/courses/{published_course['id']}", params={"force": "true"})
+    assert second.status_code == 200
+    body = second.json()
+    assert body["deleted"] is True
+    assert body["course"] is None
+    assert tclient.get(f"/api/v1/courses/{published_course['id']}").status_code == 404
+
+
+def test_force_is_ignored_on_a_course_that_isnt_archived_yet(teacher, published_course, student):
+    """force only ever applies to something already archived — on an active course with
+    activity it must still fall back to archiving, never a surprise permanent delete."""
+    tclient, _ = teacher
+    sclient, _ = student
+    sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+
+    resp = tclient.delete(f"/api/v1/courses/{published_course['id']}", params={"force": "true"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["deleted"] is False
+    assert body["course"]["status"] == "archived"
+    assert tclient.get(f"/api/v1/courses/{published_course['id']}").status_code == 200
+
+
+def test_other_teacher_cannot_force_delete_an_archived_course(teacher, published_course, student, make_user):
+    tclient, _ = teacher
+    sclient, _ = student
+    sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+    tclient.delete(f"/api/v1/courses/{published_course['id']}")  # archives it
+
+    other_client, _ = make_user(role="teacher", prefix="other-force-deleter")
+    resp = other_client.delete(f"/api/v1/courses/{published_course['id']}", params={"force": "true"})
+    assert resp.status_code == 403
+    assert tclient.get(f"/api/v1/courses/{published_course['id']}").status_code == 200
+
+
 def test_archiving_is_idempotent(teacher, published_course, student):
     client, _ = teacher
     student_client, _ = student

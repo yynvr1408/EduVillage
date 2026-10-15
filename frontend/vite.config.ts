@@ -15,7 +15,7 @@ export default defineConfig({
         name: 'EduVillage',
         short_name: 'EduVillage',
         description: 'Offline-First Low-Bandwidth Learning Platform',
-        theme_color: '#111111',
+        theme_color: '#0F5B57',
         background_color: '#FFFFFF',
         display: 'standalone',
         start_url: '/',
