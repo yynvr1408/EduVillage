@@ -31,7 +31,10 @@ export const playbackStore = {
     const saved = await db.playbackPositions.get(id)
     if (!saved || saved.completed) return 0
     const total = durationSeconds || saved.durationSeconds
-    if (total && saved.positionSeconds >= total - 5) return 0
+    // "Almost finished" means the last few seconds — but never more than 5% of a short clip, or a
+    // 5-second video could never be resumed anywhere.
+    const tail = Math.max(1, Math.min(5, total * 0.05))
+    if (total && saved.positionSeconds >= total - tail) return 0
     return saved.positionSeconds
   },
 

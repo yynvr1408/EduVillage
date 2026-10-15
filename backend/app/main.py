@@ -41,6 +41,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Browsers on another origin can only read these response headers if they are exposed; resumable
+    # downloads need Content-Range to learn a file's real size and verify each chunk.
+    expose_headers=["Content-Range", "Accept-Ranges", "X-Request-ID"],
 )
 
 app.add_exception_handler(AppError, app_error_handler)
