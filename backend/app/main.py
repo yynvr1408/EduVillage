@@ -29,6 +29,14 @@ async def lifespan(_app: FastAPI):
         logger.warning("LiveKit is not configured — classroom start/join endpoints will return 503.")
     if not settings.llm_configured:
         logger.warning("No LLM provider configured — lecture summaries will use the labeled stub provider.")
+    from app.db.session import SessionLocal
+    from app.services import admin_service
+
+    with SessionLocal() as db:
+        try:
+            admin_service.bootstrap_admin(db)
+        except Exception:  # a missing table (migrations not yet applied) must not stop the API from starting
+            logger.exception("Administrator bootstrap failed.")
     yield
 
 

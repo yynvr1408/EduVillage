@@ -440,13 +440,14 @@ export const api = {
     const [c, courses] = await Promise.all([apiRequest<Raw>(`/classes/${id}`), courseIndex()])
     return mapClass(c, courses)
   },
-  scheduleClass: async (data: { course_id: string; title: string; scheduled_at: string; section_id?: string }) => {
+  scheduleClass: async (data: { course_id: string; title: string; scheduled_at: string; section_id?: string; all_branch_sections?: boolean }) => {
     const c = await apiRequest<Raw>(`/classes?course_id=${encodeURIComponent(data.course_id)}`, {
       method: 'POST',
       body: JSON.stringify({
         title: data.title,
         scheduled_start: data.scheduled_at,
         section_ids: data.section_id ? [data.section_id] : [],
+        ...(data.all_branch_sections ? { all_branch_sections: true } : {}),
       }),
     })
     return mapClass(c, await courseIndex())

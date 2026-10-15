@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 import hmac
 
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, UnauthorizedError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationFailedError
 from app.core.security import (
     generate_session_token,
     hash_password,
@@ -14,6 +14,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.base import utcnow
+from app.db.models.college import UserBranchAssignment, UserCollegeSection
 from app.db.models.enums import UserRole, UserStatus
 from app.db.models.user import PasswordResetToken, User, UserSession
 from app.services import audit_service
@@ -47,8 +48,25 @@ def _assert_may_register_as(role: UserRole, invite_code: str | None) -> None:
         raise ForbiddenError("Teacher registration is closed; accounts are provisioned by the institution.", code="TEACHER_REGISTRATION_CLOSED")
 
 
-def register_user(db: Session, *, full_name: str, email: str, password: str, role: UserRole, invite_code: str | None = None) -> User:
-    _assert_may_register_as(role, invite_code)
+def register_user(
+    db: Session, *, full_name: str, email: str, password: str, role: UserRole, invite_code: str | None = None,
+    college_id: str | None = None, college_code: str | None = None, section_id: str | None = None,
+    branch_id: str | None = None, all_sections: bool = False,
+) -> User:
+    if role == UserRole.admin:
+        raise ForbiddenError("This role cannot be self-registered.", code="ROLE_NOT_ALLOWED")
+    from app.services import college_service
+
+    # Everything is validated before the first row is written, so a rejection leaves no partial account.
+    target = college_service.validate_registration_target(
+        db, college_id=college_id, branch_id=branch_id, section_id=section_id, all_sections=all_sections,
+        college_code=college_code, require_code=role == UserRole.teacher, allow_all_sections=role == UserRole.teacher,
+    )
+    if role == UserRole.teacher and target is None:
+        if settings.teacher_college_required:
+            raise ValidationFailedError("Select your college, enter its college code and choose a section.", code="COLLEGE_REQUIRED")
+        _assert_may_register_as(role, invite_code)
+    # (with a valid target the admin-issued college code is the proof; it grants nothing beyond the role)
     normalized_email = email.strip().lower()
     existing = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if existing:
@@ -61,7 +79,15 @@ def register_user(db: Session, *, full_name: str, email: str, password: str, rol
         role=role,
         status=UserStatus.active,
     )
+    if target is not None:
+        user.college_id = target[0].id
     db.add(user)
+    if target is not None:
+        db.flush()
+        if target[2] is not None:
+            db.add(UserCollegeSection(user_id=user.id, college_section_id=target[2].id))
+        else:  # branch-wide: a branch assignment, never a section row
+            db.add(UserBranchAssignment(user_id=user.id, branch_id=target[1].id))
     db.commit()
     db.refresh(user)
     audit_service.record(db, actor_id=user.id, action="register", resource_type="user", resource_id=user.id)
@@ -76,19 +102,21 @@ def authenticate_user(db: Session, *, email: str, password: str) -> User:
     if not user or not verify_password(password, user.password_hash):
         audit_service.record(db, actor_id=user.id if user else None, action="login_failed", resource_type="user")
         raise UnauthorizedError("Incorrect email or password.", code="INVALID_CREDENTIALS")
+    if user.role == UserRole.admin:  # administrators sign in only through the admin endpoint
+        raise UnauthorizedError("Incorrect email or password.", code="INVALID_CREDENTIALS")
     if user.status != UserStatus.active:
         raise UnauthorizedError("This account is not active.", code="ACCOUNT_INACTIVE")
     audit_service.record(db, actor_id=user.id, action="login", resource_type="user", resource_id=user.id)
     return user
 
 
-def create_session(db: Session, user: User) -> str:
+def create_session(db: Session, user: User, ttl: timedelta | None = None) -> str:
     """Returns the raw token to set as a cookie; only its hash is persisted."""
     token = generate_session_token()
     session = UserSession(
         user_id=user.id,
         session_hash=hash_token(token),
-        expires_at=utcnow() + timedelta(hours=settings.session_ttl_hours),
+        expires_at=utcnow() + (ttl or timedelta(hours=settings.session_ttl_hours)),
     )
     db.add(session)
     db.commit()
@@ -163,8 +191,8 @@ def request_password_reset(db: Session, email: str) -> str | None:
     _check_rate_limit(f"reset:{normalized_email}")
 
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
-    if not user:
-        # Do not reveal whether the email exists.
+    if not user or user.role == UserRole.admin:
+        # Do not reveal whether the email exists; the admin password is changed only via server configuration.
         return None
 
     token = generate_session_token()

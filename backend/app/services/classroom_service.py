@@ -8,7 +8,7 @@ from app.db.models.section import Section
 from app.db.models.enums import ClassStatus, ParticipationStatus, UserRole
 from app.db.models.user import User
 from app.integrations import livekit
-from app.services import audit_service, course_service, section_service
+from app.services import audit_service, course_service, section_service, teaching_scope_service
 
 
 def _room_name_for(class_id: str) -> str:
@@ -66,10 +66,13 @@ def list_classes_for_user(db: Session, user: User, *, limit: int = 50, offset: i
 
 
 def create_class(
-    db: Session, teacher: User, course_id: str, *, title: str, scheduled_start, scheduled_end, section_ids: list[str] | None = None
+    db: Session, teacher: User, course_id: str, *, title: str, scheduled_start, scheduled_end, section_ids: list[str] | None = None,
+    all_branch_sections: bool = False,
 ) -> Class:
     course = course_service.get_course_or_404(db, course_id)
     course_service.assert_owns_course(db, teacher, course)
+    # Branch/section assignment limits which cohorts a teacher may address (enforced here, not only in the UI).
+    section_ids = teaching_scope_service.resolve_class_audience(db, teacher, course, section_ids or [], all_branch_sections)
     cls = Class(
         course_id=course_id,
         teacher_id=teacher.id,

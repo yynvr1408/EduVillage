@@ -7,7 +7,7 @@ from app.db.models.course import Course
 from app.db.models.enums import UserRole
 from app.db.models.section import Section, SectionMember
 from app.db.models.user import User
-from app.services import audit_service, course_service
+from app.services import audit_service, course_service, teaching_scope_service
 
 
 def get_section_or_404(db: Session, section_id: str) -> Section:
@@ -24,9 +24,15 @@ def assert_teaches_section(db: Session, user: User, section: Section) -> Course:
     return course
 
 
-def create_section(db: Session, teacher: User, course: Course, *, name: str, code: str) -> Section:
+def create_section(
+    db: Session, teacher: User, course: Course, *, name: str, code: str, college_section_id: str | None = None
+) -> Section:
     course_service.assert_owns_course(db, teacher, course)
-    section = Section(course_id=course.id, name=name.strip(), code=code.strip().upper())
+    if college_section_id:
+        teaching_scope_service.assert_may_link(db, teacher, college_section_id)
+        if db.execute(select(Section.id).where(Section.course_id == course.id, Section.college_section_id == college_section_id)).first():
+            raise ConflictError("This course already has a section for that college section.", code="COLLEGE_SECTION_LINKED")
+    section = Section(course_id=course.id, name=name.strip(), code=code.strip().upper(), college_section_id=college_section_id)
     db.add(section)
     try:
         db.commit()
@@ -52,7 +58,7 @@ def list_sections(db: Session, user: User, course: Course) -> list[Section]:
     """Teachers see every section of a course they teach; a student sees only their own."""
     stmt = select(Section).where(Section.course_id == course.id).order_by(Section.code)
     if course_service.is_teaching(db, user, course):
-        return list(db.execute(stmt).scalars())
+        return teaching_scope_service.filter_visible_course_sections(db, user, list(db.execute(stmt).scalars()))
     course_service.assert_enrolled(db, user, course)
     return list(db.execute(stmt.where(Section.id.in_(member_section_ids(db, user.id)))).scalars())
 

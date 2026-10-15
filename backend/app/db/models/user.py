@@ -18,6 +18,12 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(UserStatus, native_enum=False), nullable=False, default=UserStatus.active
     )
 
+    # Prepared for college-scoped onboarding. Nullable on purpose: existing users are NOT assigned to any
+    # college automatically, and current login/registration do not require one.
+    college_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("colleges.id", ondelete="SET NULL", name="fk_users_college_id_colleges", use_alter=True), nullable=True, index=True
+    )
+
     sessions: Mapped[list["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 

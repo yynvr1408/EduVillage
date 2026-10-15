@@ -29,6 +29,7 @@ def create_class(payload: ClassCreate, course_id: str, user: User = Depends(get_
         scheduled_start=payload.scheduled_start,
         scheduled_end=payload.scheduled_end,
         section_ids=payload.section_ids,
+        all_branch_sections=payload.all_branch_sections,
     )
     return ClassOut.model_validate(cls)
 

@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class SectionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     code: str = Field(min_length=1, max_length=40)
+    college_section_id: str | None = Field(default=None, max_length=36)
 
 
 class SectionOut(BaseModel):
@@ -16,6 +17,7 @@ class SectionOut(BaseModel):
     course_id: str
     name: str
     code: str
+    college_section_id: str | None = None
 
 
 class SectionMemberAdd(BaseModel):

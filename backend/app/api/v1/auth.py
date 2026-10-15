@@ -41,7 +41,8 @@ def register(
 ):
     user = auth_service.register_user(
         db, full_name=payload.full_name, email=payload.email, password=payload.password, role=payload.role,
-        invite_code=payload.invite_code,
+        invite_code=payload.invite_code, college_id=payload.college_id, college_code=payload.college_code,
+        section_id=payload.section_id, branch_id=payload.branch_id, all_sections=payload.all_sections,
     )
     token = auth_service.create_session(db, user)
     _set_session_cookie(response, token, settings)

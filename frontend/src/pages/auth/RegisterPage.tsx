@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AlertCircle, UserPlus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/Input'
 import { FormField } from '../../components/ui/FormField'
 import { Select } from '../../components/ui/Select'
 import { Logo } from '../../components/ui/Logo'
+import { registrationApi, type RegistrationBranch, type RegistrationCollege, type RegistrationSection } from '../../services/registrationApi'
 
 export interface RegisterPageProps {
   /** Set by the /register/student and /register/teacher routes to fix the role and drop the
@@ -15,6 +16,29 @@ export interface RegisterPageProps {
    * a role dropdown — kept only as a safe fallback, nothing currently routes to it bare. */
   portal?: 'student' | 'teacher'
 }
+
+type FieldKey = 'fullName' | 'email' | 'password' | 'confirmPassword' | 'college' | 'collegeCode' | 'branch' | 'section'
+
+/** Select value for the teacher-only branch-wide choice; it is never sent as a section id. */
+const ALL_SECTIONS = '__all_sections__'
+type FieldErrors = Partial<Record<FieldKey, string>>
+
+/** Where each backend error code belongs, so the message shows next to the field that caused it. */
+const SERVER_FIELD: Record<string, FieldKey> = {
+  EMAIL_TAKEN: 'email',
+  INVALID_COLLEGE_CODE: 'collegeCode',
+  COLLEGE_NOT_FOUND: 'college',
+  COLLEGE_INACTIVE: 'college',
+  COLLEGE_REQUIRED: 'college',
+  BRANCH_REQUIRED: 'branch',
+  INVALID_BRANCH: 'branch',
+  BRANCH_INACTIVE: 'branch',
+  SECTION_REQUIRED: 'section',
+  INVALID_SECTION: 'section',
+  SECTION_INACTIVE: 'section',
+}
+
+type Load<T> = { status: 'idle' | 'loading' | 'error'; items: T[] } | { status: 'ready'; items: T[] }
 
 export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
   const { register } = useAuth()
@@ -25,42 +49,155 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [role, setRole] = useState<Role>(portal ?? 'student')
-  const [inviteCode, setInviteCode] = useState('')
+  const [collegeId, setCollegeId] = useState('')
+  const [collegeCode, setCollegeCode] = useState('')
+  const [branchId, setBranchId] = useState('')
+  const [sectionId, setSectionId] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+
+  const [colleges, setColleges] = useState<Load<RegistrationCollege>>({ status: 'loading', items: [] })
+  const [branches, setBranches] = useState<Load<RegistrationBranch>>({ status: 'idle', items: [] })
+  const [sections, setSections] = useState<Load<RegistrationSection>>({ status: 'idle', items: [] })
+  const branchRequest = useRef(0)
+  const sectionRequest = useRef(0)
+
+  const loadColleges = useCallback(async () => {
+    setColleges({ status: 'loading', items: [] })
+    try {
+      setColleges({ status: 'ready', items: await registrationApi.listColleges() })
+    } catch {
+      setColleges({ status: 'error', items: [] })
+    }
+  }, [])
+
+  const loadBranches = useCallback(async (id: string) => {
+    const seq = ++branchRequest.current
+    setBranches({ status: 'loading', items: [] })
+    try {
+      const items = await registrationApi.listBranches(id)
+      if (seq === branchRequest.current) setBranches({ status: 'ready', items })
+    } catch {
+      if (seq === branchRequest.current) setBranches({ status: 'error', items: [] })
+    }
+  }, [])
+
+  const loadSections = useCallback(async (id: string) => {
+    const seq = ++sectionRequest.current
+    setSections({ status: 'loading', items: [] })
+    try {
+      const items = await registrationApi.listSections(id)
+      if (seq === sectionRequest.current) setSections({ status: 'ready', items })
+    } catch {
+      if (seq === sectionRequest.current) setSections({ status: 'error', items: [] })
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadColleges()
+  }, [loadColleges])
+
+  const resetSections = () => {
+    sectionRequest.current++
+    setSections({ status: 'idle', items: [] })
+  }
+
+  const onCollegeChange = (id: string) => {
+    setCollegeId(id)
+    // a branch or section from the previous college is never valid for the new one
+    setBranchId('')
+    setSectionId('')
+    resetSections()
+    setFieldErrors((f) => ({ ...f, college: undefined, branch: undefined, section: undefined }))
+    if (id) void loadBranches(id)
+    else {
+      branchRequest.current++
+      setBranches({ status: 'idle', items: [] })
+    }
+  }
+
+  const onBranchChange = (id: string) => {
+    setBranchId(id)
+    setSectionId('')
+    setFieldErrors((f) => ({ ...f, branch: undefined, section: undefined }))
+    if (id) void loadSections(id)
+    else resetSections()
+  }
+
+  const isTeacher = role === 'teacher'
+  // Students may still register where an administrator has not set up any college yet; teachers cannot.
+  const collegeOptional = !isTeacher && colleges.status === 'ready' && colleges.items.length === 0
+  const collegesUnavailable = colleges.status === 'error'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading) return
 
-    if (!fullName.trim() || !email.trim() || !password) {
-      setError('Please fill in all required fields.')
-      return
+    const errs: FieldErrors = {}
+    if (!fullName.trim()) errs.fullName = 'Enter your full name.'
+    if (!email.trim()) errs.email = 'Enter your email address.'
+    if (!password) errs.password = 'Enter a password.'
+    else if (password.length < 8) errs.password = 'Password must be at least 8 characters long.'
+    if (password && confirmPassword !== password) errs.confirmPassword = 'Passwords do not match.'
+    if (!collegeOptional) {
+      if (!collegeId) errs.college = 'Select your college.'
+      if (collegeId && !branchId) errs.branch = 'Select your branch.'
+      if (branchId && !sectionId) errs.section = isTeacher ? 'Select a section or All Sections.' : 'Select your section.'
     }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.')
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.')
-      return
-    }
+    if (isTeacher && !collegeCode.trim()) errs.collegeCode = 'Enter the college code given by your administrator.'
+    setFieldErrors(errs)
+    setError(null)
+    if (Object.keys(errs).length > 0) return
 
     setIsLoading(true)
-    setError(null)
-
     try {
-      const user = await register(email, fullName, password, role, inviteCode)
+      const allSections = isTeacher && sectionId === ALL_SECTIONS
+      const selection = collegeId
+        ? { collegeId, branchId, sectionId: allSections ? undefined : sectionId, allSections, collegeCode: collegeCode.trim() }
+        : undefined
+      const user = await register(email, fullName, password, role, undefined, selection)
       navigate(user.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', {
         replace: true,
       })
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please check your information.')
+      const field = SERVER_FIELD[err?.code as string]
+      if (field) {
+        setFieldErrors({ [field]: err.message })
+        // The college may have been deactivated or the section removed since the page loaded.
+        if (field === 'college') void loadColleges()
+        if (field === 'branch' && collegeId) void loadBranches(collegeId)
+        if (field === 'section' && branchId) void loadSections(branchId)
+      } else {
+        setError(
+          err?.isNetworkError ? 'Cannot reach the server. Check your connection and try again.' : err?.message || 'Registration failed. Please check your information.'
+        )
+      }
     } finally {
       setIsLoading(false)
     }
   }
+
+  const collegeOptions = [
+    { value: '', label: colleges.status === 'loading' ? 'Loading colleges...' : 'Select your college' },
+    ...colleges.items.map((c) => ({ value: c.id, label: c.location ? `${c.name} — ${c.location}` : c.name })),
+  ]
+  const branchOptions = [
+    {
+      value: '',
+      label: !collegeId ? 'Select a college first' : branches.status === 'loading' ? 'Loading branches...' : 'Select your branch',
+    },
+    ...branches.items.map((b) => ({ value: b.id, label: b.short_code ? `${b.name} (${b.short_code})` : b.name })),
+  ]
+  const sectionOptions = [
+    {
+      value: '',
+      label: !branchId ? 'Select a branch first' : sections.status === 'loading' ? 'Loading sections...' : 'Select your section',
+    },
+    ...sections.items.map((s) => ({ value: s.id, label: s.name })),
+    // Teachers who teach every section of the branch; a branch-wide assignment, not a real section.
+    ...(isTeacher && branchId && sections.status === 'ready' ? [{ value: ALL_SECTIONS, label: 'All Sections' }] : []),
+  ]
 
   return (
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -103,8 +240,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <FormField label="Full Name" htmlFor="fullName" required>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+            <FormField label="Full Name" htmlFor="fullName" required error={fieldErrors.fullName}>
               <Input
                 id="fullName"
                 type="text"
@@ -112,11 +249,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
                 placeholder="e.g. Amina Diallo"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                isError={!!fieldErrors.fullName}
                 required
               />
             </FormField>
 
-            <FormField label="Email Address" htmlFor="email" required>
+            <FormField label="Email Address" htmlFor="email" required error={fieldErrors.email}>
               <Input
                 id="email"
                 type="email"
@@ -124,6 +262,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
                 placeholder="amina@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                isError={!!fieldErrors.email}
                 required
               />
             </FormField>
@@ -142,24 +281,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
               </FormField>
             )}
 
-            {role === 'teacher' && (
-              <FormField
-                label="Teacher Invite Code"
-                htmlFor="inviteCode"
-                required
-                hint="Teacher accounts are issued by your institution. Ask your administrator for the code."
-              >
-                <Input
-                  id="inviteCode"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  autoComplete="off"
-                  required
-                />
-              </FormField>
-            )}
-
-            <FormField label="Password" htmlFor="password" required hint="Min. 6 characters">
+            <FormField label="Password" htmlFor="password" required hint="Min. 8 characters" error={fieldErrors.password}>
               <Input
                 id="password"
                 type="password"
@@ -168,11 +290,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                isError={!!fieldErrors.password}
                 required
               />
             </FormField>
 
-            <FormField label="Confirm Password" htmlFor="confirmPassword" required>
+            <FormField label="Confirm Password" htmlFor="confirmPassword" required error={fieldErrors.confirmPassword}>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -181,9 +304,110 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                isError={!!fieldErrors.confirmPassword}
                 required
               />
             </FormField>
+
+            <FormField label="College" htmlFor="college" required={!collegeOptional} error={fieldErrors.college}>
+              <Select
+                id="college"
+                value={collegeId}
+                onChange={(e) => onCollegeChange(e.target.value)}
+                options={collegeOptions}
+                isError={!!fieldErrors.college}
+                disabled={colleges.status !== 'ready' || colleges.items.length === 0}
+              />
+            </FormField>
+            {collegesUnavailable && (
+              <p className="text-xs text-[#B42318] -mt-2" role="alert">
+                Could not load colleges.{' '}
+                <button type="button" onClick={loadColleges} className="font-semibold underline">
+                  Try again
+                </button>
+              </p>
+            )}
+            {colleges.status === 'ready' && colleges.items.length === 0 && (
+              <p className="text-xs text-[#687775] -mt-2" role="status">
+                {isTeacher
+                  ? 'No colleges are open for registration yet. Please contact your administrator.'
+                  : 'No colleges are available yet; you can still create your account.'}
+              </p>
+            )}
+
+            {isTeacher && (
+              <FormField
+                label="College Code"
+                htmlFor="collegeCode"
+                required
+                hint="From your administrator"
+                error={fieldErrors.collegeCode}
+              >
+                <Input
+                  id="collegeCode"
+                  value={collegeCode}
+                  onChange={(e) => {
+                    setCollegeCode(e.target.value)
+                    setFieldErrors((f) => ({ ...f, collegeCode: undefined }))
+                  }}
+                  autoComplete="off"
+                  placeholder="EV-XXXX-XXXX"
+                  isError={!!fieldErrors.collegeCode}
+                  required
+                />
+              </FormField>
+            )}
+
+            <FormField label="Branch" htmlFor="branch" required={!collegeOptional} error={fieldErrors.branch}>
+              <Select
+                id="branch"
+                value={branchId}
+                onChange={(e) => onBranchChange(e.target.value)}
+                options={branchOptions}
+                isError={!!fieldErrors.branch}
+                disabled={!collegeId || branches.status !== 'ready' || branches.items.length === 0}
+              />
+            </FormField>
+            {collegeId && branches.status === 'error' && (
+              <p className="text-xs text-[#B42318] -mt-2" role="alert">
+                Could not load branches.{' '}
+                <button type="button" onClick={() => loadBranches(collegeId)} className="font-semibold underline">
+                  Try again
+                </button>
+              </p>
+            )}
+            {collegeId && branches.status === 'ready' && branches.items.length === 0 && (
+              <p className="text-xs text-[#687775] -mt-2" role="status">
+                This college has no branches yet. Please contact your administrator.
+              </p>
+            )}
+
+            <FormField label="Section" htmlFor="section" required={!collegeOptional} error={fieldErrors.section}>
+              <Select
+                id="section"
+                value={sectionId}
+                onChange={(e) => {
+                  setSectionId(e.target.value)
+                  setFieldErrors((f) => ({ ...f, section: undefined }))
+                }}
+                options={sectionOptions}
+                isError={!!fieldErrors.section}
+                disabled={!branchId || sections.status !== 'ready' || sections.items.length === 0}
+              />
+            </FormField>
+            {branchId && sections.status === 'error' && (
+              <p className="text-xs text-[#B42318] -mt-2" role="alert">
+                Could not load sections.{' '}
+                <button type="button" onClick={() => loadSections(branchId)} className="font-semibold underline">
+                  Try again
+                </button>
+              </p>
+            )}
+            {branchId && sections.status === 'ready' && sections.items.length === 0 && (
+              <p className="text-xs text-[#687775] -mt-2" role="status">
+                This branch has no sections yet. Please contact your administrator.
+              </p>
+            )}
 
             <Button
               type="submit"

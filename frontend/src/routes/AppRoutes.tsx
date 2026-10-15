@@ -43,6 +43,7 @@ import { TeacherProfilePage } from '../pages/teacher/TeacherProfilePage'
 // Real-Time Classroom
 import { ClassroomPage } from '../pages/classroom/ClassroomPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { AdminApp } from '../pages/admin/AdminApp'
 
 export const AppRoutes: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth()
@@ -127,6 +128,9 @@ export const AppRoutes: React.FC = () => {
         <Route path="summaries" element={<TeacherSummariesPage />} />
         <Route path="profile" element={<TeacherProfilePage />} />
       </Route>
+
+      {/* Admin panel: outside the student/teacher guards; access is enforced by the backend session, not the URL */}
+      <Route path="/admin" element={<AdminApp />} />
 
       {/* 404 Catch-All */}
       <Route path="*" element={<NotFoundPage />} />

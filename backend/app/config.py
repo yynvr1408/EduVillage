@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     # Render default URL) — browsers then require the cookie to also be Secure.
     session_cookie_samesite: str = "lax"
 
+    # Platform administrator bootstrap. Both come from the SERVER environment only (never the frontend, never the
+    # repo). If both are set, that account is created on start-up when it does not exist yet; the password is
+    # stored only as an argon2 hash.
+    admin_username: str | None = None
+    admin_password: str | None = None
+    admin_reset_password_on_start: bool = False  # set true once to rotate the password to the current ADMIN_PASSWORD
+    admin_session_ttl_minutes: int = 120
+    admin_cookie_name: str = "eduvillage_admin_session"
+    admin_login_max_attempts: int = 5  # per client + username, per 15 minutes
+
     database_url: str = "sqlite:///./dev.db"
 
     livekit_url: str | None = None
@@ -34,6 +44,8 @@ class Settings(BaseSettings):
     # Teacher accounts are privileged: registering as a teacher requires this invite code.
     # Unset => teacher self-registration is open only outside production (dev/test convenience).
     teacher_invite_code: str | None = None
+    # Teachers must register with a valid college, its admin-issued code and a section of that college.
+    teacher_college_required: bool = True
 
     # Recording policy: recording is always an explicit, per-class teacher action; this is the
     # institution-wide kill switch. Recordings stay private until a teacher publishes them.

@@ -15,6 +15,11 @@ class Section(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     code: Mapped[str] = mapped_column(String(40), nullable=False)
+    # Optional link to the college section this cohort corresponds to. Used to restrict which cohorts a
+    # teacher assigned to a college section / branch may address; NULL = a plain course cohort.
+    college_section_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("college_sections.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class SectionMember(UUIDPrimaryKeyMixin, Base):

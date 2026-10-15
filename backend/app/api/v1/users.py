@@ -6,7 +6,7 @@ from app.dependencies import get_current_user, get_db
 from app.db.models.user import User
 from app.schemas.auth import RevokeAllResponse, SessionOut
 from app.schemas.user import UserOut, UserUpdate
-from app.services import auth_service
+from app.services import auth_service, teaching_scope_service
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -14,6 +14,12 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/me", response_model=UserOut)
 def read_me(user: User = Depends(get_current_user)):
     return UserOut.model_validate(user)
+
+
+@router.get("/me/teaching-scope")
+def teaching_scope(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """The branch / college section this teacher is assigned to ("none" for legacy or student accounts)."""
+    return teaching_scope_service.describe(db, user)
 
 
 @router.patch("/me", response_model=UserOut)

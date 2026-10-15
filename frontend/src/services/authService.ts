@@ -1,3 +1,4 @@
+import type { CollegeSelection } from './registrationApi'
 import { api, apiRequest } from './apiClient'
 import type { AuthResponse, User } from '../types'
 
@@ -37,7 +38,8 @@ export const authService = {
     fullName: string,
     password: string,
     role: 'student' | 'teacher',
-    inviteCode?: string
+    inviteCode?: string,
+    college?: CollegeSelection
   ): Promise<AuthResponse> {
     const data = await apiRequest<AuthResponse>('/auth/register', {
       method: 'POST',
@@ -47,6 +49,11 @@ export const authService = {
         password,
         role,
         invite_code: role === 'teacher' ? inviteCode || undefined : undefined,
+        college_id: college?.collegeId || undefined,
+        branch_id: college?.branchId || undefined,
+        section_id: college?.allSections ? undefined : college?.sectionId || undefined,
+        all_sections: role === 'teacher' && college?.allSections ? true : undefined,
+        college_code: role === 'teacher' ? college?.collegeCode || undefined : undefined,
       }),
     })
     this.cacheUser(data.user)

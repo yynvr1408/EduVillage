@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Calendar, Video, AlertCircle } from 'lucide-react'
-import { api } from '../../services/apiClient'
+import { api, apiRequest } from '../../services/apiClient'
 import { classService } from '../../services/classService'
 import { courseService } from '../../services/courseService'
 import type { Course, Section } from '../../types'
@@ -11,6 +11,9 @@ import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent } from '../../components/ui/Card'
+
+/** Select value for "every active section of my branch"; sent as a flag, never as a section id. */
+const ALL_BRANCH = '__all_branch__'
 
 export const TeacherCreateClassPage: React.FC = () => {
   const navigate = useNavigate()
@@ -24,6 +27,7 @@ export const TeacherCreateClassPage: React.FC = () => {
 
   const [sections, setSections] = useState<Section[]>([])
   const [sectionId, setSectionId] = useState<string>('')
+  const [branchName, setBranchName] = useState<string | null>(null) // set only for teachers assigned to all sections of a branch
 
   useEffect(() => {
     courseService.getCourses().then((list) => {
@@ -36,6 +40,12 @@ export const TeacherCreateClassPage: React.FC = () => {
     tomorrow.setDate(tomorrow.getDate() + 1)
     tomorrow.setHours(10, 0, 0, 0)
     setScheduledAt(tomorrow.toISOString().slice(0, 16))
+  }, [])
+
+  useEffect(() => {
+    apiRequest<{ kind: string; branch: { name: string } | null }>('/users/me/teaching-scope')
+      .then((scope) => setBranchName(scope.kind === 'branch' ? scope.branch?.name ?? null : null))
+      .catch(() => setBranchName(null))
   }, [])
 
   useEffect(() => {
@@ -57,7 +67,8 @@ export const TeacherCreateClassPage: React.FC = () => {
     try {
       await classService.scheduleClass({
         course_id: courseId,
-        section_id: sectionId || undefined,
+        section_id: sectionId && sectionId !== ALL_BRANCH ? sectionId : undefined,
+        all_branch_sections: sectionId === ALL_BRANCH || undefined,
         title,
         scheduled_at: new Date(scheduledAt).toISOString(),
       })
@@ -125,6 +136,7 @@ export const TeacherCreateClassPage: React.FC = () => {
                   onChange={(e) => setSectionId(e.target.value)}
                   options={[
                     { value: '', label: 'All Course Students (Combined Cohort)' },
+                    ...(branchName ? [{ value: ALL_BRANCH, label: `All sections in ${branchName}` }] : []),
                     ...sections.map((s) => ({
                       value: s.id,
                       label: `${s.name} (${s.student_count} students)`,

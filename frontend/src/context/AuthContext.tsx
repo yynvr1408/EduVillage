@@ -1,3 +1,4 @@
+import type { CollegeSelection } from '../services/registrationApi'
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { User, Role } from '../types'
 import { authService } from '../services/authService'
@@ -13,7 +14,7 @@ interface AuthContextType {
   isSharedDevice: boolean
   setSharedDevice: (enabled: boolean) => void
   login: (email: string, password: string) => Promise<User>
-  register: (email: string, fullName: string, password: string, role: Role, inviteCode?: string) => Promise<User>
+  register: (email: string, fullName: string, password: string, role: Role, inviteCode?: string, college?: CollegeSelection) => Promise<User>
   logout: () => Promise<void>
   switchUser: () => Promise<void>
   checkUnsavedWork: () => Promise<{ hasUnsaved: boolean; count: number; draftTitles: string[] }>
@@ -80,9 +81,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fullName: string,
     password: string,
     role: Role,
-    inviteCode?: string
+    inviteCode?: string,
+    college?: CollegeSelection
   ): Promise<User> => {
-    const res = await authService.register(email, fullName, password, role, inviteCode)
+    const res = await authService.register(email, fullName, password, role, inviteCode, college)
     setUser(res.user)
     return res.user
   }

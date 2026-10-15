@@ -4,6 +4,12 @@ import enum
 class UserRole(str, enum.Enum):
     student = "student"
     teacher = "teacher"
+    admin = "admin"  # platform administrator: created only by server-side bootstrap, never by registration
+
+
+class CollegeStatus(str, enum.Enum):
+    active = "active"
+    inactive = "inactive"
 
 
 class UserStatus(str, enum.Enum):

@@ -18,7 +18,7 @@ def list_sections(course_id: str, user: User = Depends(get_current_user), db: Se
 @router.post("/courses/{course_id}/sections", response_model=SectionOut, status_code=201)
 def create_section(course_id: str, payload: SectionCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     course = course_service.get_course_or_404(db, course_id)
-    return SectionOut.model_validate(section_service.create_section(db, user, course, name=payload.name, code=payload.code))
+    return SectionOut.model_validate(section_service.create_section(db, user, course, name=payload.name, code=payload.code, college_section_id=payload.college_section_id))
 
 
 @router.get("/sections/{section_id}/members", response_model=list[SectionMemberOut])

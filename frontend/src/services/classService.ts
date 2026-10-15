@@ -15,6 +15,7 @@ export const classService = {
     title: string
     scheduled_at: string
     section_id?: string
+    all_branch_sections?: boolean
   }): Promise<ClassRoom> {
     return api.scheduleClass(data)
   },

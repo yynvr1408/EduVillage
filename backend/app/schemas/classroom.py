@@ -11,6 +11,7 @@ class ClassCreate(BaseModel):
     scheduled_start: UtcDatetime
     scheduled_end: UtcDatetime | None = None
     section_ids: list[str] = []  # empty => the whole course
+    all_branch_sections: bool = False  # branch-wide teachers: every active section of their branch
 
 
 class ClassUpdate(BaseModel):
