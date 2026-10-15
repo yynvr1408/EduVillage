@@ -52,7 +52,12 @@ services:
       - key: LLM_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: SPEECH_TO_TEXT_API_KEY
-        sync: false
+        sync: false # same Groq key as LLM_API_KEY — without the two vars below it silently falls
+        # back to real OpenAI's endpoint/model defaults, which rejects a Groq key outright
+      - key: SPEECH_TO_TEXT_MODEL
+        value: whisper-large-v3-turbo
+      - key: SPEECH_TO_TEXT_BASE_URL
+        value: https://api.groq.com/openai/v1
 
 # No separate worker service: Render's free tier has no free Background Worker plan.
 # The API itself kicks off summary/transcription jobs via FastAPI BackgroundTasks on request,
