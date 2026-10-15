@@ -35,12 +35,6 @@ export const StudentDownloadsPage: React.FC = () => {
     loadDownloads()
   }
 
-  const handleOpenOffline = async (id: string) => {
-    const url = await downloadManager.getResourceBlobUrl(id)
-    if (url) {
-      window.open(url, '_blank')
-    }
-  }
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B'
@@ -97,14 +91,11 @@ export const StudentDownloadsPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleOpenOffline(item.id)}
-                    icon={<ExternalLink className="w-3.5 h-3.5" />}
-                  >
-                    Open Resource
-                  </Button>
+                  <Link to={`/student/downloads/${item.id}`}>
+                    <Button size="sm" variant="outline" icon={<ExternalLink className="w-3.5 h-3.5" />}>
+                      Open Resource
+                    </Button>
+                  </Link>
                   <button
                     type="button"
                     onClick={() => handleDelete(item.id)}

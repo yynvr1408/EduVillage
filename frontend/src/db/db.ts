@@ -46,11 +46,21 @@ export interface DownloadedSummary {
   payload: Summary
 }
 
+/** Where the student left off in a downloaded or streamed lecture (kept on the device, works offline). */
+export interface PlaybackPosition {
+  id: string // 'res:<resourceId>' | 'rec:<recordingId>'
+  positionSeconds: number
+  durationSeconds: number
+  completed: boolean
+  updatedAt: string
+}
+
 class EduVillageDatabase extends Dexie {
   downloadedResources!: EntityTable<DownloadedResource, 'id'>
   downloadedRecordings!: EntityTable<DownloadedRecording, 'id'>
   downloadedSummaries!: EntityTable<DownloadedSummary, 'id'>
   downloadJobs!: EntityTable<DownloadJob, 'id'>
+  playbackPositions!: EntityTable<PlaybackPosition, 'id'>
   downloadParts!: EntityTable<DownloadPart, 'jobId' | 'index'>
   cachedLessonMetadata!: EntityTable<CachedLesson, 'id'>
   cachedSummaries!: EntityTable<CachedSummary, 'classId'>
@@ -91,6 +101,20 @@ class EduVillageDatabase extends Dexie {
       assignmentDrafts: 'id, assignmentId, studentId, courseId, syncStatus, savedAt',
       syncOperations: 'id, operationType, entityId, status, idempotencyKey, createdAt',
     })
+
+    // Schema version 4: local playback positions
+    this.version(4).stores({
+      downloadedResources: 'id, resourceId, courseId, lessonId, fileType, downloadedAt',
+      downloadedRecordings: 'id, recordingId, courseId, title, downloadedAt',
+      downloadedSummaries: 'id, classId, courseId, downloadedAt',
+      downloadJobs: 'id, status, updatedAt',
+      downloadParts: '[jobId+index], jobId',
+      playbackPositions: 'id, updatedAt',
+      cachedLessonMetadata: 'id, courseId, title, updatedAt',
+      cachedSummaries: 'classId, courseId, status, reviewStatus, updatedAt',
+      assignmentDrafts: 'id, assignmentId, studentId, courseId, syncStatus, savedAt',
+      syncOperations: 'id, operationType, entityId, status, idempotencyKey, createdAt',
+    })
   }
 
   /**
@@ -111,6 +135,7 @@ class EduVillageDatabase extends Dexie {
           this.downloadedSummaries,
           this.downloadJobs,
           this.downloadParts,
+          this.playbackPositions,
           this.cachedSummaries,
           this.cachedLessonMetadata,
         ],
@@ -120,6 +145,7 @@ class EduVillageDatabase extends Dexie {
           await this.downloadedSummaries.clear()
           await this.downloadJobs.clear()
           await this.downloadParts.clear()
+          await this.playbackPositions.clear()
           await this.cachedSummaries.clear()
           await this.cachedLessonMetadata.clear()
         }
