@@ -49,4 +49,8 @@ export const summaryService = {
   async createSummaryJob(classId: string, transcriptText?: string): Promise<{ job_id: string; status: string }> {
     return api.createSummaryJob(classId, transcriptText)
   },
+
+  getJobStatus(jobId: string) {
+    return api.getJobStatus(jobId)
+  },
 }

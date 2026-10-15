@@ -3,6 +3,8 @@
 Recording *capture* (start/stop for a live class) lives under /classes/{id}/recordings in
 classes.py; both call the same recording_service, so there is one implementation."""
 
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,7 @@ from app.schemas.summary import SummaryJobOut, SummaryJobRequest
 from app.services import recording_service, summary_service
 
 router = APIRouter(prefix="/recordings", tags=["recordings"])
+logger = logging.getLogger("eduvillage.recordings")
 
 
 def _get_visible(db: Session, user: User, recording_id: str):
@@ -42,8 +45,8 @@ async def list_recordings(
     for r in recordings:
         try:
             r = await recording_service.refresh_status(db, r)
-        except Exception:  # noqa: BLE001 - listing must not fail because the media provider is down
-            pass
+        except Exception as exc:  # noqa: BLE001 - listing must not fail because the media provider is down
+            logger.warning("recording_refresh_failed recording=%s egress=%s error=%s", r.id, r.egress_id, exc)
         refreshed.append(r)
     return [RecordingLibraryItem(**recording_service.describe(db, user, r)) for r in refreshed]
 

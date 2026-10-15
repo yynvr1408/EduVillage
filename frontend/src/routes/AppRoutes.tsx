@@ -7,6 +7,7 @@ import { TeacherLayout } from '../components/layout/TeacherLayout'
 
 // Auth Pages
 import { LoginPage } from '../pages/auth/LoginPage'
+import { LoginChoicePage } from '../pages/auth/LoginChoicePage'
 import { RegisterPage } from '../pages/auth/RegisterPage'
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage'
 
@@ -58,7 +59,9 @@ export const AppRoutes: React.FC = () => {
       <Route path="/" element={renderRootRedirect()} />
 
       {/* Public Authentication Routes */}
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={<LoginChoicePage />} />
+      <Route path="/login/student" element={<LoginPage portal="student" />} />
+      <Route path="/login/teacher" element={<LoginPage portal="teacher" />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 

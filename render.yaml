@@ -2,11 +2,16 @@ services:
   - type: web
     name: eduvillage-api
     runtime: docker
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
+    # No rootDir: dockerfilePath/dockerContext are both given relative to the repo root instead,
+    # since Render resolves dockerContext relative to rootDir (when set) but dockerfilePath
+    # relative to the repo root regardless — mixing the two caused a bad "backend/backend" path.
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
     plan: free
     healthCheckPath: /health
-    preDeployCommand: alembic upgrade head
+    # No preDeployCommand: Render's free tier doesn't support it. Migrations instead run as part
+    # of the container's own startup command (see backend/Dockerfile's CMD) — idempotent, so this
+    # is safe to run on every boot, including every free-tier cold start after spin-down.
     envVars:
       - key: APP_ENV
         value: production

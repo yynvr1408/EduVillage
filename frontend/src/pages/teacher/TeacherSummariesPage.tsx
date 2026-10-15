@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react'
-import { Sparkles, CheckCircle2, Clock, AlertTriangle, Edit3 } from 'lucide-react'
+import { Sparkles, CheckCircle2, Clock, AlertTriangle, Edit3, Wand2 } from 'lucide-react'
 import { summaryService } from '../../services/summaryService'
 import type { Summary } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { SummaryViewer } from '../../components/summary/SummaryViewer'
 import { SummaryReviewModal } from '../../components/summary/SummaryReviewModal'
+import { GenerateSummaryModal } from '../../components/summary/GenerateSummaryModal'
 import { Badge, Button, LoadingState, EmptyState } from '../../components/ui'
 
 export const TeacherSummariesPage: React.FC = () => {
   const [summaries, setSummaries] = useState<Summary[]>([])
   const [selectedSummary, setSelectedSummary] = useState<Summary | null>(null)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   const loadSummaries = async () => {
@@ -31,6 +33,11 @@ export const TeacherSummariesPage: React.FC = () => {
     <PageContainer
       title="AI Lecture Summaries & Teacher Review"
       subtitle="Review machine-generated lecture overviews, key concepts, and revision questions before publishing to students."
+      action={
+        <Button size="sm" variant="primary" icon={<Wand2 className="w-3.5 h-3.5" />} onClick={() => setIsGenerateOpen(true)}>
+          Generate Summary
+        </Button>
+      }
     >
       {isLoading ? (
         <LoadingState message="Loading synthesized lecture summaries..." />
@@ -105,6 +112,15 @@ export const TeacherSummariesPage: React.FC = () => {
           setSelectedSummary(null)
         }}
         onSuccess={() => loadSummaries()}
+      />
+
+      <GenerateSummaryModal
+        isOpen={isGenerateOpen}
+        onClose={() => setIsGenerateOpen(false)}
+        onSuccess={() => {
+          setIsGenerateOpen(false)
+          loadSummaries()
+        }}
       />
     </PageContainer>
   )
