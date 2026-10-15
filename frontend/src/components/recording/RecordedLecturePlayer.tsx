@@ -19,6 +19,7 @@ import {
 import type { Recording } from '../../types'
 import { api } from '../../services/apiClient'
 import { downloadManager } from '../../services/downloadManager'
+import { playbackStore } from '../../services/playbackStore'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 
@@ -55,6 +56,19 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
   const [isDownloaded, setIsDownloaded] = useState(false)
   const [downloadSuccessMessage, setDownloadSuccessMessage] = useState<string | null>(null)
   const lastSavedPositionRef = useRef<number>(initialPositionSeconds)
+  // Where to resume: the later of the server's saved position and the one kept on this device
+  // (which also covers time watched while offline).
+  const [startPosition, setStartPosition] = useState(initialPositionSeconds)
+
+  useEffect(() => {
+    let active = true
+    playbackStore.resumeAt(playbackStore.key.recording(recording.id), recording.duration_seconds).then((local) => {
+      if (active && local > initialPositionSeconds) setStartPosition(local)
+    })
+    return () => {
+      active = false
+    }
+  }, [recording.id, recording.duration_seconds, initialPositionSeconds])
 
   // 1. Resolve media source (check offline IndexedDB blob first)
   useEffect(() => {
@@ -101,9 +115,9 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
       if (videoRef.current.duration) {
         setDuration(videoRef.current.duration)
       }
-      if (initialPositionSeconds > 0 && initialPositionSeconds < (videoRef.current.duration || recording.duration_seconds)) {
-        videoRef.current.currentTime = initialPositionSeconds
-        setCurrentTime(initialPositionSeconds)
+      if (startPosition > 0 && startPosition < (videoRef.current.duration || recording.duration_seconds)) {
+        videoRef.current.currentTime = startPosition
+        setCurrentTime(startPosition)
       }
     }
   }
@@ -115,6 +129,8 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
         return
       }
       lastSavedPositionRef.current = pos
+      // Always keep the position on this device first: it works offline and survives a failed sync.
+      void playbackStore.save(playbackStore.key.recording(recording.id), pos, videoRef.current?.duration ?? recording.duration_seconds, completed)
       try {
         await api.saveRecordingProgress(recording.id, Math.round(pos), completed)
         if (onProgressSaved) onProgressSaved(Math.round(pos))
@@ -318,9 +334,9 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             </Badge>
           )}
 
-          {initialPositionSeconds > 0 && currentTime === initialPositionSeconds && (
+          {startPosition > 0 && currentTime === startPosition && (
             <Badge variant="secondary" className="bg-[#202B2A] text-[#CBD7D1] border-[#374947] text-[10px]">
-              Resumed at {formatDuration(initialPositionSeconds)}
+              Resumed at {formatDuration(startPosition)}
             </Badge>
           )}
         </div>

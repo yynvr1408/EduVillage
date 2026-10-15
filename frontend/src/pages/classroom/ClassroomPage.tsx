@@ -27,6 +27,8 @@ import {
   Radio,
 } from 'lucide-react'
 import { api } from '../../services/apiClient'
+import { useConnectionRecovery } from '../../hooks/useConnectionRecovery'
+import { ConnectionLostPanel } from '../../components/class/ConnectionLostPanel'
 import { classService } from '../../services/classService'
 import { summaryService } from '../../services/summaryService'
 import { useAuth } from '../../context/AuthContext'
@@ -75,6 +77,9 @@ const ClassroomStage: React.FC<{
       room.off('connectionStateChanged', updateState)
     }
   }, [room])
+
+  // A sustained outage offers the offline recovery screen (Downloads stay usable without any server)
+  const { recoveryRequired, dismiss } = useConnectionRecovery(connectionStateStr)
 
   // Get video tracks from publishers
   const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare], {
@@ -272,6 +277,10 @@ const ClassroomStage: React.FC<{
 
       {/* Audio Renderer for WebRTC audio playback */}
       <RoomAudioRenderer />
+
+      {recoveryRequired && (
+        <ConnectionLostPanel showDownloads={!isTeacher} onKeepWaiting={dismiss} onLeave={onLeave} />
+      )}
     </div>
   )
 }

@@ -64,18 +64,34 @@ function messageFrom(body: any, fallback: string): string {
   return fallback
 }
 
-export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export const DEFAULT_TIMEOUT_MS = 30_000
+
+export interface ApiRequestOptions extends RequestInit {
+  /** Abort and treat as a network failure after this long; 0 disables (large uploads). */
+  timeoutMs?: number
+}
+
+export async function apiRequest<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options
+  options = init
   const headers = new Headers(options.headers || {})
   if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
 
+  // A server that never answers (black-holed connection) must not leave the UI loading forever.
+  const controller = new AbortController()
+  options.signal?.addEventListener('abort', () => controller.abort())
+  const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined
+
   let response: Response
   try {
-    response = await fetch(apiUrl(endpoint), { ...options, headers, credentials: 'include' })
+    response = await fetch(apiUrl(endpoint), { ...options, headers, credentials: 'include', signal: controller.signal })
   } catch {
-    // Network failure (server down, offline, DNS failure, etc.)
+    // Network failure (server down, offline, DNS failure, timeout, etc.)
     throw new ApiError('Unable to connect to EduVillage server. Operating in offline mode.', 0, true)
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 
   if (!response.ok) {
@@ -294,7 +310,7 @@ const SYNC_OPERATION_TYPE: Record<string, string> = { submit_assignment: 'assign
 
 export const api = {
   // --- Auth / profile ---
-  getCurrentUser: async () => mapUser(await apiRequest<Raw>('/users/me')),
+  getCurrentUser: async (timeoutMs?: number) => mapUser(await apiRequest<Raw>('/users/me', { timeoutMs })),
 
   // --- Courses & lessons ---
   getCourses: async () => (await apiRequest<Raw[]>('/courses?limit=200')).map((c) => mapCourse(c)),
@@ -522,6 +538,7 @@ export const api = {
         method: 'PUT',
         body: file,
         headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        timeoutMs: 0, // a large upload on a slow link legitimately takes a long time
       })
     }
     return mapResource(await apiRequest<Raw>(`/resources/${init.resource_id}/complete`, { method: 'POST' }))

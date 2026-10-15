@@ -154,7 +154,8 @@ The frontend talks to the API only through `frontend/src/services/apiClient.ts`,
 cd backend && pytest                 # SQLite; add TEST_DATABASE_URL=... to run against PostgreSQL
 cd frontend && npm test              # Vitest
 cd frontend && npx tsc -b && npm run build
-cd frontend && npx playwright test --project="Desktop Chrome"   # e2e (not re-run during the backend audit)
+cd frontend && npx playwright test --project="Desktop Chrome"   # e2e against the dev server (needs the backend + demo data)
+cd frontend && npm run test:e2e:offline   # real Chromium + production build + service worker: opens and plays downloads with the network disconnected
 ```
 
 Results recorded on 2026-10-15: backend 159 passed on SQLite, 157 on PostgreSQL 18; frontend 25 passed; type-check and production build clean. See [docs/BACKEND_REQUIREMENTS_MATRIX.md](docs/BACKEND_REQUIREMENTS_MATRIX.md) for what each test does and does not prove.

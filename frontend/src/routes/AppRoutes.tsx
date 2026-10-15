@@ -20,6 +20,7 @@ import { StudentClassSummaryPage } from '../pages/student/StudentClassSummaryPag
 import { StudentAssignmentsPage } from '../pages/student/StudentAssignmentsPage'
 import { StudentAssignmentDetailPage } from '../pages/student/StudentAssignmentDetailPage'
 import { StudentDownloadsPage } from '../pages/student/StudentDownloadsPage'
+import { OfflineViewerPage } from '../pages/student/OfflineViewerPage'
 import { StudentProfilePage } from '../pages/student/StudentProfilePage'
 import { StudentRecordedLessonsPage } from '../pages/student/StudentRecordedLessonsPage'
 import { StudentRecordedLessonDetailPage } from '../pages/student/StudentRecordedLessonDetailPage'
@@ -93,6 +94,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="assignments" element={<StudentAssignmentsPage />} />
         <Route path="assignments/:assignmentId" element={<StudentAssignmentDetailPage />} />
         <Route path="downloads" element={<StudentDownloadsPage />} />
+        <Route path="downloads/:resourceId" element={<OfflineViewerPage />} />
         <Route path="profile" element={<StudentProfilePage />} />
       </Route>
 

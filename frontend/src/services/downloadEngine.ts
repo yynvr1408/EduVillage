@@ -232,7 +232,9 @@ async function run(spec: DownloadSpec, options: DownloadOptions, signal: AbortSi
   }
 
   try {
-    await assertEnoughStorage(Math.max(0, job.totalBytes - job.bytesDownloaded))
+    // Peak usage is the bytes still to download PLUS the assembled final copy, which briefly coexists
+    // with the chunks until they are deleted after verification — so ask for both, not just the download.
+    await assertEnoughStorage(Math.max(0, job.totalBytes - job.bytesDownloaded) + job.totalBytes)
   } catch (err) {
     if (err instanceof DownloadError) return fail(err.code, err.message, true)
     throw err

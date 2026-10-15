@@ -36,7 +36,14 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}']
+        // Precache only the application shell (code, styles, icons). API responses are private and are
+        // deliberately never cached by the service worker; offline content lives in IndexedDB instead.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        cleanupOutdatedCaches: true,
+        // Any client-side route (e.g. /student/downloads) opens from the cached shell when offline,
+        // but real API paths are never answered with index.html.
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/health/, /^\/ready/, /^\/docs/, /^\/openapi\.json/]
       }
     })
   ],

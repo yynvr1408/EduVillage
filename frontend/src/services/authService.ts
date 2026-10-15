@@ -53,8 +53,8 @@ export const authService = {
     return data
   },
 
-  async getMe(): Promise<User> {
-    return api.getCurrentUser()
+  async getMe(timeoutMs = 8000): Promise<User> {
+    return api.getCurrentUser(timeoutMs) // short: offline startup must not hang on a dead connection
   },
 
   /** Revokes the session on the server (so a stale cookie on a shared machine is useless), then forgets the local cache. */
