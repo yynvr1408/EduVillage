@@ -106,3 +106,36 @@ def test_non_enrolled_student_cannot_download(student, teacher, published_course
     sclient, _ = student
     resp = sclient.get(f"/api/v1/resources/{resource['id']}/download")
     assert resp.status_code == 403
+
+
+def test_downloads_support_byte_ranges_so_clients_can_resume(teacher, enrolled_student, published_course):
+    tclient, _ = teacher
+    body = b"0123456789" * 100
+    resource = _upload_file(tclient, published_course["id"], content=body)
+    sclient, _ = enrolled_student
+
+    full = sclient.get(f"/api/v1/resources/{resource['id']}/download", follow_redirects=True)
+    assert full.status_code == 200 and full.content == body
+
+    part = sclient.get(f"/api/v1/resources/{resource['id']}/download", headers={"Range": "bytes=990-"}, follow_redirects=True)
+    assert part.status_code == 206
+    assert part.content == body[990:]
+    assert part.headers["content-range"] == f"bytes 990-{len(body) - 1}/{len(body)}"
+    assert sclient.get(f"/api/v1/resources/{resource['id']}").json()["checksum_sha256"]  # for client-side verification
+
+
+def test_download_info_describes_the_file_for_verified_chunked_downloads(teacher, enrolled_student, published_course, student, make_user):
+    tclient, _ = teacher
+    resource = _upload_file(tclient, published_course["id"], content=b"verify me")
+    sclient, _ = enrolled_student
+    info = sclient.get(f"/api/v1/resources/{resource['id']}/download-info").json()
+    assert info["same_origin"] is True and info["url"].startswith("/api/v1/resources/download-content/")
+    assert info["size_bytes"] == 9 and info["version"] >= 2
+    import hashlib
+
+    assert info["checksum_sha256"] == hashlib.sha256(b"verify me").hexdigest()
+
+    outsider, _ = make_user(role="student", prefix="outsider")
+    assert outsider.get(f"/api/v1/resources/{resource['id']}/download-info").status_code == 403
+    tclient.patch(f"/api/v1/resources/{resource['id']}", json={"is_published": False})
+    assert sclient.get(f"/api/v1/resources/{resource['id']}/download-info").status_code == 404

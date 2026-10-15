@@ -102,6 +102,25 @@ def download(resource_id: str, user: User = Depends(get_current_user), db: Sessi
     return RedirectResponse(url=target["url"])
 
 
+@router.get("/resources/{resource_id}/download-info")
+def download_info(resource_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Where and how to fetch the file, for clients that download in byte-range chunks.
+    `url` is either a short-lived signed storage URL (no credentials) or a same-origin API path
+    (session cookie); `version`/`size_bytes`/`checksum_sha256` let the client verify and detect updates."""
+    resource = resource_service.get_resource_or_404(db, resource_id)
+    resource_service.assert_can_access_resource(db, user, resource)
+    target = resource_service.download_info(resource)
+    return {
+        "url": target["url"],
+        "same_origin": bool(target.get("stream")),
+        "version": resource.version,
+        "size_bytes": resource.size_bytes,
+        "checksum_sha256": resource.checksum_sha256,
+        "mime_type": resource.detected_mime_type or resource.mime_type,
+        "expires_in": None if target.get("stream") else 900,
+    }
+
+
 @router.get("/resources/download-content/{storage_key:path}")
 def download_content(storage_key: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     resource = db.execute(

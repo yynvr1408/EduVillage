@@ -1,5 +1,6 @@
 import { api } from './apiClient'
 import { db } from '../db/db'
+import { downloadManager } from './downloadManager'
 import type { Summary } from '../types'
 
 export const summaryService = {
@@ -17,7 +18,9 @@ export const summaryService = {
       }).catch(() => {})
       return summary
     } catch (err) {
-      // Offline fallback: try reading cached summary
+      // Offline fallback: a summary the student explicitly saved, then the passively cached copy
+      const saved = await downloadManager.getDownloadedSummaryForClass(classId)
+      if (saved?.payload) return saved.payload
       const cached = await db.cachedSummaries.get(classId)
       if (cached?.payload) {
         return cached.payload

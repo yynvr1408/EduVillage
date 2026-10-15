@@ -1,6 +1,16 @@
-import { db, type DownloadedRecording } from '../db/db'
-import { apiUrl } from './apiClient'
-import type { DownloadedResource, Material, Recording } from '../types'
+import { db, type DownloadedRecording, type DownloadedSummary } from '../db/db'
+import { api } from './apiClient'
+import {
+  DownloadError,
+  clearJob,
+  getInFlight,
+  getJob,
+  pauseDownload,
+  startDownload,
+  type DownloadOptions,
+  type DownloadState,
+} from './downloadEngine'
+import type { DownloadedResource, Material, Recording, Summary } from '../types'
 
 export interface StorageEstimateInfo {
   usageBytes: number
@@ -9,113 +19,208 @@ export interface StorageEstimateInfo {
   availableMB: number
   /** false when the browser exposes no storage estimate; the numbers are then meaningless. */
   supported: boolean
+  /** true when the browser has granted persistent storage (protected from automatic eviction). */
+  persisted?: boolean
+}
+
+/** What a student sees for one file. "available_offline" is only ever reported for a fully verified local copy. */
+export type OfflineState =
+  | 'not_downloaded'
+  | 'queued'
+  | 'downloading'
+  | 'paused'
+  | 'verifying'
+  | 'failed'
+  | 'available_offline'
+  | 'update_available'
+
+export interface OfflineStatus {
+  state: OfflineState
+  percent: number
+  error?: string
+  errorCode?: string
+}
+
+export interface ResourceDownloadOptions extends DownloadOptions {
+  onState?: (state: DownloadState) => void
+  /** Download again even if the local copy is current. */
+  force?: boolean
+}
+
+const MB = 1024 * 1024
+
+function isNetworkFailure(err: unknown): boolean {
+  return !(err instanceof DownloadError) && (err as { isNetworkError?: boolean })?.isNetworkError === true
 }
 
 export const downloadManager = {
   /**
-   * Explicitly download a learning resource and save to IndexedDB
+   * Download a learning resource for offline use. Resumable, verified, and a no-op when a current,
+   * verified copy is already stored (no unnecessary network use).
    */
   async downloadResource(
     material: Material,
-    courseTitle?: string,
-    onProgress?: (percent: number) => void
+    _courseTitle?: string,
+    onProgress?: (percent: number) => void,
+    options: ResourceDownloadOptions = {}
   ): Promise<DownloadedResource> {
+    const existing = await db.downloadedResources.get(material.id)
+
+    let info
     try {
-      // Authenticated fetch of the real file (the server redirects to a short-lived signed URL or streams it).
-      // A failed download is reported as a failure — never replaced by placeholder content.
-      const response = await fetch(apiUrl(material.file_url), { credentials: 'include' })
-      if (!response.ok) {
-        throw new Error(response.status === 403 || response.status === 404 ? 'You no longer have access to this file.' : `Server returned ${response.status}`)
+      info = await api.getResourceDownloadInfo(material.id)
+    } catch (err) {
+      // Offline or the server is down: a verified local copy still satisfies the request.
+      if (existing && isNetworkFailure(err)) return existing
+      if (err instanceof Error && (err as { status?: number }).status && [403, 404].includes((err as { status?: number }).status!)) {
+        throw new DownloadError('UNAVAILABLE', 'This file is no longer available to you (removed, unpublished, or access changed).')
       }
-      const blob = await response.blob()
-      const textContent: string | undefined = undefined
-
-      const record: DownloadedResource = {
-        id: material.id,
-        resourceId: material.id,
-        courseId: material.course_id,
-        lessonId: material.lesson_id,
-        title: material.title,
-        fileType: material.file_type,
-        sizeBytes: blob.size || material.file_size || 1024,
-        blob,
-        content: textContent,
-        downloadedAt: new Date().toISOString(),
-      }
-
-      await db.downloadedResources.put(record)
-      if (onProgress) onProgress(100)
-      return record
-    } catch (err: any) {
-      console.error('Download error:', err)
-      throw new Error(`Failed to download resource: ${err.message || 'Storage error'}`)
+      throw err
     }
+
+    if (existing && !options.force && existing.version === info.version) {
+      onProgress?.(100)
+      return existing // same version already verified on this device: nothing to download
+    }
+
+    const blob = await startDownload(
+      {
+        id: material.id,
+        url: info.url,
+        credentials: info.sameOrigin,
+        totalBytes: info.sizeBytes || material.file_size,
+        version: info.version,
+        checksum: info.checksum,
+        mimeType: info.mimeType || material.file_type,
+      },
+      {
+        ...options,
+        onProgress: (p) => {
+          onProgress?.(p.percent)
+          options.onProgress?.(p)
+          options.onState?.(p.state)
+        },
+      }
+    )
+
+    const record: DownloadedResource = {
+      id: material.id,
+      resourceId: material.id,
+      courseId: material.course_id,
+      lessonId: material.lesson_id,
+      title: material.title,
+      fileType: material.resource_type || material.file_type,
+      sizeBytes: blob.size,
+      blob,
+      downloadedAt: new Date().toISOString(),
+      version: info.version,
+      checksum: info.checksum,
+      verifiedAt: new Date().toISOString(),
+    }
+    try {
+      await db.downloadedResources.put(record) // only now is it "available offline"
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'QuotaExceededError') {
+        throw new DownloadError('STORAGE_LIMIT', 'The browser refused to store this file (storage is full). Free some space and retry.')
+      }
+      throw err
+    }
+    await clearJob(material.id) // chunks are no longer needed once the verified file is stored
+    onProgress?.(100)
+    return record
   },
 
-  /**
-   * Get all downloaded resources
-   */
+  /** Current offline status of a resource. Pass the server's version to detect a stale local copy. */
+  async getResourceStatus(resourceId: string, currentVersion?: number): Promise<OfflineStatus> {
+    const record = await db.downloadedResources.get(resourceId)
+    if (record) {
+      const stale = currentVersion !== undefined && record.version !== undefined && record.version < currentVersion
+      return { state: stale ? 'update_available' : 'available_offline', percent: 100 }
+    }
+    const job = await getJob(resourceId)
+    if (!job) return { state: 'not_downloaded', percent: 0 }
+    const percent = job.totalBytes > 0 ? Math.floor((job.bytesDownloaded / job.totalBytes) * 100) : 0
+    // A persisted "downloading" job with nothing running (closed tab, crash) is really paused.
+    const active = getInFlight(resourceId)
+    const state: OfflineState =
+      job.status === 'failed' ? 'failed' : job.status === 'verifying' ? 'verifying' : active ? 'downloading' : 'paused'
+    return { state, percent, error: job.error, errorCode: job.errorCode }
+  },
+
+  /** Stop an active download, keeping the bytes already stored so it can resume. */
+  pauseResourceDownload(resourceId: string): void {
+    pauseDownload(resourceId)
+  },
+
+  /** Abandon a partial download and free its stored chunks. */
+  async cancelResourceDownload(resourceId: string): Promise<void> {
+    pauseDownload(resourceId)
+    await clearJob(resourceId)
+  },
+
+  /** Resources with an interrupted/failed download waiting to be resumed. */
+  async getPendingJobs() {
+    return db.downloadJobs.where('status').anyOf('queued', 'downloading', 'paused', 'failed').toArray()
+  },
+
   async getAllDownloads(): Promise<DownloadedResource[]> {
     return db.downloadedResources.toArray()
   },
 
-  /**
-   * Check if a resource is downloaded
-   */
   async isDownloaded(resourceId: string): Promise<boolean> {
-    const item = await db.downloadedResources.get(resourceId)
-    return Boolean(item)
+    return Boolean(await db.downloadedResources.get(resourceId))
   },
 
-  /**
-   * Remove a downloaded resource to reclaim storage
-   */
+  /** Remove a downloaded file (and any partial data) to reclaim space. */
   async deleteDownload(resourceId: string): Promise<void> {
     await db.downloadedResources.delete(resourceId)
+    await clearJob(resourceId)
   },
 
-  /**
-   * Open / access downloaded resource blob URL
-   */
   async getResourceBlobUrl(resourceId: string): Promise<string | null> {
     const item = await db.downloadedResources.get(resourceId)
     if (!item) return null
-
-    if (item.blob) {
-      return URL.createObjectURL(item.blob)
-    }
-    if (item.content) {
-      const blob = new Blob([item.content], { type: 'text/plain' })
-      return URL.createObjectURL(blob)
-    }
+    if (item.blob) return URL.createObjectURL(item.blob)
+    if (item.content) return URL.createObjectURL(new Blob([item.content], { type: 'text/plain' }))
     return null
   },
 
-  /**
-   * Download a recorded lecture for offline viewing
-   */
+  // ---------------------------------------------------------------- recordings
+
+  /** Download a recorded lecture for offline viewing (same resumable, verified engine). */
   async downloadRecording(
     recording: Recording,
-    onProgress?: (percent: number) => void
+    onProgress?: (percent: number) => void,
+    options: ResourceDownloadOptions = {}
   ): Promise<DownloadedRecording> {
     if (recording.status !== 'READY' || (!recording.video_url && !recording.download_url)) {
-      throw new Error('Recording is not ready for offline download.')
+      throw new DownloadError('UNAVAILABLE', 'This recording is not ready for offline download.')
+    }
+    const id = `rec:${recording.id}`
+    const existing = await db.downloadedRecordings.get(recording.id)
+    if (existing && !options.force) {
+      onProgress?.(100)
+      return existing
     }
 
-    // Check device storage before downloading large media
-    const estimate = await this.getStorageEstimate()
-    const requiredMB = Math.round(recording.file_size_bytes / (1024 * 1024))
-    if (estimate.availableMB < requiredMB + 50) {
-      throw new Error(`Insufficient storage. Required: ${requiredMB} MB, Available: ${estimate.availableMB} MB`)
-    }
-
-    const downloadUrl = recording.download_url || recording.video_url!
-    // Signed storage URL: no credentials are sent. A failure surfaces as an error, never as a fake file.
-    const response = await fetch(downloadUrl)
-    if (!response.ok) {
-      throw new Error(`Could not download the recording (server returned ${response.status}). Try again while online.`)
-    }
-    const blob = await response.blob()
+    const blob = await startDownload(
+      {
+        id,
+        url: (recording.download_url || recording.video_url)!,
+        credentials: false, // signed storage URL
+        totalBytes: recording.file_size_bytes,
+        version: 1,
+        mimeType: 'video/mp4',
+      },
+      {
+        ...options,
+        onProgress: (p) => {
+          onProgress?.(p.percent)
+          options.onProgress?.(p)
+          options.onState?.(p.state)
+        },
+      }
+    )
 
     const record: DownloadedRecording = {
       id: recording.id,
@@ -124,20 +229,28 @@ export const downloadManager = {
       title: recording.title,
       courseTitle: recording.course_title || recording.course_code || 'Course',
       durationSeconds: recording.duration_seconds,
-      fileSizeBytes: blob.size || recording.file_size_bytes,
+      fileSizeBytes: blob.size,
       blob,
       downloadedAt: new Date().toISOString(),
       transcript: recording.transcript,
+      version: 1,
+      mimeType: 'video/mp4',
     }
-
-    await db.downloadedRecordings.put(record)
-    if (onProgress) onProgress(100)
+    try {
+      await db.downloadedRecordings.put(record)
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'QuotaExceededError') {
+        throw new DownloadError('STORAGE_LIMIT', 'The browser refused to store this file (storage is full). Free some space and retry.')
+      }
+      throw err
+    }
+    await clearJob(id)
+    onProgress?.(100)
     return record
   },
 
   async isRecordingDownloaded(recordingId: string): Promise<boolean> {
-    const item = await db.downloadedRecordings.get(recordingId)
-    return Boolean(item)
+    return Boolean(await db.downloadedRecordings.get(recordingId))
   },
 
   async getDownloadedRecording(recordingId: string): Promise<DownloadedRecording | undefined> {
@@ -152,36 +265,73 @@ export const downloadManager = {
 
   async deleteDownloadedRecording(recordingId: string): Promise<void> {
     await db.downloadedRecordings.delete(recordingId)
+    await clearJob(`rec:${recordingId}`)
   },
 
   async getAllDownloadedRecordings(): Promise<DownloadedRecording[]> {
     return db.downloadedRecordings.toArray()
   },
 
-  /**
-   * Inspect device storage estimate
-   */
+  // ---------------------------------------------------------------- summaries
+
+  /** Save a teacher-approved summary for offline reading. Opening it later needs no network or AI call. */
+  async downloadSummary(summary: Summary, title?: string): Promise<DownloadedSummary> {
+    if (summary.status !== 'COMPLETED') {
+      throw new DownloadError('UNAVAILABLE', 'Only summaries approved by the teacher can be downloaded.')
+    }
+    const record: DownloadedSummary = {
+      id: summary.id,
+      classId: summary.class_id,
+      courseId: summary.course_id,
+      title: title || 'Lecture summary',
+      downloadedAt: new Date().toISOString(),
+      payload: summary,
+    }
+    await db.downloadedSummaries.put(record)
+    return record
+  },
+
+  async getDownloadedSummaries(): Promise<DownloadedSummary[]> {
+    return db.downloadedSummaries.toArray()
+  },
+
+  async getDownloadedSummaryForClass(classId: string): Promise<DownloadedSummary | undefined> {
+    return db.downloadedSummaries.where('classId').equals(classId).first()
+  },
+
+  async deleteDownloadedSummary(summaryId: string): Promise<void> {
+    await db.downloadedSummaries.delete(summaryId)
+  },
+
+  // ---------------------------------------------------------------- storage
+
+  /** Inspect device storage; reports honestly when the browser can't say. */
   async getStorageEstimate(): Promise<StorageEstimateInfo> {
     if (navigator.storage && navigator.storage.estimate) {
       try {
         const { usage, quota } = await navigator.storage.estimate()
         const usageBytes = usage || 0
-        const quotaBytes = quota || 1024 * 1024 * 1024 // 1GB fallback
-        const percentageUsed = quotaBytes > 0 ? Math.round((usageBytes / quotaBytes) * 100) : 0
-        const availableMB = Math.round((quotaBytes - usageBytes) / (1024 * 1024))
-        return {
-          usageBytes,
-          quotaBytes,
-          percentageUsed,
-          availableMB,
-          supported: true,
+        const quotaBytes = quota || 0
+        if (quotaBytes > 0) {
+          let persisted: boolean | undefined
+          try {
+            persisted = await navigator.storage.persisted?.()
+          } catch {
+            persisted = undefined
+          }
+          return {
+            usageBytes,
+            quotaBytes,
+            percentageUsed: Math.round((usageBytes / quotaBytes) * 100),
+            availableMB: Math.round((quotaBytes - usageBytes) / MB),
+            supported: true,
+            persisted,
+          }
         }
       } catch {
-        // Fallback
+        // fall through
       }
     }
-
-    // The browser can't report storage: say so (zeroes) rather than inventing numbers.
     return { usageBytes: 0, quotaBytes: 0, percentageUsed: 0, availableMB: Number.MAX_SAFE_INTEGER, supported: false }
   },
 }

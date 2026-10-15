@@ -527,6 +527,18 @@ export const api = {
     return mapResource(await apiRequest<Raw>(`/resources/${init.resource_id}/complete`, { method: 'POST' }))
   },
 
+  /** Current server-side facts about a file plus where to fetch it (signed URL or same-origin path). */
+  getResourceDownloadInfo: async (resourceId: string) => {
+    const d = await apiRequest<Raw>(`/resources/${resourceId}/download-info`)
+    return {
+      url: d.same_origin ? apiUrl(d.url) : (d.url as string),
+      sameOrigin: Boolean(d.same_origin),
+      version: (d.version ?? 1) as number,
+      sizeBytes: (d.size_bytes ?? 0) as number,
+      checksum: (d.checksum_sha256 ?? undefined) as string | undefined,
+      mimeType: (d.mime_type ?? undefined) as string | undefined,
+    }
+  },
   setMaterialPublished: async (resourceId: string, published: boolean) =>
     mapResource(await apiRequest<Raw>(`/resources/${resourceId}`, { method: 'PATCH', body: JSON.stringify({ is_published: published }) })),
 

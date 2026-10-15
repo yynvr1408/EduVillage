@@ -218,6 +218,10 @@ export interface DownloadedResource {
   blob?: Blob
   content?: string
   downloadedAt: string
+  /** Server content version the verified local copy was taken from (stale when the server's is newer). */
+  version?: number
+  checksum?: string
+  verifiedAt?: string
 }
 
 export type NetworkQuality = 'excellent' | 'good' | 'poor' | 'offline'
