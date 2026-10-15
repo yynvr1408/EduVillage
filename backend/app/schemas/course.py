@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.db.models.enums import CourseStatus, EnrollmentStatus
+from app.db.models.enums import CourseStatus, CourseTeacherRole, EnrollmentStatus
 
 
 class CourseCreate(BaseModel):
@@ -43,3 +43,17 @@ class EnrollmentOut(BaseModel):
     student_id: str
     status: EnrollmentStatus
     enrolled_at: datetime
+
+
+class CoTeacherCreate(BaseModel):
+    teacher_id: str
+
+
+class CoTeacherOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    course_id: str
+    teacher_id: str
+    role: CourseTeacherRole
+    added_at: datetime

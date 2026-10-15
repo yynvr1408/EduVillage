@@ -92,3 +92,15 @@ class SyncOperationStatus(str, enum.Enum):
     accepted = "accepted"
     rejected = "rejected"
     conflict = "conflict"
+
+
+class RecordingStatus(str, enum.Enum):
+    recording = "recording"
+    processing = "processing"
+    available = "available"
+    failed = "failed"
+
+
+class CourseTeacherRole(str, enum.Enum):
+    owner = "owner"
+    co_teacher = "co_teacher"

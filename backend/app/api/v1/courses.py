@@ -5,7 +5,7 @@ from app.core.permissions import require_role
 from app.dependencies import get_current_user, get_db
 from app.db.models.enums import UserRole
 from app.db.models.user import User
-from app.schemas.course import CourseCreate, CourseOut, CourseUpdate, EnrollmentCreate, EnrollmentOut
+from app.schemas.course import CoTeacherCreate, CoTeacherOut, CourseCreate, CourseOut, CourseUpdate, EnrollmentCreate, EnrollmentOut
 from app.schemas.lesson import LessonCreate, LessonOut, LessonUpdate
 from app.services import course_service
 
@@ -39,7 +39,7 @@ def update_course(
     course_id: str, payload: CourseUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     course = course_service.get_course_or_404(db, course_id)
-    course_service.assert_owns_course(user, course)
+    course_service.assert_owns_course(db, user, course)
     course = course_service.update_course(db, course, **payload.model_dump())
     return CourseOut.model_validate(course)
 
@@ -56,7 +56,7 @@ def create_lesson(
     course_id: str, payload: LessonCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     course = course_service.get_course_or_404(db, course_id)
-    course_service.assert_owns_course(user, course)
+    course_service.assert_owns_course(db, user, course)
     lesson = course_service.create_lesson(
         db, course, title=payload.title, content=payload.content, position=payload.position, status=payload.status
     )
@@ -77,7 +77,7 @@ def update_lesson(
 ):
     lesson = course_service.get_lesson_or_404(db, lesson_id)
     course = course_service.get_course_or_404(db, lesson.course_id)
-    course_service.assert_owns_course(user, course)
+    course_service.assert_owns_course(db, user, course)
     lesson = course_service.update_lesson(db, lesson, **payload.model_dump())
     return LessonOut.model_validate(lesson)
 
@@ -85,7 +85,7 @@ def update_lesson(
 @router.get("/courses/{course_id}/enrollments", response_model=list[EnrollmentOut])
 def list_enrollments(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     course = course_service.get_course_or_404(db, course_id)
-    course_service.assert_owns_course(user, course)
+    course_service.assert_owns_course(db, user, course)
     return [EnrollmentOut.model_validate(e) for e in course_service.list_enrollments(db, course_id)]
 
 
@@ -96,3 +96,26 @@ def create_enrollment(
     course = course_service.get_course_or_404(db, course_id)
     enrollment = course_service.enroll_student(db, course, acting_user=user, student_id=payload.student_id)
     return EnrollmentOut.model_validate(enrollment)
+
+
+@router.get("/courses/{course_id}/teachers", response_model=list[CoTeacherOut])
+def list_co_teachers(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    course = course_service.get_course_or_404(db, course_id)
+    course_service.assert_owns_course(db, user, course)
+    return [CoTeacherOut.model_validate(t) for t in course_service.list_co_teachers(db, course_id)]
+
+
+@router.post("/courses/{course_id}/teachers", response_model=CoTeacherOut, status_code=201)
+def add_co_teacher(
+    course_id: str, payload: CoTeacherCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    course = course_service.get_course_or_404(db, course_id)
+    co_teacher = course_service.add_co_teacher(db, user, course, teacher_id=payload.teacher_id)
+    return CoTeacherOut.model_validate(co_teacher)
+
+
+@router.delete("/courses/{course_id}/teachers/{teacher_id}", status_code=204)
+def remove_co_teacher(course_id: str, teacher_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    course = course_service.get_course_or_404(db, course_id)
+    course_service.remove_co_teacher(db, user, course, teacher_id=teacher_id)
+    return None

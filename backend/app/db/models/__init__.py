@@ -1,6 +1,6 @@
 from app.db.models.assignment import Assignment, AssignmentSubmission, SubmissionRevision
-from app.db.models.classroom import Class, ClassParticipant
-from app.db.models.course import Course, CourseEnrollment
+from app.db.models.classroom import Class, ClassParticipant, ClassRecording
+from app.db.models.course import Course, CourseEnrollment, CourseTeacher
 from app.db.models.lesson import LearningResource, Lesson
 from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
 from app.db.models.sync_operation import AuditEvent, SyncOperation
@@ -12,8 +12,10 @@ __all__ = [
     "SubmissionRevision",
     "Class",
     "ClassParticipant",
+    "ClassRecording",
     "Course",
     "CourseEnrollment",
+    "CourseTeacher",
     "LearningResource",
     "Lesson",
     "BackgroundJob",

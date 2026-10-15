@@ -31,7 +31,7 @@ Backend runs at `http://localhost:8000`. Check `http://localhost:8000/health` an
 
 The default `.env` uses `sqlite:///./dev.db` — zero setup needed to start building. Switch `DATABASE_URL` to a Postgres URL (or run `docker compose up` from `backend/`, which starts Postgres + the API together) when you want parity with production. LiveKit and LLM/STT features degrade gracefully with clear `503`/stub responses until their keys are set in `.env` — they are not required to run the rest of the API.
 
-Run the test suite (69 tests covering every module — auth, authorization boundaries, courses/lessons/enrollments, classes + LiveKit tokens, resources, assignments, sync idempotency, summaries, dashboards, audit logging, pagination):
+Run the test suite (87 tests covering every module — auth, authorization boundaries, courses/lessons/enrollments, classes + LiveKit tokens, recordings, co-teachers, resources, assignments, sync idempotency, summaries, dashboards, session management, audit logging, pagination):
 
 ```bash
 cd backend
@@ -93,10 +93,13 @@ backend/
 - **"Published" ≠ "enrolled."** A published course's title/description/lesson list is a public preview (so students can browse before committing). Anything that's actual coursework — downloading a resource, joining a live class, viewing a lecture summary, submitting an assignment — requires real enrollment, checked via `course_service.assert_enrolled`. Two earlier bugs where a non-enrolled student could join a class or download resources were caught by the test suite, not by inspection — see the git history for `app/services/classroom_service.py` and `resource_service.py` if you're curious what that class of bug looks like.
 - **Security-relevant actions write an audit trail** (`app/services/audit_service.py` → the `audit_events` table): register, login/login-failed, logout, course creation, class start/end, resource deletion, summary approval. It only ever logs who-did-what-to-which-resource, never request payloads or credentials.
 - **List endpoints are paginated** (`limit`/`offset` query params, default 50, capped at 200 — see `app/utils/pagination.py`) on courses, classes, submissions, and resources.
+- **Recorded classes are a real pipeline, not just the AI summary.** `POST /classes/{id}/recordings/start` triggers a LiveKit room-composite egress straight to an S3-compatible bucket; `stop` ends it; the list/download endpoints refresh the job status from LiveKit (there's no webhook receiver yet, so status is pulled on read — fine for a hackathon demo, a webhook is the production upgrade). Needs `STORAGE_BACKEND=s3` *and* LiveKit configured — local-disk storage can't be an egress target, so recording returns an honest `RECORDING_NOT_CONFIGURED` 503 rather than silently doing nothing. This is deliberately separate from the transcript-based AI summary: a student should be able to actually watch a missed class, not just read about it.
+- **Co-teachers answer "limited teachers."** A course has one primary owner plus any number of co-teachers (`course_teachers` table) who get equal content-management rights — creating lessons, running classes, managing assignments — everywhere `assert_owns_course` is checked (now `course_service.is_teaching`). Only the primary owner can add/remove co-teachers. This lets one scarce qualified teacher be shared across sections or colleges, or gives a course a backup teacher for continuity.
+- **Session management answers "few devices."** `GET/DELETE /users/me/sessions` and `POST /users/me/sessions/revoke-all` let a student on a shared lab computer or borrowed phone see every device signed in to their account and sign out of ones they forgot — without needing their password again.
 
 ### API surface
 
-All endpoints are under `/api/v1`. See `app/api/v1/*.py` for the full list; the main groups are `auth`, `users`, `courses` (+ lessons + enrollments), `classes` (+ LiveKit join-token + participants), `resources` (list/upload/download/delete), `assignments` (+ submissions), `summaries` (+ jobs + approval), `sync` (offline operations), and `student`/`teacher` `dashboard`.
+All endpoints are under `/api/v1`. See `app/api/v1/*.py` for the full list; the main groups are `auth` (+ password reset), `users` (+ `/me/sessions`), `courses` (+ lessons + enrollments + co-teachers), `classes` (+ LiveKit join-token + participants + recordings), `resources` (list/upload/download/delete), `assignments` (+ submissions), `summaries` (+ jobs + approval), `sync` (offline operations), and `student`/`teacher` `dashboard`.
 
 Errors always come back as:
 
@@ -111,9 +114,25 @@ Errors always come back as:
 - Open a PR, get the other teammate to review, merge, delete the branch.
 - Never both edit the same files on `main` directly — branch first.
 
+## Against the problem statement
+
+> *"Rural colleges face weak internet, few devices, and limited teachers... Build a simple tool for live and recorded classes that works on low bandwidth. Success means students can attend, catch up, and submit work even on poor connections."*
+
+| Ask | Status |
+|---|---|
+| Weak internet / low bandwidth | Audio-only LiveKit fallback, offline-first assignment sync |
+| Live classes | LiveKit WebRTC, role-based join tokens |
+| **Recorded classes** | LiveKit egress → S3, with honest 503 if storage isn't configured |
+| Students attend | Live join + audio-only degradation |
+| Students catch up | Recording playback **and** AI transcript summary (two paths, not one) |
+| Students submit work on poor connections | Offline drafts + idempotent sync — the most heavily tested part of this backend |
+| **Few devices** | Session listing/revocation for shared/public devices |
+| **Limited teachers** | Co-teachers — one teacher can be added to multiple courses/sections |
+
 ## What's not done yet
 
-- LiveKit room egress/recording (needed before "AI summary from a real lecture recording" works end to end — today the summary pipeline accepts a supplied transcript, matching the hackathon fallback the architecture doc calls out explicitly).
+- Recording completion is polled on read (no LiveKit webhook receiver yet) — fine for a demo, a webhook endpoint is the production upgrade.
 - CSRF protection beyond `SameSite=Lax` cookies (fine for same-site demo use; add a double-submit token before any cross-site production deployment).
 - Celery/Redis for background jobs — summary generation currently runs via FastAPI `BackgroundTasks`, which is enough for hackathon load; swap in Celery when job volume or multi-worker scaling requires it.
+- "Few devices" is addressed at the account-security level (session management); there's no low-bandwidth/low-end-device video profile yet (e.g. forcing audio-only below a device/network threshold automatically rather than on-demand).
 - Frontend integration — the backend is built and tested standalone; wiring it into the React app is the next step.

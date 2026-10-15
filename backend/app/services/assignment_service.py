@@ -23,7 +23,7 @@ def list_assignments(db: Session, course_id: str) -> list[Assignment]:
 
 def create_assignment(db: Session, teacher: User, course_id: str, *, title: str, instructions: str | None, due_at, status) -> Assignment:
     course = course_service.get_course_or_404(db, course_id)
-    course_service.assert_owns_course(teacher, course)
+    course_service.assert_owns_course(db, teacher, course)
     assignment = Assignment(course_id=course_id, created_by=teacher.id, title=title, instructions=instructions, due_at=due_at, status=status)
     db.add(assignment)
     db.commit()
@@ -33,7 +33,7 @@ def create_assignment(db: Session, teacher: User, course_id: str, *, title: str,
 
 def update_assignment(db: Session, teacher: User, assignment: Assignment, **fields) -> Assignment:
     course = course_service.get_course_or_404(db, assignment.course_id)
-    course_service.assert_owns_course(teacher, course)
+    course_service.assert_owns_course(db, teacher, course)
     for key, value in fields.items():
         if value is not None:
             setattr(assignment, key, value)
@@ -105,6 +105,6 @@ def list_submissions(db: Session, teacher: User, assignment: Assignment, *, limi
     from app.utils.pagination import paginate
 
     course = course_service.get_course_or_404(db, assignment.course_id)
-    course_service.assert_owns_course(teacher, course)
+    course_service.assert_owns_course(db, teacher, course)
     stmt = select(AssignmentSubmission).where(AssignmentSubmission.assignment_id == assignment.id)
     return paginate(db, stmt, limit=limit, offset=offset)

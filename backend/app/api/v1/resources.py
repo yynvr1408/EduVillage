@@ -52,7 +52,7 @@ async def upload_content(storage_key: str, request: Request, user: User = Depend
         raise NotFoundError("Resource not found.")
     resource_service.get_resource_or_404(db, resource.id)
     course = course_service.get_course_or_404(db, resource.course_id)
-    course_service.assert_owns_course(user, course)
+    course_service.assert_owns_course(db, user, course)
 
     storage = get_storage()
     if not isinstance(storage, LocalObjectStorage):

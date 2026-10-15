@@ -33,9 +33,17 @@ def assert_enrolled_in_class(db: Session, user: User, cls: Class) -> None:
     course_service.assert_enrolled(db, user, course)
 
 
-def assert_teaches_class(user: User, cls: Class) -> None:
-    if user.role != UserRole.teacher or cls.teacher_id != user.id:
-        raise ForbiddenError("Only the assigned teacher can manage this class.")
+def assert_teaches_class(db: Session, user: User, cls: Class) -> None:
+    """True for the class's originally assigned teacher, and for any co-teacher on the
+    course — so a backup/shared teacher can run a session if the primary is unavailable."""
+    if user.role != UserRole.teacher:
+        raise ForbiddenError("Only a teacher can manage this class.")
+    if cls.teacher_id == user.id:
+        return
+    course = course_service.get_course_or_404(db, cls.course_id)
+    if course_service.is_teaching(db, user, course):
+        return
+    raise ForbiddenError("Only the assigned teacher or a co-teacher on this course can manage this class.")
 
 
 MAX_COURSES_FOR_CLASS_LOOKUP = 200  # enough to cover any real teacher/student's course load
@@ -54,7 +62,7 @@ def list_classes_for_user(db: Session, user: User, *, limit: int = 50, offset: i
 
 def create_class(db: Session, teacher: User, course_id: str, *, title: str, scheduled_start, scheduled_end) -> Class:
     course = course_service.get_course_or_404(db, course_id)
-    course_service.assert_owns_course(teacher, course)
+    course_service.assert_owns_course(db, teacher, course)
     cls = Class(
         course_id=course_id,
         teacher_id=teacher.id,
@@ -79,7 +87,7 @@ def update_class(db: Session, cls: Class, **fields) -> Class:
 
 
 async def start_class(db: Session, teacher: User, cls: Class) -> Class:
-    assert_teaches_class(teacher, cls)
+    assert_teaches_class(db, teacher, cls)
     if cls.status == ClassStatus.live:
         return cls  # idempotent: already live
     if cls.status not in (ClassStatus.scheduled,):
@@ -97,7 +105,7 @@ async def start_class(db: Session, teacher: User, cls: Class) -> Class:
 
 
 def end_class(db: Session, teacher: User, cls: Class) -> Class:
-    assert_teaches_class(teacher, cls)
+    assert_teaches_class(db, teacher, cls)
     if cls.status == ClassStatus.ended:
         return cls  # idempotent
     if cls.status != ClassStatus.live:
@@ -115,10 +123,11 @@ def issue_join_token(db: Session, user: User, cls: Class) -> dict:
 
     settings = get_settings()
 
-    is_teacher = user.role == UserRole.teacher and cls.teacher_id == user.id
+    course = course_service.get_course_or_404(db, cls.course_id)
+    is_teacher = course_service.is_teaching(db, user, course)
     if not is_teacher:
         if user.role != UserRole.student:
-            raise ForbiddenError("Only the teacher or enrolled students may join this class.")
+            raise ForbiddenError("Only a teacher on this course or an enrolled student may join this class.")
         # Joining live media requires actual enrollment, not just published-course preview access.
         assert_enrolled_in_class(db, user, cls)
 

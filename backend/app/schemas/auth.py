@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.db.models.enums import UserRole
 from app.schemas.user import UserOut
@@ -27,3 +29,15 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=8, max_length=256)
+
+
+class SessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    created_at: datetime
+    expires_at: datetime
+
+
+class RevokeAllResponse(BaseModel):
+    revoked_count: int

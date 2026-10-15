@@ -125,7 +125,7 @@ def get_summary_for_class(db: Session, user: User, cls: Class) -> LectureSummary
 
 def approve_summary(db: Session, teacher: User, summary: LectureSummary) -> LectureSummary:
     cls = db.get(Class, summary.class_id)
-    classroom_service.assert_teaches_class(teacher, cls)
+    classroom_service.assert_teaches_class(db, teacher, cls)
     if summary.status != SummaryStatus.needs_review:
         raise ConflictError(f"Cannot approve a summary in status '{summary.status.value}'.")
     summary.status = SummaryStatus.completed
@@ -139,7 +139,7 @@ def approve_summary(db: Session, teacher: User, summary: LectureSummary) -> Lect
 
 def request_changes(db: Session, teacher: User, summary: LectureSummary) -> LectureSummary:
     cls = db.get(Class, summary.class_id)
-    classroom_service.assert_teaches_class(teacher, cls)
+    classroom_service.assert_teaches_class(db, teacher, cls)
     summary.status = SummaryStatus.queued
     summary.reviewed_by = teacher.id
     summary.reviewed_at = utcnow()

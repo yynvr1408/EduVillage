@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.core.exceptions import ConflictError, UnauthorizedError
+from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.core.security import (
     generate_session_token,
     hash_password,
@@ -99,6 +99,46 @@ def revoke_session(db: Session, token: str) -> None:
         session.revoked_at = utcnow()
         db.commit()
         audit_service.record(db, actor_id=session.user_id, action="logout", resource_type="user", resource_id=session.user_id)
+
+
+def list_active_sessions(db: Session, user: User) -> list[UserSession]:
+    """For shared/public devices: lets a student see every device currently signed in to
+    their account and sign out of one they forgot to log out of elsewhere."""
+    stmt = (
+        select(UserSession)
+        .where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None), UserSession.expires_at > utcnow())
+        .order_by(UserSession.created_at.desc())
+    )
+    return list(db.execute(stmt).scalars())
+
+
+def revoke_session_by_id(db: Session, user: User, session_id: str) -> None:
+    session = db.get(UserSession, session_id)
+    if not session or session.user_id != user.id:
+        raise NotFoundError("Session not found.")
+    if session.revoked_at is None:
+        session.revoked_at = utcnow()
+        db.commit()
+        audit_service.record(db, actor_id=user.id, action="session_revoked", resource_type="user_session", resource_id=session.id)
+
+
+def revoke_all_sessions_except(db: Session, user: User, *, keep_token: str | None) -> int:
+    """Signs out every other device — the "I'm on a shared computer, lock everything else
+    out" action. Returns how many sessions were revoked."""
+    keep_hash = hash_token(keep_token) if keep_token else None
+    sessions = db.execute(
+        select(UserSession).where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+    ).scalars()
+    count = 0
+    for session in sessions:
+        if keep_hash and session.session_hash == keep_hash:
+            continue
+        session.revoked_at = utcnow()
+        count += 1
+    if count:
+        db.commit()
+        audit_service.record(db, actor_id=user.id, action="sessions_revoked_all", resource_type="user", resource_id=user.id)
+    return count
 
 
 def request_password_reset(db: Session, email: str) -> str | None:

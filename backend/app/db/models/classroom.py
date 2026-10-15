@@ -3,8 +3,8 @@ from datetime import datetime
 from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.db.models.enums import ClassStatus, ParticipationStatus
+from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
+from app.db.models.enums import ClassStatus, ParticipationStatus, RecordingStatus
 
 
 class Class(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -31,3 +31,21 @@ class ClassParticipant(UUIDPrimaryKeyMixin, Base):
     participation_status: Mapped[ParticipationStatus] = mapped_column(
         Enum(ParticipationStatus, native_enum=False), nullable=False, default=ParticipationStatus.joined
     )
+
+
+class ClassRecording(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """A recorded version of a live class, so students who missed it (or want to
+    rewatch) can play it back later — distinct from the AI text summary, which is a
+    different, lighter-weight catch-up path."""
+
+    __tablename__ = "class_recordings"
+
+    class_id: Mapped[str] = mapped_column(String(36), ForeignKey("classes.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    egress_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[RecordingStatus] = mapped_column(
+        Enum(RecordingStatus, native_enum=False), nullable=False, default=RecordingStatus.recording
+    )
+    started_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)

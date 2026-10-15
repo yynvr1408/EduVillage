@@ -4,7 +4,7 @@ from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
-from app.db.models.enums import CourseStatus, EnrollmentStatus
+from app.db.models.enums import CourseStatus, CourseTeacherRole, EnrollmentStatus
 
 
 class Course(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -35,3 +35,20 @@ class CourseEnrollment(UUIDPrimaryKeyMixin, Base):
     enrolled_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
 
     course: Mapped[Course] = relationship(back_populates="enrollments")
+
+
+class CourseTeacher(UUIDPrimaryKeyMixin, Base):
+    """Additional teachers on a course beyond its original owner (Course.teacher_id).
+    Exists so one scarce qualified teacher can be shared across sections/colleges, or a
+    course can have a backup teacher for continuity when the primary is unavailable —
+    directly answering the "limited teachers" half of the problem statement."""
+
+    __tablename__ = "course_teachers"
+    __table_args__ = (UniqueConstraint("course_id", "teacher_id", name="uq_course_teacher"),)
+
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    teacher_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    role: Mapped[CourseTeacherRole] = mapped_column(
+        Enum(CourseTeacherRole, native_enum=False), nullable=False, default=CourseTeacherRole.co_teacher
+    )
+    added_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)

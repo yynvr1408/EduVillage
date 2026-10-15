@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.db.models.enums import ClassStatus, ParticipationStatus
+from app.db.models.enums import ClassStatus, ParticipationStatus, RecordingStatus
 
 
 class ClassCreate(BaseModel):
@@ -44,3 +44,13 @@ class ParticipantOut(BaseModel):
     joined_at: datetime | None
     left_at: datetime | None
     participation_status: ParticipationStatus
+
+
+class RecordingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    class_id: str
+    status: RecordingStatus
+    started_at: datetime
+    completed_at: datetime | None

@@ -23,7 +23,7 @@ def _validate_declared_upload(filename: str, mime_type: str, size_bytes: int) ->
 
 def init_upload(db: Session, teacher: User, *, course_id: str, lesson_id: str | None, filename: str, mime_type: str, size_bytes: int) -> tuple[LearningResource, dict]:
     course = course_service.get_course_or_404(db, course_id)
-    course_service.assert_owns_course(teacher, course)
+    course_service.assert_owns_course(db, teacher, course)
     _validate_declared_upload(filename, mime_type, size_bytes)
 
     storage_key = make_storage_key(course_id, filename)
@@ -60,7 +60,7 @@ def assert_can_access_resource(db: Session, user: User, resource: LearningResour
 
 def complete_upload(db: Session, teacher: User, resource: LearningResource) -> LearningResource:
     course = course_service.get_course_or_404(db, resource.course_id)
-    course_service.assert_owns_course(teacher, course)
+    course_service.assert_owns_course(db, teacher, course)
 
     actual_size = get_storage().verify_uploaded(resource.storage_key)
     if actual_size is None:
@@ -79,7 +79,7 @@ def download_info(resource: LearningResource) -> dict:
 
 def delete_resource(db: Session, teacher: User, resource: LearningResource) -> None:
     course = course_service.get_course_or_404(db, resource.course_id)
-    course_service.assert_owns_course(teacher, course)
+    course_service.assert_owns_course(db, teacher, course)
     get_storage().delete(resource.storage_key)
     resource.status = ResourceStatus.deleted
     db.commit()
