@@ -47,6 +47,8 @@ export interface Material {
 
 export type MaterialType = 'video' | 'audio' | 'document' | 'presentation' | 'notes' | 'other'
 
+export type CourseStatus = 'draft' | 'published' | 'archived'
+
 export interface Course {
   id: string
   title: string
@@ -57,6 +59,11 @@ export interface Course {
   created_at: string
   lessons_count?: number
   lessons?: Lesson[]
+  status: CourseStatus
+  grade_level?: string
+  language?: string
+  institution?: string
+  region?: string
 }
 
 export interface Section {

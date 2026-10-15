@@ -13,6 +13,13 @@ class Course(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     subject: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Discovery filters only (no separate Institution/Region entities — nothing elsewhere in the
+    # app models multi-institution or administrative-region concerns, so a free-text field a
+    # teacher fills in is deliberately simpler than inventing relational entities nothing needs yet).
+    grade_level: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    language: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    institution: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    region: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
     teacher_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     status: Mapped[CourseStatus] = mapped_column(
         Enum(CourseStatus, native_enum=False), nullable=False, default=CourseStatus.draft

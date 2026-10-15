@@ -140,6 +140,11 @@ function mapCourse(c: Raw, lessons?: Lesson[]): Course {
     created_at: c.created_at,
     lessons_count: lessons?.length,
     lessons,
+    status: c.status ?? 'draft',
+    grade_level: c.grade_level ?? undefined,
+    language: c.language ?? undefined,
+    institution: c.institution ?? undefined,
+    region: c.region ?? undefined,
   }
 }
 
@@ -324,13 +329,39 @@ export const api = {
     ])
     return mapCourse(course, lessons.map(mapLesson))
   },
-  createCourse: async (data: { title: string; code: string; description?: string }) =>
+  createCourse: async (data: {
+    title: string
+    code: string
+    description?: string
+    grade_level?: string
+    language?: string
+    institution?: string
+    region?: string
+  }) =>
     mapCourse(
       await apiRequest<Raw>('/courses', {
         method: 'POST',
-        body: JSON.stringify({ title: data.title, description: data.description, subject: data.code, status: 'published' }),
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description,
+          subject: data.code,
+          grade_level: data.grade_level || undefined,
+          language: data.language || undefined,
+          institution: data.institution || undefined,
+          region: data.region || undefined,
+          status: 'published',
+        }),
       })
     ),
+  updateCourse: async (id: string, data: { title?: string; description?: string; code?: string; status?: 'draft' | 'published' }) =>
+    mapCourse(
+      await apiRequest<Raw>(`/courses/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: data.title, description: data.description, subject: data.code, status: data.status }),
+      })
+    ),
+  /** Always archives rather than destroying the row — see the backend's course_service.archive_course. */
+  archiveCourse: async (id: string) => mapCourse(await apiRequest<Raw>(`/courses/${id}`, { method: 'DELETE' })),
   createLesson: async (courseId: string, data: { title: string; content?: string; order_index?: number }) =>
     mapLesson(
       await apiRequest<Raw>(`/courses/${courseId}/lessons`, {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft,
   Plus,
@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   FolderOpen,
   AlertCircle,
+  Pencil,
+  Archive,
 } from 'lucide-react'
 import { courseService } from '../../services/courseService'
 import type { Course, Lesson } from '../../types'
@@ -29,6 +31,7 @@ import {
 
 export const TeacherManageCoursePage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>()
+  const navigate = useNavigate()
 
   const [course, setCourse] = useState<Course | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -41,6 +44,18 @@ export const TeacherManageCoursePage: React.FC = () => {
   const [lessonContent, setLessonContent] = useState('')
   const [isSavingLesson, setIsSavingLesson] = useState(false)
   const [lessonError, setLessonError] = useState<string | null>(null)
+
+  // Edit Course Modal state
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  // Archive confirmation state
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
 
   const loadData = async () => {
     if (!courseId) return
@@ -91,6 +106,47 @@ export const TeacherManageCoursePage: React.FC = () => {
     }
   }
 
+  const openEdit = () => {
+    if (!course) return
+    setEditTitle(course.title)
+    setEditDescription(course.description || '')
+    setEditError(null)
+    setIsEditOpen(true)
+  }
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!courseId) return
+    if (!editTitle.trim()) {
+      setEditError('Course title is required.')
+      return
+    }
+    setIsSavingEdit(true)
+    setEditError(null)
+    try {
+      await courseService.updateCourse(courseId, { title: editTitle.trim(), description: editDescription.trim() })
+      setIsEditOpen(false)
+      loadData()
+    } catch (err: any) {
+      setEditError(err.message || 'Failed to save changes.')
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  const handleArchive = async () => {
+    if (!courseId) return
+    setIsArchiving(true)
+    setArchiveError(null)
+    try {
+      await courseService.archiveCourse(courseId)
+      navigate('/teacher/courses')
+    } catch (err: any) {
+      setArchiveError(err.message || 'Failed to archive this course.')
+      setIsArchiving(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <PageContainer>
@@ -136,6 +192,11 @@ export const TeacherManageCoursePage: React.FC = () => {
             <Badge variant="secondary" size="sm">
               {course.lessons?.length || 0} Lessons
             </Badge>
+            {course.status === 'archived' && (
+              <Badge variant="warning" size="sm">
+                Archived
+              </Badge>
+            )}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
             {course.title}
@@ -143,14 +204,32 @@ export const TeacherManageCoursePage: React.FC = () => {
           <p className="text-xs text-[#687775] mt-1 max-w-2xl">{course.description}</p>
         </div>
 
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={() => setIsAddLessonOpen(true)}
-          icon={<Plus className="w-4 h-4" />}
-        >
-          Add New Lesson
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button size="sm" variant="outline" onClick={openEdit} icon={<Pencil className="w-3.5 h-3.5" />}>
+            Edit Course
+          </Button>
+          {course.status !== 'archived' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setArchiveError(null)
+                setIsArchiveConfirmOpen(true)
+              }}
+              icon={<Archive className="w-3.5 h-3.5" />}
+            >
+              Archive
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => setIsAddLessonOpen(true)}
+            icon={<Plus className="w-4 h-4" />}
+          >
+            Add New Lesson
+          </Button>
+        </div>
       </div>
 
       {/* Lessons List */}
@@ -252,6 +331,70 @@ export const TeacherManageCoursePage: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Dialog>
+
+      {/* Edit Course Dialog */}
+      <Dialog
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        title="Edit Course"
+        description="Changes are saved to this course's record; enrollments and lesson history are untouched."
+        maxWidth="lg"
+      >
+        <form onSubmit={handleSaveEdit} className="flex flex-col gap-4 text-xs">
+          {editError && (
+            <div className="p-3 bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] rounded-lg font-medium">
+              {editError}
+            </div>
+          )}
+
+          <FormField label="Course Title" htmlFor="editTitle" required>
+            <Input id="editTitle" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required />
+          </FormField>
+
+          <FormField label="Description" htmlFor="editDescription">
+            <Textarea
+              id="editDescription"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              rows={4}
+            />
+          </FormField>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E1E8E4]">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" variant="primary" isLoading={isSavingEdit}>
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog
+        isOpen={isArchiveConfirmOpen}
+        onClose={() => !isArchiving && setIsArchiveConfirmOpen(false)}
+        title="Archive This Course?"
+        description="Archiving removes it from the catalog and new self-enrollment, but keeps every lesson, enrollment, assignment and class record intact — nothing is deleted, and you can keep managing it from your course list."
+        maxWidth="md"
+      >
+        <div className="flex flex-col gap-4 text-xs">
+          {archiveError && (
+            <div className="p-3 bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] rounded-lg font-medium">
+              {archiveError}
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E1E8E4]">
+            <Button type="button" variant="ghost" size="sm" disabled={isArchiving} onClick={() => setIsArchiveConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" size="sm" variant="primary" isLoading={isArchiving} onClick={handleArchive}>
+              Archive Course
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </PageContainer>
   )

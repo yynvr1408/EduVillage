@@ -32,8 +32,27 @@ export const courseService = {
     return course
   },
 
-  async createCourse(data: { title: string; code: string; description?: string }): Promise<Course> {
+  async createCourse(data: {
+    title: string
+    code: string
+    description?: string
+    grade_level?: string
+    language?: string
+    institution?: string
+    region?: string
+  }): Promise<Course> {
     return api.createCourse(data)
+  },
+
+  async updateCourse(
+    id: string,
+    data: { title?: string; description?: string; code?: string; status?: 'draft' | 'published' }
+  ): Promise<Course> {
+    return api.updateCourse(id, data)
+  },
+
+  async archiveCourse(id: string): Promise<Course> {
+    return api.archiveCourse(id)
   },
 
   async createLesson(courseId: string, data: {

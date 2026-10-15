@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { AlertCircle, LogIn, ArrowRight } from 'lucide-react'
+import { AlertCircle, LogIn } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -8,8 +8,7 @@ import { FormField } from '../../components/ui/FormField'
 
 export interface LoginPageProps {
   /** Set by the /login/student and /login/teacher routes to theme the form and enforce that the
-   * account signing in actually has that role. Left unset, this renders the original generic form
-   * (both demo buttons, no role check) — used directly by existing tests and as a fallback. */
+   * account signing in actually has that role. Left unset, this renders the original generic form. */
   portal?: 'student' | 'teacher'
 }
 
@@ -56,17 +55,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleDemoFill = (role: 'student' | 'teacher') => {
-    if (role === 'student') {
-      setEmail('student@eduvillage.org')
-      setPassword('student123')
-    } else {
-      setEmail('teacher@eduvillage.org')
-      setPassword('teacher123')
-    }
-    setError(null)
   }
 
   return (
@@ -176,34 +164,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
             </Button>
           </form>
 
-          {/* Quick Demo Fill Buttons */}
-          <div className="mt-6 pt-5 border-t border-[#E1E8E4]">
-            <p className="text-xs font-bold text-[#687775] uppercase tracking-wider mb-2.5 text-center">
-              Quick Demo Accounts
-            </p>
-            <div className={`grid gap-2 ${portal ? 'grid-cols-1' : 'grid-cols-2'}`}>
-              {(!portal || portal === 'student') && (
-                <button
-                  type="button"
-                  onClick={() => handleDemoFill('student')}
-                  className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
-                >
-                  <strong className="block text-[#0F5B57]">Student Demo</strong>
-                  <span className="text-xs text-[#687775]">Amina Diallo</span>
-                </button>
-              )}
-              {(!portal || portal === 'teacher') && (
-                <button
-                  type="button"
-                  onClick={() => handleDemoFill('teacher')}
-                  className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
-                >
-                  <strong className="block text-[#0F5B57]">Teacher Demo</strong>
-                  <span className="text-xs text-[#687775]">Dr. Elena Rostova</span>
-                </button>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Footer Link */}

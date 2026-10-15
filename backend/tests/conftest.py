@@ -25,6 +25,10 @@ os.environ["SESSION_COOKIE_NAME"] = "eduvillage_session"
 # providers; a developer's real .env (real S3/LiveKit/LLM credentials) must not leak into
 # tests, or they silently start hitting live third-party services instead of the fakes.
 os.environ["STORAGE_BACKEND"] = "local"
+# Tests assert against this exact origin (e.g. test_cors_exposes_range_headers_to_the_frontend_origin);
+# a developer's real .env now legitimately points FRONTEND_ORIGIN at a deployed URL, which must not
+# leak into the test process any more than the credentials below do.
+os.environ["FRONTEND_ORIGIN"] = "http://localhost:5173"
 # Set (not pop) to "": pydantic-settings reads backend/.env for any var absent from os.environ,
 # so a bare pop() would still leak a developer's real .env values into the test process.
 for _var in ("LLM_API_KEY", "LLM_BASE_URL", "SPEECH_TO_TEXT_API_KEY", "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"):

@@ -26,12 +26,10 @@ describe('Authentication & Protected Routes', () => {
     expect(container.querySelector('#email')).toBeInTheDocument()
     expect(container.querySelector('#password')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sign In/i })).toBeInTheDocument()
-    expect(screen.getByText(/Student Demo/i)).toBeInTheDocument()
-    expect(screen.getByText(/Teacher Demo/i)).toBeInTheDocument()
   })
 
-  it('quick fills demo student account credentials on button click', () => {
-    const { container } = render(
+  it('does not expose any demo-login shortcut or pre-fillable credentials', () => {
+    render(
       <BrowserRouter>
         <AuthProvider>
           <LoginPage />
@@ -39,21 +37,15 @@ describe('Authentication & Protected Routes', () => {
       </BrowserRouter>
     )
 
-    const studentDemoBtn = screen.getByText(/Student Demo/i)
-    fireEvent.click(studentDemoBtn)
-
-    expect((container.querySelector('#email') as HTMLInputElement).value).toBe(
-      'student@eduvillage.org'
-    )
-    expect((container.querySelector('#password') as HTMLInputElement).value).toBe('student123')
+    expect(screen.queryByText(/demo/i)).not.toBeInTheDocument()
   })
 
   it('authenticates student successfully and persists session token', async () => {
     vi.spyOn(authService, 'login').mockResolvedValueOnce({
       user: {
         id: 'student-1',
-        email: 'student@eduvillage.org',
-        full_name: 'Amina Diallo',
+        email: 'student.a@example.com',
+        full_name: 'Student A',
         role: 'student',
         created_at: new Date().toISOString(),
       },
@@ -68,18 +60,18 @@ describe('Authentication & Protected Routes', () => {
     )
 
     fireEvent.change(container.querySelector('#email')!, {
-      target: { value: 'student@eduvillage.org' },
+      target: { value: 'student.a@example.com' },
     })
     fireEvent.change(container.querySelector('#password')!, {
-      target: { value: 'student123' },
+      target: { value: 'a-real-password' },
     })
 
     fireEvent.click(screen.getByRole('button', { name: /Sign In/i }))
 
     await waitFor(() => {
       expect(authService.login).toHaveBeenCalledWith(
-        'student@eduvillage.org',
-        'student123'
+        'student.a@example.com',
+        'a-real-password'
       )
     })
   })
@@ -87,8 +79,8 @@ describe('Authentication & Protected Routes', () => {
   it('enforces role protection and blocks student from teacher routes', async () => {
     const studentUser = {
       id: 'student-1',
-      email: 'student@eduvillage.org',
-      full_name: 'Amina Diallo',
+      email: 'student.a@example.com',
+      full_name: 'Student A',
       role: 'student' as const,
       created_at: new Date().toISOString(),
     }

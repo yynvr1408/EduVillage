@@ -71,16 +71,9 @@ The visual design system strictly follows educational usability standards optimi
 
 ---
 
-## Demo Accounts
+## Local Demo Accounts (development only)
 
-`python -m app.seed` (after `alembic upgrade head`) creates two demo accounts, a published course, a section and an assignment. It refuses to run when `APP_ENV=production` because these passwords are public.
-
-| Role | Name | Email | Password |
-|---|---|---|---|
-| **Teacher** | Dr. Elena Rostova | `teacher@eduvillage.org` | `teacher123` |
-| **Student** | Amina Diallo | `student@eduvillage.org` | `student123` |
-
-*The login page also provides one-click quick-fill buttons for both demo accounts.*
+`python -m app.seed` (after `alembic upgrade head`) creates a demo teacher and student account, a published course, a section and an assignment, for local development convenience. **It refuses to run when `APP_ENV=production`**, and the credentials it creates are not published here — run the script yourself and read `backend/app/seed.py` to see them. There is no demo-login shortcut in the UI; register a real account through `/register` on any deployed environment.
 
 ---
 

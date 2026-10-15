@@ -26,16 +26,38 @@ def list_courses(limit: int = 50, offset: int = 0, user: User = Depends(get_curr
 
 
 @router.get("/courses/catalog", response_model=list[CourseOut])
-def course_catalog(limit: int = 50, offset: int = 0, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def course_catalog(
+    limit: int = 50,
+    offset: int = 0,
+    subject: str | None = None,
+    grade_level: str | None = None,
+    language: str | None = None,
+    institution: str | None = None,
+    region: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Published courses a student can browse and then self-enroll in."""
-    return [_course_out(db, c) for c in course_service.list_catalog(db, limit=limit, offset=offset)]
+    courses = course_service.list_catalog(
+        db, limit=limit, offset=offset, subject=subject, grade_level=grade_level, language=language, institution=institution, region=region
+    )
+    return [_course_out(db, c) for c in courses]
 
 
 @router.post("/courses", response_model=CourseOut, status_code=201)
 def create_course(payload: CourseCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     require_role(user, UserRole.teacher)
     course = course_service.create_course(
-        db, user, title=payload.title, description=payload.description, subject=payload.subject, status=payload.status
+        db,
+        user,
+        title=payload.title,
+        description=payload.description,
+        subject=payload.subject,
+        grade_level=payload.grade_level,
+        language=payload.language,
+        institution=payload.institution,
+        region=payload.region,
+        status=payload.status,
     )
     return CourseOut.model_validate(course)
 
@@ -55,6 +77,14 @@ def update_course(
     course_service.assert_owns_course(db, user, course)
     course = course_service.update_course(db, course, **payload.model_dump())
     return CourseOut.model_validate(course)
+
+
+@router.delete("/courses/{course_id}", response_model=CourseOut)
+def delete_course(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Always archives rather than deleting the row — see course_service.archive_course."""
+    course = course_service.get_course_or_404(db, course_id)
+    course = course_service.archive_course(db, user, course)
+    return _course_out(db, course)
 
 
 @router.get("/courses/{course_id}/lessons", response_model=list[LessonOut])

@@ -128,16 +128,61 @@ def list_courses_for_user(db: Session, user: User, *, limit: int = 50, offset: i
     return paginate(db, stmt.order_by(Course.created_at.desc()), limit=limit, offset=offset)
 
 
-def list_catalog(db: Session, *, limit: int = 50, offset: int = 0) -> list[Course]:
-    """Published courses anyone can browse before enrolling (title/description only)."""
+def list_catalog(
+    db: Session,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    subject: str | None = None,
+    grade_level: str | None = None,
+    language: str | None = None,
+    institution: str | None = None,
+    region: str | None = None,
+) -> list[Course]:
+    """Published courses anyone can browse before enrolling. Filters are discovery aids, not
+    access control — a student not matching any filter can still find and enroll in a course
+    by browsing without filters; nothing here restricts who may enroll (see enroll_student)."""
     from app.utils.pagination import paginate
 
-    stmt = select(Course).where(Course.status == CourseStatus.published).order_by(Course.created_at.desc())
+    stmt = select(Course).where(Course.status == CourseStatus.published)
+    if subject:
+        stmt = stmt.where(Course.subject == subject)
+    if grade_level:
+        stmt = stmt.where(Course.grade_level == grade_level)
+    if language:
+        stmt = stmt.where(Course.language == language)
+    if institution:
+        stmt = stmt.where(Course.institution == institution)
+    if region:
+        stmt = stmt.where(Course.region == region)
+    stmt = stmt.order_by(Course.created_at.desc())
     return paginate(db, stmt, limit=limit, offset=offset)
 
 
-def create_course(db: Session, teacher: User, *, title: str, description: str | None, subject: str | None, status: CourseStatus) -> Course:
-    course = Course(title=title, description=description, subject=subject, teacher_id=teacher.id, status=status)
+def create_course(
+    db: Session,
+    teacher: User,
+    *,
+    title: str,
+    description: str | None,
+    subject: str | None,
+    status: CourseStatus,
+    grade_level: str | None = None,
+    language: str | None = None,
+    institution: str | None = None,
+    region: str | None = None,
+) -> Course:
+    course = Course(
+        title=title,
+        description=description,
+        subject=subject,
+        grade_level=grade_level,
+        language=language,
+        institution=institution,
+        region=region,
+        teacher_id=teacher.id,
+        status=status,
+    )
     db.add(course)
     db.commit()
     db.refresh(course)
@@ -151,6 +196,23 @@ def update_course(db: Session, course: Course, **fields) -> Course:
             setattr(course, key, value)
     db.commit()
     db.refresh(course)
+    return course
+
+
+def archive_course(db: Session, teacher: User, course: Course) -> Course:
+    """The only supported "delete": always archives rather than removing the row. A course
+    may already carry enrollments, lessons, assignments and class history, and this app never
+    cascade-deletes that activity just because a teacher wants a course off their active list.
+    Archived courses drop out of the catalog (list_catalog filters on published) and out of
+    self-enrollment, but stay visible to their teacher and already-enrolled students — nothing
+    is hidden or lost. Idempotent: archiving an already-archived course is a no-op."""
+    assert_owns_course(db, teacher, course)
+    if course.status == CourseStatus.archived:
+        return course
+    course.status = CourseStatus.archived
+    db.commit()
+    db.refresh(course)
+    audit_service.record(db, actor_id=teacher.id, action="course_archived", resource_type="course", resource_id=course.id)
     return course
 
 

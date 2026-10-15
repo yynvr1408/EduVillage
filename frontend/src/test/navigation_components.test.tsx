@@ -30,6 +30,7 @@ describe('Navigation & Domain Components', () => {
       teacher_name: 'Dr. Elena Rostova',
       created_at: new Date().toISOString(),
       lessons_count: 5,
+      status: 'published',
     }
 
     render(
