@@ -76,6 +76,18 @@ def _queue_summary_job(
     if duplicate is not None:
         existing_job = _latest_job_for(db, duplicate.id)
         if existing_job is not None:
+            # A dead-but-retryable job (e.g. a transient STT outage that has since been fixed)
+            # must not be handed back as-is: the caller always schedules process_summary_job on
+            # whatever job it gets, and _claim is a no-op on anything that isn't status=queued —
+            # so without this, asking again for the same source would silently never retry.
+            if (
+                existing_job.status == JobStatus.failed
+                and existing_job.error_code in RETRYABLE_ERROR_CODES
+                and existing_job.attempts < existing_job.max_attempts
+            ):
+                existing_job.status = JobStatus.queued
+                db.commit()
+                db.refresh(existing_job)
             return existing_job
 
     transcript = LectureTranscript(

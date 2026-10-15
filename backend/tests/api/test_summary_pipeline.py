@@ -31,6 +31,67 @@ def test_duplicate_request_for_same_transcript_reuses_the_job(teacher, live_clas
     assert other["job_id"] != first["job_id"]
 
 
+def test_a_retryable_failed_job_is_actually_retried_not_just_returned_dead(teacher, live_class, db_session):
+    """Regression: asking again for the same source after a transient, retryable failure (e.g. an
+    STT outage that has since been fixed) must actually reprocess the job, not just hand back the
+    same dead one — the API always schedules processing on whatever job it gets back, and that's
+    a silent no-op unless the dead job is flipped back to queued first."""
+    from app.db.models.enums import JobStatus, JobType, SummaryStatus, TranscriptStatus
+    from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
+    from app.services.summary_service import _source_hash
+
+    client, _ = teacher
+    content_hash = _source_hash(TRANSCRIPT, None, None)
+    t = LectureTranscript(class_id=live_class["id"], content=TRANSCRIPT, content_hash=content_hash, status=TranscriptStatus.ready)
+    db_session.add(t)
+    db_session.flush()
+    s = LectureSummary(class_id=live_class["id"], transcript_id=t.id, status=SummaryStatus.processing)
+    db_session.add(s)
+    db_session.flush()
+    dead_job = BackgroundJob(
+        job_type=JobType.summary_generation, status=JobStatus.failed, reference_id=s.id,
+        error_code="STT_CHUNK_FAILED", attempts=1, max_attempts=3,
+    )
+    db_session.add(dead_job)
+    db_session.commit()
+    dead_job_id = dead_job.id
+
+    result = _post(client, live_class["id"], transcript_text=TRANSCRIPT).json()
+    assert result["job_id"] == dead_job_id  # same job row, reused and actually reprocessed
+    db_session.expire_all()
+    assert db_session.get(BackgroundJob, dead_job_id).status.value == "completed"
+    assert db_session.get(LectureSummary, s.id).status.value == "needs_review"
+
+
+def test_a_dead_job_past_its_attempt_cap_is_not_resurrected(teacher, live_class, db_session):
+    """A job that already burned every retry must stay dead, not loop forever, even if it's
+    (unusually) still attached to a non-failed summary."""
+    from app.db.models.enums import JobStatus, JobType, SummaryStatus, TranscriptStatus
+    from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
+    from app.services.summary_service import _source_hash
+
+    client, _ = teacher
+    content_hash = _source_hash(TRANSCRIPT, None, None)
+    t = LectureTranscript(class_id=live_class["id"], content=TRANSCRIPT, content_hash=content_hash, status=TranscriptStatus.ready)
+    db_session.add(t)
+    db_session.flush()
+    s = LectureSummary(class_id=live_class["id"], transcript_id=t.id, status=SummaryStatus.processing)
+    db_session.add(s)
+    db_session.flush()
+    dead_job = BackgroundJob(
+        job_type=JobType.summary_generation, status=JobStatus.failed, reference_id=s.id,
+        error_code="STT_CHUNK_FAILED", attempts=3, max_attempts=3,
+    )
+    db_session.add(dead_job)
+    db_session.commit()
+    dead_job_id = dead_job.id
+
+    result = _post(client, live_class["id"], transcript_text=TRANSCRIPT).json()
+    assert result["job_id"] == dead_job_id
+    db_session.expire_all()
+    assert db_session.get(BackgroundJob, dead_job_id).status.value == "failed"
+
+
 def test_students_cannot_trigger_summary_generation(enrolled_student, live_class):
     sclient, _ = enrolled_student
     assert _post(sclient, live_class["id"], transcript_text=TRANSCRIPT).status_code == 403
