@@ -1,8 +1,16 @@
 fastapi
 uvicorn[standard]
 pydantic
-sqlalchemy
+pydantic[email]
+pydantic-settings
+sqlalchemy>=2.0
+alembic
 psycopg2-binary
+argon2-cffi
 python-dotenv
+python-multipart
+livekit-api
+boto3
+openai
 pytest
 httpx
