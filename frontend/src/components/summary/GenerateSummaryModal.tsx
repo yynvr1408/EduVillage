@@ -66,8 +66,10 @@ export const GenerateSummaryModal: React.FC<GenerateSummaryModalProps> = ({ isOp
         const job = await summaryService.getJobStatus(jobId)
         if (job.status === 'completed') return 'completed'
         if (job.status === 'failed') {
+          // The real server-side reason, when there is one, beats the generic per-code text.
           setError(
-            (job.error_code && JOB_ERROR_MESSAGES[job.error_code]) ||
+            job.error_message ||
+              (job.error_code && JOB_ERROR_MESSAGES[job.error_code]) ||
               `Generation failed (${job.error_code || 'unknown error'}).`
           )
           return 'failed'

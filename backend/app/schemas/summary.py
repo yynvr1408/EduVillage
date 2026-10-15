@@ -34,6 +34,7 @@ class JobStatusOut(BaseModel):
     status: JobStatus
     attempts: int
     error_code: str | None
+    error_message: str | None = None
     completed_at: UtcDatetime | None
 
 

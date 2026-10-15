@@ -53,6 +53,39 @@ function isNetworkFailure(err: unknown): boolean {
   return !(err instanceof DownloadError) && (err as { isNetworkError?: boolean })?.isNetworkError === true
 }
 
+/** Triggers the browser's native "save file" behavior (their actual Downloads folder, same as
+ * clicking a normal download link) for a Blob that's already sitting in memory/IndexedDB — no
+ * network request, works fully offline. */
+function saveBlobToDevice(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // Revoke after the click has had time to start the save (revoking immediately can cancel it in some browsers).
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+const EXT_BY_MIME: Record<string, string> = {
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+}
+
+function suggestFilename(title: string, mimeType: string | undefined): string {
+  const safeTitle = (title || 'download').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'download'
+  const hasExtAlready = /\.[a-z0-9]{2,4}$/i.test(safeTitle)
+  if (hasExtAlready) return safeTitle
+  const ext = (mimeType && EXT_BY_MIME[mimeType]) || 'dat'
+  return `${safeTitle}.${ext}`
+}
+
 export const downloadManager = {
   /**
    * Download a learning resource for offline use. Resumable, verified, and a no-op when a current,
@@ -333,5 +366,25 @@ export const downloadManager = {
       }
     }
     return { usageBytes: 0, quotaBytes: 0, percentageUsed: 0, availableMB: Number.MAX_SAFE_INTEGER, supported: false }
+  },
+
+  // ---------------------------------------------------------------- save to device (real file, not just IndexedDB)
+
+  /** Writes an already-downloaded resource's stored blob to the user's actual filesystem (their
+   * browser's Downloads folder, via the normal save dialog) — separate from being saved in
+   * IndexedDB for offline in-app viewing. Throws if the resource was never downloaded. */
+  async saveResourceToDevice(resourceId: string): Promise<void> {
+    const item = await db.downloadedResources.get(resourceId)
+    if (!item) throw new DownloadError('UNAVAILABLE', 'This file is not saved on this device yet.')
+    const blob = item.blob ?? (item.content != null ? new Blob([item.content], { type: 'text/plain' }) : null)
+    if (!blob) throw new DownloadError('UNAVAILABLE', 'This file has no stored content to save.')
+    saveBlobToDevice(blob, suggestFilename(item.title, blob.type))
+  },
+
+  /** Same, for a downloaded recorded lecture. */
+  async saveRecordingToDevice(recordingId: string): Promise<void> {
+    const item = await db.downloadedRecordings.get(recordingId)
+    if (!item?.blob) throw new DownloadError('UNAVAILABLE', 'This recording is not saved on this device yet.')
+    saveBlobToDevice(item.blob, suggestFilename(item.title, item.mimeType || item.blob.type))
   },
 }

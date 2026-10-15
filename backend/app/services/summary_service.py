@@ -76,6 +76,18 @@ def _queue_summary_job(
     if duplicate is not None:
         existing_job = _latest_job_for(db, duplicate.id)
         if existing_job is not None:
+            # A dead-but-retryable job (e.g. a transient STT outage that has since been fixed)
+            # must not be handed back as-is: the caller always schedules process_summary_job on
+            # whatever job it gets, and _claim is a no-op on anything that isn't status=queued —
+            # so without this, asking again for the same source would silently never retry.
+            if (
+                existing_job.status == JobStatus.failed
+                and existing_job.error_code in RETRYABLE_ERROR_CODES
+                and existing_job.attempts < existing_job.max_attempts
+            ):
+                existing_job.status = JobStatus.queued
+                db.commit()
+                db.refresh(existing_job)
             return existing_job
 
     transcript = LectureTranscript(
@@ -188,15 +200,15 @@ def process_summary_job(job_id: str) -> None:
                 # Retryable failures keep their finished chunks and stay pending, so the next attempt resumes.
                 if exc.code not in RETRYABLE_ERROR_CODES or job.attempts >= job.max_attempts:
                     transcript.status = TranscriptStatus.failed
-                _fail(db, job, summary, exc.code)
+                _fail(db, job, summary, exc.code, error_message=exc.message)
                 return
 
         try:
             content = llm_provider.generate_summary(transcript.content or "")
-        except Exception:  # noqa: BLE001 - provider/network failure => retryable
+        except Exception as exc:  # noqa: BLE001 - provider/network failure => retryable
             logger.exception("LLM call failed for job %s", job_id)
             db.rollback()
-            _fail(db, db.get(BackgroundJob, job_id), db.get(LectureSummary, summary.id), "LLM_ERROR")
+            _fail(db, db.get(BackgroundJob, job_id), db.get(LectureSummary, summary.id), "LLM_ERROR", error_message=str(exc)[:500])
             return
 
         done, total = transcription_service.chunk_summary(transcript)
@@ -212,23 +224,26 @@ def process_summary_job(job_id: str) -> None:
         job.completed_at = utcnow()
         db.commit()
         logger.info("summary_ready summary=%s generator=%s", summary.id, summary.generator)
-    except Exception:  # noqa: BLE001 - last-resort guard for background execution
+    except Exception as exc:  # noqa: BLE001 - last-resort guard for background execution
         logger.exception("summary job %s failed unexpectedly", job_id)
         db.rollback()
         job = db.get(BackgroundJob, job_id)
         if job:
-            _fail(db, job, db.get(LectureSummary, job.reference_id), "UNEXPECTED_ERROR")
+            _fail(db, job, db.get(LectureSummary, job.reference_id), "UNEXPECTED_ERROR", error_message=str(exc)[:500])
     finally:
         db.close()
 
 
-def _fail(db: Session, job: BackgroundJob, summary: LectureSummary | None, error_code: str) -> None:
+def _fail(
+    db: Session, job: BackgroundJob, summary: LectureSummary | None, error_code: str, *, error_message: str | None = None
+) -> None:
     job.status = JobStatus.failed
     job.error_code = error_code
+    job.error_message = error_message
     if summary is not None and (error_code not in RETRYABLE_ERROR_CODES or job.attempts >= job.max_attempts):
         summary.status = SummaryStatus.failed
     db.commit()
-    logger.warning("summary_job_failed job=%s code=%s attempts=%s", job.id, error_code, job.attempts)
+    logger.warning("summary_job_failed job=%s code=%s message=%s attempts=%s", job.id, error_code, error_message, job.attempts)
 
 
 def requeue_retryable_jobs(db: Session, *, stale_after_minutes: int = 15) -> int:

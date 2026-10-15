@@ -237,7 +237,12 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
     try {
       setIsDownloading(true)
       setPlaybackError(null)
-      await downloadManager.downloadRecording(recording)
+      // The signed playback URL on `recording` was fetched when this page loaded and expires
+      // after SIGNED_URL_TTL_SECONDS (5 min) — a student who sits on this page a while before
+      // clicking Download would otherwise download against a dead URL, where every chunk fails
+      // identically and surfaces as "connection was interrupted." Get a fresh one first.
+      const fresh = await api.getRecording(recording.id)
+      await downloadManager.downloadRecording(fresh)
       setIsDownloaded(true)
       setIsOfflineBlob(true)
       setDownloadSuccessMessage('Saved to IndexedDB. Available for offline viewing.')

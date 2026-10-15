@@ -51,4 +51,8 @@ class BackgroundJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     error_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # The real underlying reason (e.g. the actual provider error text), not just the fixed code —
+    # error_code alone was undiagnosable in production (e.g. "STT_CHUNK_FAILED" with no way to
+    # tell an expired API key from a quota limit from a malformed chunk).
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)

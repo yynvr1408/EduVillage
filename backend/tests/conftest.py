@@ -33,7 +33,11 @@ os.environ["STORAGE_BACKEND"] = "local"
 os.environ["FRONTEND_ORIGIN"] = "http://localhost:5173"
 # Set (not pop) to "": pydantic-settings reads backend/.env for any var absent from os.environ,
 # so a bare pop() would still leak a developer's real .env values into the test process.
-for _var in ("LLM_API_KEY", "LLM_BASE_URL", "SPEECH_TO_TEXT_API_KEY", "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"):
+for _var in (
+    "LLM_API_KEY", "LLM_BASE_URL",
+    "SPEECH_TO_TEXT_API_KEY", "SPEECH_TO_TEXT_BASE_URL",
+    "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
+):
     os.environ[_var] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402

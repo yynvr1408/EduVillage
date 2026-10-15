@@ -53,7 +53,10 @@ def _transcribe_chunk(path: Path, *, sleep=time.sleep, attempts: int = 3) -> str
             logger.warning("transcription attempt %d/%d failed: %s", attempt + 1, attempts, type(exc).__name__)
             if attempt < attempts - 1:
                 sleep(2**attempt)
-    raise AppError("The speech-to-text service failed for part of the recording.", code="STT_CHUNK_FAILED", status_code=502) from last
+    reason = str(last)[:300] if last else "unknown error"
+    raise AppError(
+        f"The speech-to-text service failed for part of the recording: {reason}", code="STT_CHUNK_FAILED", status_code=502
+    ) from last
 
 
 def transcribe_recording(db: Session, transcript: LectureTranscript, source: Path, workdir: Path, *, sleep=time.sleep) -> str:

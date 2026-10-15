@@ -43,7 +43,7 @@ def get_job(job_id: str, user: User = Depends(get_current_user), db: Session = D
     summary_service.assert_can_view_job(db, user, job)
     return JobStatusOut(
         id=job.id, job_type=job.job_type.value, status=job.status, attempts=job.attempts,
-        error_code=job.error_code, completed_at=job.completed_at,
+        error_code=job.error_code, error_message=job.error_message, completed_at=job.completed_at,
     )
 
 

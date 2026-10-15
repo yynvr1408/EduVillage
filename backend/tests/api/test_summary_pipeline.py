@@ -31,6 +31,67 @@ def test_duplicate_request_for_same_transcript_reuses_the_job(teacher, live_clas
     assert other["job_id"] != first["job_id"]
 
 
+def test_a_retryable_failed_job_is_actually_retried_not_just_returned_dead(teacher, live_class, db_session):
+    """Regression: asking again for the same source after a transient, retryable failure (e.g. an
+    STT outage that has since been fixed) must actually reprocess the job, not just hand back the
+    same dead one — the API always schedules processing on whatever job it gets back, and that's
+    a silent no-op unless the dead job is flipped back to queued first."""
+    from app.db.models.enums import JobStatus, JobType, SummaryStatus, TranscriptStatus
+    from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
+    from app.services.summary_service import _source_hash
+
+    client, _ = teacher
+    content_hash = _source_hash(TRANSCRIPT, None, None)
+    t = LectureTranscript(class_id=live_class["id"], content=TRANSCRIPT, content_hash=content_hash, status=TranscriptStatus.ready)
+    db_session.add(t)
+    db_session.flush()
+    s = LectureSummary(class_id=live_class["id"], transcript_id=t.id, status=SummaryStatus.processing)
+    db_session.add(s)
+    db_session.flush()
+    dead_job = BackgroundJob(
+        job_type=JobType.summary_generation, status=JobStatus.failed, reference_id=s.id,
+        error_code="STT_CHUNK_FAILED", attempts=1, max_attempts=3,
+    )
+    db_session.add(dead_job)
+    db_session.commit()
+    dead_job_id = dead_job.id
+
+    result = _post(client, live_class["id"], transcript_text=TRANSCRIPT).json()
+    assert result["job_id"] == dead_job_id  # same job row, reused and actually reprocessed
+    db_session.expire_all()
+    assert db_session.get(BackgroundJob, dead_job_id).status.value == "completed"
+    assert db_session.get(LectureSummary, s.id).status.value == "needs_review"
+
+
+def test_a_dead_job_past_its_attempt_cap_is_not_resurrected(teacher, live_class, db_session):
+    """A job that already burned every retry must stay dead, not loop forever, even if it's
+    (unusually) still attached to a non-failed summary."""
+    from app.db.models.enums import JobStatus, JobType, SummaryStatus, TranscriptStatus
+    from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
+    from app.services.summary_service import _source_hash
+
+    client, _ = teacher
+    content_hash = _source_hash(TRANSCRIPT, None, None)
+    t = LectureTranscript(class_id=live_class["id"], content=TRANSCRIPT, content_hash=content_hash, status=TranscriptStatus.ready)
+    db_session.add(t)
+    db_session.flush()
+    s = LectureSummary(class_id=live_class["id"], transcript_id=t.id, status=SummaryStatus.processing)
+    db_session.add(s)
+    db_session.flush()
+    dead_job = BackgroundJob(
+        job_type=JobType.summary_generation, status=JobStatus.failed, reference_id=s.id,
+        error_code="STT_CHUNK_FAILED", attempts=3, max_attempts=3,
+    )
+    db_session.add(dead_job)
+    db_session.commit()
+    dead_job_id = dead_job.id
+
+    result = _post(client, live_class["id"], transcript_text=TRANSCRIPT).json()
+    assert result["job_id"] == dead_job_id
+    db_session.expire_all()
+    assert db_session.get(BackgroundJob, dead_job_id).status.value == "failed"
+
+
 def test_students_cannot_trigger_summary_generation(enrolled_student, live_class):
     sclient, _ = enrolled_student
     assert _post(sclient, live_class["id"], transcript_text=TRANSCRIPT).status_code == 403
@@ -192,7 +253,7 @@ def test_transient_llm_failure_is_retried_up_to_the_cap_then_fails(queued_job, d
     from app.integrations import llm_provider
 
     def boom(text):
-        raise RuntimeError("provider down")
+        raise RuntimeError("provider down: quota exceeded")
 
     monkeypatch.setattr(llm_provider, "generate_summary", boom)
     job_id, summary_id = queued_job
@@ -201,6 +262,9 @@ def test_transient_llm_failure_is_retried_up_to_the_cap_then_fails(queued_job, d
     db_session.expire_all()
     job = db_session.get(BackgroundJob, job_id)
     assert job.status.value == "failed" and job.error_code == "LLM_ERROR" and job.attempts == job.max_attempts == 3
+    # The real underlying reason must be preserved, not just the generic code — this is what
+    # actually lets someone diagnose a failure (e.g. a quota error) instead of guessing.
+    assert "quota exceeded" in (job.error_message or "")
     assert db_session.get(LectureSummary, summary_id).status.value == "failed"
 
 
@@ -294,6 +358,9 @@ def test_summary_waits_for_every_chunk_retries_and_is_only_published_when_comple
     # First attempt: failed midway. It is retryable, so nothing is published or marked failed-for-good,
     # and the chunks that finished are kept.
     assert (j.status.value, j.error_code) == ("failed", "STT_CHUNK_FAILED")
+    # The real provider error must reach the stored message, not just the generic code — this
+    # is what actually lets someone tell a rate limit apart from, say, an expired key.
+    assert "rate limited" in (j.error_message or "")
     assert s.status.value == "processing" and not s.content_json  # no summary of a half-transcribed recording
     assert t.status.value == "pending" and sorted(t.chunk_state["done"]) == ["0", "1"]
     assert tclient.post(f"/api/v1/summaries/{s.id}/approve").status_code == 409  # cannot be approved/published
