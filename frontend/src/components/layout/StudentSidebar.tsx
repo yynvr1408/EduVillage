@@ -42,7 +42,7 @@ export const StudentSidebar: React.FC = () => {
                 }`
               }
             >
-              <Icon className="w-[18px] h-[18px] shrink-0" />
+              <Icon className="w-4.5 h-4.5 shrink-0" />
               <span>{item.label}</span>
             </NavLink>
           )
