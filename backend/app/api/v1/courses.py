@@ -5,7 +5,7 @@ from app.core.permissions import require_role
 from app.dependencies import get_current_user, get_db
 from app.db.models.enums import UserRole
 from app.db.models.user import User
-from app.schemas.course import CoTeacherCreate, CoTeacherOut, CourseCreate, CourseOut, CourseUpdate, EnrollmentCreate, EnrollmentOut
+from app.schemas.course import CoTeacherCreate, CoTeacherOut, CourseCreate, CourseDeleteOut, CourseOut, CourseUpdate, EnrollmentCreate, EnrollmentOut
 from app.schemas.lesson import LessonCreate, LessonOut, LessonUpdate
 from app.services import course_service
 
@@ -79,12 +79,13 @@ def update_course(
     return CourseOut.model_validate(course)
 
 
-@router.delete("/courses/{course_id}", response_model=CourseOut)
+@router.delete("/courses/{course_id}", response_model=CourseDeleteOut)
 def delete_course(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Always archives rather than deleting the row — see course_service.archive_course."""
+    """Permanently deletes an empty, untouched draft; archives (never destroys) anything with
+    real activity — see course_service.delete_or_archive_course."""
     course = course_service.get_course_or_404(db, course_id)
-    course = course_service.archive_course(db, user, course)
-    return _course_out(db, course)
+    deleted, remaining = course_service.delete_or_archive_course(db, user, course)
+    return CourseDeleteOut(deleted=deleted, course=_course_out(db, remaining) if remaining else None)
 
 
 @router.get("/courses/{course_id}/lessons", response_model=list[LessonOut])

@@ -51,8 +51,9 @@ export const courseService = {
     return api.updateCourse(id, data)
   },
 
-  async archiveCourse(id: string): Promise<Course> {
-    return api.archiveCourse(id)
+  /** Permanently deletes an empty course; archives (keeps, never destroys) one with real activity. */
+  async deleteCourse(id: string): Promise<{ deleted: boolean; course: Course | null }> {
+    return api.deleteCourse(id)
   },
 
   async createLesson(courseId: string, data: {

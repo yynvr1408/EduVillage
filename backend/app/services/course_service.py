@@ -2,9 +2,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
+from app.db.models.assignment import Assignment
+from app.db.models.classroom import Class
 from app.db.models.course import Course, CourseEnrollment, CourseTeacher
 from app.db.models.enums import CourseStatus, CourseTeacherRole, EnrollmentStatus, UserRole
-from app.db.models.lesson import Lesson
+from app.db.models.lesson import Lesson, LearningResource
+from app.db.models.section import Section
 from app.db.models.user import User
 from app.services import audit_service
 
@@ -197,6 +200,38 @@ def update_course(db: Session, course: Course, **fields) -> Course:
     db.commit()
     db.refresh(course)
     return course
+
+
+def _course_has_activity(db: Session, course_id: str) -> bool:
+    """True if anything beyond the bare course record exists for it — any one of these is
+    enough reason to archive instead of destroy (never silently drop student work, content a
+    teacher authored, or scheduled/historical classes)."""
+    checks = (
+        select(CourseEnrollment.id).where(CourseEnrollment.course_id == course_id),
+        select(Lesson.id).where(Lesson.course_id == course_id),
+        select(LearningResource.id).where(LearningResource.course_id == course_id),
+        select(Class.id).where(Class.course_id == course_id),
+        select(Section.id).where(Section.course_id == course_id),
+        select(Assignment.id).where(Assignment.course_id == course_id),
+        select(CourseTeacher.id).where(CourseTeacher.course_id == course_id),
+    )
+    return any(db.execute(stmt.limit(1)).first() is not None for stmt in checks)
+
+
+def delete_or_archive_course(db: Session, teacher: User, course: Course) -> tuple[bool, Course | None]:
+    """The real delete action. A genuinely empty, untouched draft is permanently removed
+    (returns (True, None)); anything with real activity is archived instead, same as
+    archive_course (returns (False, course)) — this is the hard guardrail the plan itself
+    calls for: "do not cascade-delete ... simply because a course is deleted"."""
+    assert_owns_course(db, teacher, course)
+    if _course_has_activity(db, course.id):
+        return False, archive_course(db, teacher, course)
+
+    course_id = course.id
+    db.delete(course)
+    db.commit()
+    audit_service.record(db, actor_id=teacher.id, action="course_deleted", resource_type="course", resource_id=course_id)
+    return True, None
 
 
 def archive_course(db: Session, teacher: User, course: Course) -> Course:

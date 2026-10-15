@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Search, BookOpen } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Plus, Search, BookOpen, CheckCircle2, X } from 'lucide-react'
 import { courseService } from '../../services/courseService'
 import type { Course } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
@@ -11,9 +11,20 @@ import { SkeletonCard } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 
 export const TeacherCoursesPage: React.FC = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [courses, setCourses] = useState<Course[]>([])
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [flashMessage, setFlashMessage] = useState<string | null>((location.state as any)?.flashMessage ?? null)
+
+  useEffect(() => {
+    // Clear the router state so refreshing/revisiting this page doesn't re-show a stale message.
+    if ((location.state as any)?.flashMessage) {
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -49,6 +60,26 @@ export const TeacherCoursesPage: React.FC = () => {
         </Link>
       }
     >
+      {flashMessage && (
+        <div
+          role="status"
+          className="mb-6 p-3 bg-[#DDF3EA] text-[#0F5B57] border border-[#0F5B57]/30 rounded-lg text-xs font-medium flex items-center justify-between gap-3"
+        >
+          <span className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            {flashMessage}
+          </span>
+          <button
+            type="button"
+            onClick={() => setFlashMessage(null)}
+            className="shrink-0 text-[#0F5B57] hover:opacity-70 cursor-pointer"
+            aria-label="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       <div className="mb-6 max-w-md">
         <Input
           type="search"

@@ -45,6 +45,15 @@ class CourseOut(BaseModel):
     teacher_name: str | None = None
 
 
+class CourseDeleteOut(BaseModel):
+    """deleted=True: the row is gone (it was an empty, untouched draft). deleted=False: it had
+    real activity (enrollments, lessons, classes...) so it was archived instead — course carries
+    the now-archived record."""
+
+    deleted: bool
+    course: CourseOut | None = None
+
+
 class EnrollmentCreate(BaseModel):
     student_id: str | None = None  # omitted => the authenticated student self-enrolls
 

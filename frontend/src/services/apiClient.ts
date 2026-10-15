@@ -360,8 +360,12 @@ export const api = {
         body: JSON.stringify({ title: data.title, description: data.description, subject: data.code, status: data.status }),
       })
     ),
-  /** Always archives rather than destroying the row — see the backend's course_service.archive_course. */
-  archiveCourse: async (id: string) => mapCourse(await apiRequest<Raw>(`/courses/${id}`, { method: 'DELETE' })),
+  /** Permanently deletes an empty, untouched course; archives (never destroys) anything with
+   * real activity — see the backend's course_service.delete_or_archive_course. */
+  deleteCourse: async (id: string): Promise<{ deleted: boolean; course: Course | null }> => {
+    const res = await apiRequest<{ deleted: boolean; course: Raw | null }>(`/courses/${id}`, { method: 'DELETE' })
+    return { deleted: res.deleted, course: res.course ? mapCourse(res.course) : null }
+  },
   createLesson: async (courseId: string, data: { title: string; content?: string; order_index?: number }) =>
     mapLesson(
       await apiRequest<Raw>(`/courses/${courseId}/lessons`, {
