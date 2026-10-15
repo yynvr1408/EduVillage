@@ -40,8 +40,9 @@ async function mockBackend(page: Page) {
 }
 
 async function signInAndJoin(page: Page) {
-  await page.goto('/login')
-  await page.click('text=Student Demo')
+  await page.goto('/login/student')
+  await page.fill('#email', 'student@eduvillage.org')
+  await page.fill('#password', 'student123')
   await page.click('button:has-text("Sign In")')
   await page.waitForURL(/\/student\/dashboard/)
   await page.goto('/classroom/k1')

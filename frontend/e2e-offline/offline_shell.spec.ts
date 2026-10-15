@@ -60,8 +60,9 @@ test('downloaded lectures open and play with the network completely disconnected
   await mockBackend(page)
 
   // 1. Online: sign in, let the service worker install, and create the local database.
-  await page.goto('/login')
-  await page.click('text=Student Demo')
+  await page.goto('/login/student')
+  await page.fill('#email', 'student@eduvillage.org')
+  await page.fill('#password', 'student123')
   await page.click('button:has-text("Sign In")')
   await page.waitForURL(/\/student\/dashboard/)
   await page.evaluate(() => navigator.serviceWorker.ready)
@@ -106,8 +107,9 @@ test('downloaded lectures open and play with the network completely disconnected
 
 test('the Downloads page is reachable from the dashboard while offline (client-side navigation)', async ({ page, context }) => {
   await mockBackend(page)
-  await page.goto('/login')
-  await page.click('text=Student Demo')
+  await page.goto('/login/student')
+  await page.fill('#email', 'student@eduvillage.org')
+  await page.fill('#password', 'student123')
   await page.click('button:has-text("Sign In")')
   await page.waitForURL(/\/student\/dashboard/)
   await page.evaluate(() => navigator.serviceWorker.ready)
