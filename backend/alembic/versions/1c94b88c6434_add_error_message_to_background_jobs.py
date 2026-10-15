@@ -1,7 +1,7 @@
 """add error_message to background_jobs
 
 Revision ID: 1c94b88c6434
-Revises: d4e9e92dd07b
+Revises: c3e0ffee0003
 Create Date: 2026-10-16 02:52:58.922725
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '1c94b88c6434'
-down_revision: Union[str, Sequence[str], None] = 'd4e9e92dd07b'
+down_revision: Union[str, Sequence[str], None] = 'c3e0ffee0003'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
