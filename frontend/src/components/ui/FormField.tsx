@@ -22,10 +22,10 @@ export const FormField: React.FC<FormFieldProps> = ({
   return (
     <div className={`flex flex-col gap-1.5 w-full ${className}`}>
       <div className="flex justify-between items-baseline">
-        <label htmlFor={htmlFor} className="text-xs font-semibold text-[#111111] tracking-wide">
+        <label htmlFor={htmlFor} className="text-xs font-semibold text-[#202B2A] tracking-wide">
           {label} {required && <span className="text-[#B42318]">*</span>}
         </label>
-        {hint && !error && <span className="text-xs text-[#666666]">{hint}</span>}
+        {hint && !error && <span className="text-xs text-[#687775]">{hint}</span>}
       </div>
       {children}
       {error && (

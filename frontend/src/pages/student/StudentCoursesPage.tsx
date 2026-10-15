@@ -63,7 +63,7 @@ export const StudentCoursesPage: React.FC = () => {
       subtitle="Explore rural-adapted curriculum modules, download study guides, and review lesson notes."
     >
       {enrollError && (
-        <div className="mb-4 p-3 bg-[#B42318]/10 text-[#B42318] rounded-md text-xs font-medium">{enrollError}</div>
+        <div className="mb-4 p-3 bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] rounded-lg text-xs font-medium">{enrollError}</div>
       )}
 
       {/* Search Input */}

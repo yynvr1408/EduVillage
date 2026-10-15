@@ -26,20 +26,20 @@ export const StudentProfilePage: React.FC = () => {
         {/* User Card */}
         <Card>
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-[#111111] text-[#FFFFFF] flex items-center justify-center font-bold text-lg shrink-0">
+            <div className="w-14 h-14 rounded-full bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-lg shrink-0">
               {user?.full_name?.charAt(0) || 'S'}
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-lg font-bold text-[#111111]">{user?.full_name}</h2>
+                <h2 className="text-lg font-bold text-[#202B2A]">{user?.full_name}</h2>
                 <Badge variant="secondary" size="sm" className="uppercase text-[10px]">
                   {user?.role}
                 </Badge>
               </div>
-              <p className="text-xs text-[#666666] flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5" /> {user?.email}
+              <p className="text-xs text-[#687775] flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-[#0F5B57]" /> {user?.email}
               </p>
-              <p className="text-[11px] text-[#888888] mt-1">
+              <p className="text-[11px] text-[#84908D] mt-1">
                 Registered: {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Active'}
               </p>
             </div>
@@ -48,14 +48,14 @@ export const StudentProfilePage: React.FC = () => {
 
         {/* Network & Low-Bandwidth Preferences */}
         <Card>
-          <CardHeader className="py-3 px-5 font-bold text-sm text-[#111111] flex items-center gap-2">
-            <Wifi className="w-4 h-4" /> Low-Bandwidth Optimization Settings
+          <CardHeader className="py-3 px-5 font-bold text-sm text-[#202B2A] flex items-center gap-2">
+            <Wifi className="w-4 h-4 text-[#0F5B57]" /> Low-Bandwidth Optimization Settings
           </CardHeader>
           <CardContent className="p-5 flex flex-col gap-4 text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-[#F5F5F5]">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E1E8E4]">
               <div>
-                <p className="font-semibold text-[#111111]">Always Start Live Classes in Audio-Only Mode</p>
-                <p className="text-[11px] text-[#666666]">
+                <p className="font-semibold text-[#202B2A]">Always Start Live Classes in Audio-Only Mode</p>
+                <p className="text-[11px] text-[#687775]">
                   Saves ~85% mobile data by muting presenter video streams unless explicitly toggled.
                 </p>
               </div>
@@ -63,14 +63,14 @@ export const StudentProfilePage: React.FC = () => {
                 type="checkbox"
                 checked={audioOnlyPref}
                 onChange={(e) => setAudioOnlyPref(e.target.checked)}
-                className="w-4 h-4 rounded border-[#CCCCCC] text-[#111111] focus:ring-[#111111]"
+                className="w-4 h-4 rounded border-[#CBD7D1] text-[#0F5B57] focus:ring-[#0F5B57]"
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-[#111111]">Current Network Diagnostic</p>
-                <p className="text-[11px] text-[#666666]">
+                <p className="font-semibold text-[#202B2A]">Current Network Diagnostic</p>
+                <p className="text-[11px] text-[#687775]">
                   Status: {isOnline ? `Online (${quality})` : 'Offline'} • Latency: {latencyMs}ms
                 </p>
               </div>
@@ -90,11 +90,11 @@ export const StudentProfilePage: React.FC = () => {
             variant="outline"
             fullWidth
             onClick={() => logout()}
-            icon={<LogOut className="w-4 h-4" />}
+            icon={<LogOut className="w-4 h-4 text-[#687775]" />}
           >
             Sign Out of EduVillage
           </Button>
-          <p className="text-[11px] text-[#666666] text-center mt-2">
+          <p className="text-[11px] text-[#687775] text-center mt-2">
             Signing out wipes draft tokens and pending queue records from this device for privacy.
           </p>
         </div>

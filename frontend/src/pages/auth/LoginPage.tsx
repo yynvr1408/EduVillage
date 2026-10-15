@@ -56,28 +56,28 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFFFF] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-[#111111] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
             EV
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
             EduVillage
           </h1>
-          <p className="text-xs text-[#666666] mt-1 max-w-xs">
+          <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
             Offline-first educational learning platform for reliable learning in low-bandwidth regions.
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl p-6 sm:p-8 shadow-xs">
-          <h2 className="text-lg font-bold text-[#111111] mb-5">Sign In to Your Account</h2>
+        <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs">
+          <h2 className="text-lg font-bold text-[#202B2A] mb-5">Sign In to Your Account</h2>
 
           {error && (
             <div
-              className="mb-5 p-3 rounded-md bg-[#B42318]/10 border border-[#B42318]/20 text-[#B42318] text-xs flex items-center gap-2"
+              className="mb-5 p-3 rounded-lg bg-[#FDE8E7] border border-[#B42318]/30 text-[#B42318] text-xs flex items-center gap-2"
               role="alert"
             >
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -112,18 +112,18 @@ export const LoginPage: React.FC = () => {
             </FormField>
 
             <div className="flex flex-col gap-2 pt-1">
-              <label className="flex items-center gap-2 text-xs text-[#666666] cursor-pointer">
+              <label className="flex items-center gap-2 text-xs text-[#687775] cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={isSharedDevice}
                   onChange={(e) => setSharedDevice(e.target.checked)}
-                  className="rounded border-[#CCCCCC] text-[#111111] focus:ring-[#111111]"
+                  className="rounded border-[#CBD7D1] text-[#0F5B57] focus:ring-[#0F5B57]"
                 />
-                <span className="font-medium text-[#111111]">Using a shared community / school device?</span>
+                <span className="font-medium text-[#202B2A]">Using a shared community / school device?</span>
               </label>
 
               {isSharedDevice && (
-                <div className="text-[11px] text-[#854D0E] bg-[#854D0E]/10 p-2 rounded border border-[#854D0E]/20 leading-relaxed">
+                <div className="text-[11px] text-[#8A5700] bg-[#FFF0CB] p-2.5 rounded-lg border border-[#8A5700]/30 leading-relaxed">
                   <strong>Shared Device Protection:</strong> Credentials will not be remembered on this browser, and private assignment drafts will be cleared upon sign-out to prevent access by subsequent learners.
                 </div>
               )}
@@ -131,7 +131,7 @@ export const LoginPage: React.FC = () => {
               <div className="flex justify-end text-xs pt-1">
                 <Link
                   to="/forgot-password"
-                  className="text-[#111111] hover:underline font-medium"
+                  className="text-[#0F5B57] hover:underline font-semibold"
                 >
                   Forgot password?
                 </Link>
@@ -150,35 +150,35 @@ export const LoginPage: React.FC = () => {
           </form>
 
           {/* Quick Demo Fill Buttons */}
-          <div className="mt-6 pt-5 border-t border-[#E5E5E5]">
-            <p className="text-[11px] font-semibold text-[#666666] uppercase tracking-wider mb-2.5 text-center">
+          <div className="mt-6 pt-5 border-t border-[#E1E8E4]">
+            <p className="text-[11px] font-bold text-[#687775] uppercase tracking-wider mb-2.5 text-center">
               Quick Demo Accounts
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => handleDemoFill('student')}
-                className="px-3 py-2 text-xs border border-[#E5E5E5] hover:border-[#111111] bg-[#F5F5F5] rounded-md text-[#111111] text-left transition-colors cursor-pointer"
+                className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
               >
-                <strong className="block">Student Demo</strong>
-                <span className="text-[10px] text-[#666666]">Amina Diallo</span>
+                <strong className="block text-[#0F5B57]">Student Demo</strong>
+                <span className="text-[10px] text-[#687775]">Amina Diallo</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoFill('teacher')}
-                className="px-3 py-2 text-xs border border-[#E5E5E5] hover:border-[#111111] bg-[#F5F5F5] rounded-md text-[#111111] text-left transition-colors cursor-pointer"
+                className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
               >
-                <strong className="block">Teacher Demo</strong>
-                <span className="text-[10px] text-[#666666]">Dr. Elena Rostova</span>
+                <strong className="block text-[#0F5B57]">Teacher Demo</strong>
+                <span className="text-[10px] text-[#687775]">Dr. Elena Rostova</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Footer Link */}
-        <p className="text-center text-xs text-[#666666] mt-6">
+        <p className="text-center text-xs text-[#687775] mt-6">
           Don't have an account yet?{' '}
-          <Link to="/register" className="font-semibold text-[#111111] hover:underline">
+          <Link to="/register" className="font-semibold text-[#0F5B57] hover:underline">
             Register here
           </Link>
         </p>

@@ -236,8 +236,8 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
   // Case 1: Recording is still being processed
   if (recording.status === 'PROCESSING') {
     return (
-      <div className="w-full bg-[#111111] text-[#FFFFFF] rounded-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center border border-[#E5E5E5] space-y-4">
-        <Clock className="w-12 h-12 text-[#854D0E] animate-pulse" />
+      <div className="w-full bg-[#202B2A] text-[#FFFFFF] rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center border border-[#CBD7D1] space-y-4 shadow-sm">
+        <Clock className="w-12 h-12 text-[#8A5700] animate-pulse" />
         <div className="space-y-1 max-w-md">
           <Badge variant="warning" className="uppercase tracking-wider">
             Processing Lecture
@@ -245,14 +245,14 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
           <h3 className="text-base sm:text-lg font-semibold text-[#FFFFFF] pt-2">
             Your lecture recording is being prepared.
           </h3>
-          <p className="text-xs sm:text-sm text-[#CCCCCC] leading-relaxed">
+          <p className="text-xs sm:text-sm text-[#CBD7D1] leading-relaxed">
             The video stream, audio isolation, and transcript are currently being finalized. You can return later to watch this recording.
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="bg-transparent text-[#FFFFFF] border-[#E5E5E5] hover:bg-[#222222]"
+          className="bg-transparent text-[#FFFFFF] border-[#CBD7D1] hover:bg-[#123B39]"
           onClick={() => window.location.reload()}
         >
           <RefreshCw className="w-4 h-4 mr-1.5" />
@@ -265,10 +265,10 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
   // Case 2: Recording processing failed or unavailable
   if (recording.status === 'FAILED' || (!recording.video_url && !mediaSrc)) {
     return (
-      <div className="w-full bg-[#F5F5F5] rounded-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center border border-[#E5E5E5] space-y-3">
+      <div className="w-full bg-[#F1F5F2] rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center border border-[#E1E8E4] space-y-3">
         <AlertCircle className="w-10 h-10 text-[#B42318]" />
-        <h3 className="text-base font-semibold text-[#111111]">Recording Unavailable</h3>
-        <p className="text-xs sm:text-sm text-[#666666] max-w-md">
+        <h3 className="text-base font-semibold text-[#202B2A]">Recording Unavailable</h3>
+        <p className="text-xs sm:text-sm text-[#687775] max-w-md leading-relaxed">
           {recording.status === 'FAILED'
             ? 'The recording for this live class encountered a processing error. The instructor has been notified.'
             : 'No media stream was generated for this session. Please review the AI summary and study guide below.'}
@@ -278,9 +278,9 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
   }
 
   return (
-    <div className="w-full bg-[#111111] rounded-sm overflow-hidden border border-[#E5E5E5] shadow-sm">
+    <div className="w-full bg-[#202B2A] rounded-2xl overflow-hidden border border-[#E1E8E4] shadow-md">
       {/* Video / Audio Canvas */}
-      <div className="relative aspect-video bg-black flex items-center justify-center">
+      <div className="relative aspect-video bg-[#121A19] flex items-center justify-center">
         <video
           ref={videoRef}
           src={mediaSrc || undefined}
@@ -296,10 +296,10 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
         {/* Audio-only Mode Visualizer */}
         {isAudioOnly && (
           <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
-            <Radio className="w-12 h-12 text-[#166534] animate-pulse" />
+            <Radio className="w-12 h-12 text-[#2364AA] animate-pulse" />
             <div>
               <p className="text-sm font-semibold text-[#FFFFFF]">Low-Bandwidth Audio-Only Mode</p>
-              <p className="text-xs text-[#999999] max-w-sm mt-1">
+              <p className="text-xs text-[#CBD7D1] max-w-sm mt-1">
                 Video track hidden to conserve cellular bandwidth on low-speed networks.
               </p>
             </div>
@@ -309,17 +309,17 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
         {/* Source Badge (Offline vs Network) */}
         <div className="absolute top-3 left-3 flex items-center space-x-2">
           {isOfflineBlob ? (
-            <Badge variant="success" className="bg-[#166534] text-[#FFFFFF] border-none text-[10px]">
+            <Badge variant="success" className="bg-[#E5F5EB] text-[#247A4D] border border-[#247A4D]/30 text-[10px]">
               <HardDrive className="w-3 h-3 mr-1 inline" /> Offline Storage
             </Badge>
           ) : (
-            <Badge variant="secondary" className="bg-[#222222] text-[#E5E5E5] border-[#444444] text-[10px]">
-              <Video className="w-3 h-3 mr-1 inline" /> Stream
+            <Badge variant="secondary" className="bg-[#202B2A] text-[#CBD7D1] border-[#374947] text-[10px]">
+              <Video className="w-3 h-3 mr-1 inline text-[#0F5B57]" /> Stream
             </Badge>
           )}
 
           {initialPositionSeconds > 0 && currentTime === initialPositionSeconds && (
-            <Badge variant="secondary" className="bg-[#222222] text-[#E5E5E5] border-[#444444] text-[10px]">
+            <Badge variant="secondary" className="bg-[#202B2A] text-[#CBD7D1] border-[#374947] text-[10px]">
               Resumed at {formatDuration(initialPositionSeconds)}
             </Badge>
           )}
@@ -330,7 +330,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
           <button
             onClick={togglePlay}
             aria-label="Play Recording"
-            className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-[#111111]/80 hover:bg-[#111111] text-[#FFFFFF] flex items-center justify-center border border-[#E5E5E5] transition-transform hover:scale-105"
+            className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-[#0F5B57]/90 hover:bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center border border-[#CBD7D1] transition-transform hover:scale-105 shadow-lg"
           >
             <Play className="w-7 h-7 ml-1" />
           </button>
@@ -339,7 +339,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
 
       {/* Playback Error Alert */}
       {playbackError && (
-        <div className="p-3 bg-[#B42318]/10 border-t border-[#B42318] text-[#B42318] text-xs flex items-center justify-between">
+        <div className="p-3 bg-[#FDE8E7] border-t border-[#B42318]/30 text-[#B42318] text-xs flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{playbackError}</span>
@@ -360,17 +360,17 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
 
       {/* Download Success Alert */}
       {downloadSuccessMessage && (
-        <div className="p-2.5 bg-[#166534]/10 border-t border-[#166534] text-[#166534] text-xs flex items-center space-x-2">
+        <div className="p-2.5 bg-[#E5F5EB] border-t border-[#247A4D]/30 text-[#247A4D] text-xs flex items-center space-x-2">
           <CheckCircle className="w-4 h-4 shrink-0" />
           <span>{downloadSuccessMessage}</span>
         </div>
       )}
 
       {/* Control Bar */}
-      <div className="bg-[#111111] text-[#FFFFFF] p-3 sm:p-4 space-y-2 border-t border-[#222222]">
+      <div className="bg-[#202B2A] text-[#FFFFFF] p-3 sm:p-4 space-y-2 border-t border-[#374947]">
         {/* Scrub Bar */}
         <div className="flex items-center space-x-3">
-          <span className="text-[11px] font-mono text-[#999999] min-w-9 text-right">
+          <span className="text-[11px] font-mono text-[#CBD7D1] min-w-9 text-right">
             {formatDuration(currentTime)}
           </span>
           <input
@@ -383,9 +383,9 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             onMouseUp={handleScrubEnd}
             onTouchEnd={handleScrubEnd}
             aria-label="Seek time"
-            className="w-full h-1.5 bg-[#333333] rounded-lg appearance-none cursor-pointer accent-[#FFFFFF]"
+            className="w-full h-1.5 bg-[#374947] rounded-lg appearance-none cursor-pointer accent-[#0F5B57]"
           />
-          <span className="text-[11px] font-mono text-[#999999] min-w-9">
+          <span className="text-[11px] font-mono text-[#CBD7D1] min-w-9">
             {formatDuration(duration)}
           </span>
         </div>
@@ -397,7 +397,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             <button
               onClick={togglePlay}
               aria-label={isPlaying ? 'Pause' : 'Play'}
-              className="p-2 rounded bg-[#FFFFFF] text-[#111111] hover:bg-[#E5E5E5] transition-colors"
+              className="p-2 rounded-lg bg-[#0F5B57] text-[#FFFFFF] hover:bg-[#123B39] transition-colors"
             >
               {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             </button>
@@ -405,7 +405,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             <button
               onClick={() => seekRelative(-10)}
               aria-label="Rewind 10 seconds"
-              className="p-1.5 text-[#CCCCCC] hover:text-[#FFFFFF] transition-colors"
+              className="p-1.5 text-[#CBD7D1] hover:text-[#FFFFFF] transition-colors"
               title="Rewind 10s"
             >
               <RotateCcw className="w-4 h-4" />
@@ -414,7 +414,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             <button
               onClick={() => seekRelative(10)}
               aria-label="Fast forward 10 seconds"
-              className="p-1.5 text-[#CCCCCC] hover:text-[#FFFFFF] transition-colors"
+              className="p-1.5 text-[#CBD7D1] hover:text-[#FFFFFF] transition-colors"
               title="Forward 10s"
             >
               <RotateCw className="w-4 h-4" />
@@ -425,7 +425,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
               <button
                 onClick={toggleMute}
                 aria-label={isMuted ? 'Unmute' : 'Mute'}
-                className="text-[#CCCCCC] hover:text-[#FFFFFF]"
+                className="text-[#CBD7D1] hover:text-[#FFFFFF]"
               >
                 {isMuted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
@@ -437,7 +437,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
                 aria-label="Volume"
-                className="w-16 h-1 bg-[#333333] rounded appearance-none cursor-pointer accent-[#FFFFFF]"
+                className="w-16 h-1 bg-[#374947] rounded appearance-none cursor-pointer accent-[#0F5B57]"
               />
             </div>
           </div>
@@ -447,10 +447,10 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             {/* Audio-only toggle */}
             <button
               onClick={() => setIsAudioOnly(!isAudioOnly)}
-              className={`text-xs px-2.5 py-1 rounded border transition-colors flex items-center space-x-1 ${
+              className={`text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center space-x-1 ${
                 isAudioOnly
-                  ? 'bg-[#166534] text-[#FFFFFF] border-[#166534]'
-                  : 'bg-[#222222] text-[#CCCCCC] border-[#444444] hover:text-[#FFFFFF]'
+                  ? 'bg-[#2364AA] text-[#FFFFFF] border-[#2364AA]'
+                  : 'bg-[#2A3735] text-[#CBD7D1] border-[#374947] hover:text-[#FFFFFF]'
               }`}
               title="Switch to audio-only stream to save bandwidth"
             >
@@ -462,7 +462,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             <button
               onClick={togglePlaybackRate}
               aria-label="Change playback speed"
-              className="text-xs px-2 py-1 rounded bg-[#222222] text-[#CCCCCC] hover:text-[#FFFFFF] border border-[#444444]"
+              className="text-xs px-2 py-1 rounded-md bg-[#2A3735] text-[#CBD7D1] hover:text-[#FFFFFF] border border-[#374947]"
             >
               {playbackRate}x
             </button>
@@ -479,7 +479,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
                 <span className="hidden sm:inline">{isDownloading ? 'Downloading...' : 'Offline'}</span>
               </button>
             ) : (
-              <span className="text-[11px] text-[#166534] flex items-center space-x-1 px-1.5 py-1">
+              <span className="text-[11px] text-[#247A4D] flex items-center space-x-1 px-1.5 py-1">
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Saved</span>
               </span>

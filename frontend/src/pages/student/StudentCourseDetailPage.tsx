@@ -92,14 +92,14 @@ export const StudentCourseDetailPage: React.FC = () => {
       <div className="mb-4">
         <Link
           to="/student/courses"
-          className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+          className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1.5"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Courses
         </Link>
       </div>
 
       {/* Course Overview Card */}
-      <div className="p-6 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl mb-8">
+      <div className="p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl mb-8">
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <Badge variant="outline" className="font-mono">
             {course.code}
@@ -108,15 +108,15 @@ export const StudentCourseDetailPage: React.FC = () => {
             {course.lessons?.length || 0} Lessons
           </Badge>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#111111] mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#202B2A] mb-2">
           {course.title}
         </h1>
         {course.teacher_name && (
-          <p className="text-xs text-[#666666] flex items-center gap-1.5 mb-4">
-            <User className="w-4 h-4" /> Instructor: <strong className="text-[#111111]">{course.teacher_name}</strong>
+          <p className="text-xs text-[#687775] flex items-center gap-1.5 mb-4">
+            <User className="w-4 h-4 text-[#0F5B57]" /> Instructor: <strong className="text-[#202B2A]">{course.teacher_name}</strong>
           </p>
         )}
-        <p className="text-sm text-[#666666] leading-relaxed max-w-3xl">
+        <p className="text-sm text-[#687775] leading-relaxed max-w-3xl">
           {course.description || 'Comprehensive curriculum optimized for offline and low-bandwidth learning.'}
         </p>
       </div>
@@ -125,12 +125,12 @@ export const StudentCourseDetailPage: React.FC = () => {
         {/* Left Column: Lessons list */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           <section>
-            <h2 className="text-lg font-bold text-[#111111] mb-3 flex items-center gap-2">
-              <BookOpen className="w-5 h-5" /> Course Curriculum & Lessons
+            <h2 className="text-lg font-bold text-[#202B2A] mb-3 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-[#0F5B57]" /> Course Curriculum & Lessons
             </h2>
 
             {(!course.lessons || course.lessons.length === 0) ? (
-              <div className="p-6 border border-[#E5E5E5] rounded-lg text-center text-xs text-[#666666]">
+              <div className="p-6 border border-dashed border-[#CBD7D1] bg-[#F8FAF7] rounded-xl text-center text-xs text-[#687775]">
                 Lessons are being uploaded by the instructor.
               </div>
             ) : (
@@ -139,11 +139,11 @@ export const StudentCourseDetailPage: React.FC = () => {
                   <Link
                     key={lesson.id}
                     to={`/student/lessons/${lesson.id}`}
-                    className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] hover:border-[#111111] rounded-lg flex items-center justify-between transition-colors group"
+                    className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] hover:border-[#CBD7D1] hover:bg-[#F8FAF7] rounded-xl flex items-center justify-between transition-colors group"
                   >
                     <div className="min-w-0 pr-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-[#111111] group-hover:underline truncate">
+                        <span className="text-xs font-semibold text-[#202B2A] group-hover:text-[#0F5B57] truncate">
                           {lesson.title}
                         </span>
                         {lesson.offline_ready && (
@@ -153,12 +153,12 @@ export const StudentCourseDetailPage: React.FC = () => {
                         )}
                       </div>
                       {lesson.description && (
-                        <p className="text-xs text-[#666666] line-clamp-1">
+                        <p className="text-xs text-[#687775] line-clamp-1">
                           {lesson.description}
                         </p>
                       )}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-[#666666] group-hover:text-[#111111] shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-[#84908D] group-hover:text-[#0F5B57] shrink-0" />
                   </Link>
                 ))}
               </div>
@@ -167,10 +167,10 @@ export const StudentCourseDetailPage: React.FC = () => {
 
           {/* Downloadable Course Materials */}
           <section>
-            <h2 className="text-lg font-bold text-[#111111] mb-3 flex items-center gap-2">
-              <FolderOpen className="w-5 h-5" /> Downloadable Course Materials
+            <h2 className="text-lg font-bold text-[#202B2A] mb-3 flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-[#0F5B57]" /> Downloadable Course Materials
             </h2>
-            <p className="text-xs text-[#666666] mb-4">
+            <p className="text-xs text-[#687775] mb-4">
               Save study resources to your device's IndexedDB storage for offline reading and playback.
             </p>
 
@@ -186,24 +186,24 @@ export const StudentCourseDetailPage: React.FC = () => {
         <div className="flex flex-col gap-6">
           {/* Related Live / Scheduled Classes */}
           <Card>
-            <CardHeader className="py-3 px-4 font-bold text-sm text-[#111111] flex items-center gap-2">
-              <Video className="w-4 h-4" /> Class Sessions
+            <CardHeader className="py-3 px-4 font-bold text-sm text-[#202B2A] flex items-center gap-2">
+              <Video className="w-4 h-4 text-[#0F5B57]" /> Class Sessions
             </CardHeader>
             <CardContent className="p-4 flex flex-col gap-3">
               {classes.length === 0 ? (
-                <p className="text-xs text-[#666666]">No class sessions currently scheduled.</p>
+                <p className="text-xs text-[#687775]">No class sessions currently scheduled.</p>
               ) : (
                 classes.map((c) => (
-                  <div key={c.id} className="p-3 bg-[#F5F5F5] rounded-md flex flex-col gap-2 text-xs">
+                  <div key={c.id} className="p-3 bg-[#F1F5F2] border border-[#E1E8E4] rounded-lg flex flex-col gap-2 text-xs">
                     <div className="flex items-center justify-between">
                       <Badge variant={c.status === 'LIVE' ? 'live' : 'secondary'} size="sm">
                         {c.status}
                       </Badge>
-                      <span className="text-[11px] text-[#666666]">
+                      <span className="text-[11px] text-[#687775]">
                         {new Date(c.scheduled_at).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className="font-semibold text-[#111111] line-clamp-1">{c.title}</p>
+                    <p className="font-semibold text-[#202B2A] line-clamp-1">{c.title}</p>
                     {c.status === 'LIVE' ? (
                       <Link to={`/classroom/${c.id}`} className="mt-1">
                         <Button size="sm" variant="primary" fullWidth>
@@ -225,17 +225,17 @@ export const StudentCourseDetailPage: React.FC = () => {
 
           {/* Related Assignments */}
           <Card>
-            <CardHeader className="py-3 px-4 font-bold text-sm text-[#111111] flex items-center gap-2">
-              <FileText className="w-4 h-4" /> Course Tasks
+            <CardHeader className="py-3 px-4 font-bold text-sm text-[#202B2A] flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#0F5B57]" /> Course Tasks
             </CardHeader>
             <CardContent className="p-4 flex flex-col gap-3">
               {assignments.length === 0 ? (
-                <p className="text-xs text-[#666666]">No assignments assigned yet.</p>
+                <p className="text-xs text-[#687775]">No assignments assigned yet.</p>
               ) : (
                 assignments.map((a) => (
-                  <div key={a.id} className="p-3 border border-[#E5E5E5] rounded-md flex flex-col gap-1.5 text-xs">
+                  <div key={a.id} className="p-3 border border-[#E1E8E4] bg-[#FFFFFF] rounded-lg flex flex-col gap-1.5 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[#111111] line-clamp-1">{a.title}</span>
+                      <span className="font-semibold text-[#202B2A] line-clamp-1">{a.title}</span>
                       {a.my_submission ? (
                         <Badge variant="success" size="sm">Submitted</Badge>
                       ) : (

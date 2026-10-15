@@ -92,7 +92,7 @@ export const StudentLessonPage: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <Link
           to={`/student/courses/${lesson.course_id}`}
-          className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+          className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1.5"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Curriculum
         </Link>
@@ -110,35 +110,35 @@ export const StudentLessonPage: React.FC = () => {
       </div>
 
       {/* Lesson Header */}
-      <div className="pb-6 mb-6 border-b border-[#E5E5E5]">
+      <div className="pb-6 mb-6 border-b border-[#E1E8E4]">
         {course && (
-          <span className="text-xs font-mono text-[#666666] uppercase tracking-wider block mb-1">
+          <span className="text-xs font-mono text-[#687775] uppercase tracking-wider block mb-1">
             {course.code} • Lesson {lesson.order_index}
           </span>
         )}
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#111111]">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#202B2A]">
           {lesson.title}
         </h1>
         {lesson.description && (
-          <p className="text-sm text-[#666666] mt-2 leading-relaxed">{lesson.description}</p>
+          <p className="text-sm text-[#687775] mt-2 leading-relaxed">{lesson.description}</p>
         )}
       </div>
 
       {/* Lesson Body Content */}
-      <article className="prose prose-neutral max-w-none mb-10 text-sm leading-relaxed text-[#111111] space-y-4">
+      <article className="prose prose-neutral max-w-none mb-10 text-sm leading-relaxed text-[#202B2A] space-y-4">
         {lesson.content ? (
-          <div className="p-6 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl font-sans whitespace-pre-wrap leading-relaxed">
+          <div className="p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl font-sans whitespace-pre-wrap leading-relaxed text-[#202B2A]">
             {lesson.content}
           </div>
         ) : (
-          <div className="p-8 border border-dashed border-[#E5E5E5] rounded-xl text-center text-xs text-[#666666]">
+          <div className="p-8 border border-dashed border-[#CBD7D1] bg-[#F8FAF7] rounded-2xl text-center text-xs text-[#687775]">
             Interactive lesson notes and formulas are stored here.
           </div>
         )}
       </article>
 
       {/* Previous / Next Lesson Navigation Footer */}
-      <div className="pt-6 border-t border-[#E5E5E5] flex items-center justify-between gap-4">
+      <div className="pt-6 border-t border-[#E1E8E4] flex items-center justify-between gap-4">
         {prevLesson ? (
           <Link to={`/student/lessons/${prevLesson.id}`} className="min-w-0">
             <Button size="sm" variant="outline" icon={<ArrowLeft className="w-3.5 h-3.5" />}>

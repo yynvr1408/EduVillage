@@ -55,17 +55,17 @@ export const Dialog: React.FC<DialogProps> = ({
         aria-hidden="true"
       />
       <div
-        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[90vh]`}
+        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl shadow-xl z-10 overflow-hidden flex flex-col max-h-[90vh]`}
       >
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E5E5E5]">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E1E8E4]">
           <div>
-            {title && <h2 className="text-base sm:text-lg font-semibold text-[#111111]">{title}</h2>}
-            {description && <p className="text-xs text-[#666666] mt-0.5">{description}</p>}
+            {title && <h2 className="text-base sm:text-lg font-semibold text-[#202B2A]">{title}</h2>}
+            {description && <p className="text-xs text-[#687775] mt-0.5">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-[#666666] hover:text-[#111111] rounded-md hover:bg-[#F5F5F5] transition-colors"
+            className="p-2 text-[#687775] hover:text-[#0F5B57] rounded-lg hover:bg-[#DDF3EA] transition-colors"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />

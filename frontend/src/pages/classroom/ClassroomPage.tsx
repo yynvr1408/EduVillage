@@ -94,14 +94,14 @@ const ClassroomStage: React.FC<{
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#0A0A0A] text-[#FFFFFF] overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-[#121A19] text-[#FFFFFF] overflow-hidden">
       {/* Top Header */}
-      <div className="bg-[#111111] border-b border-[#262626] h-14 px-4 flex items-center justify-between shrink-0">
+      <div className="bg-[#121A19] border-b border-[#202B2A] h-14 px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={onLeave}
-            className="p-1.5 text-[#AAAAAA] hover:text-[#FFFFFF] rounded-md hover:bg-[#262626]"
+            className="p-1.5 text-[#84908D] hover:text-[#FFFFFF] rounded-md hover:bg-[#202B2A] cursor-pointer"
             aria-label="Exit classroom"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -110,14 +110,14 @@ const ClassroomStage: React.FC<{
             <h1 className="font-bold text-sm sm:text-base text-[#FFFFFF] truncate">
               {classroom.title}
             </h1>
-            <p className="text-[11px] text-[#888888] truncate">
+            <p className="text-[11px] text-[#84908D] truncate">
               {classroom.course_title || 'Live Classroom Session'} • Teacher: {classroom.teacher_name}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-1.5 text-xs text-[#AAAAAA] bg-[#222222] px-2.5 py-1 rounded-full border border-[#333333]">
+          <div className="flex items-center gap-1.5 text-xs text-[#CBD7D1] bg-[#202B2A] px-2.5 py-1 rounded-full border border-[#374947]">
             <Users className="w-3.5 h-3.5 text-[#FFFFFF]" />
             <span>{remoteParticipants.length + 1}</span>
           </div>
@@ -130,9 +130,9 @@ const ClassroomStage: React.FC<{
 
       {/* Adaptive Audio-Only Banner Notification */}
       {isAudioOnly && (
-        <div className="bg-[#1E1B18] border-b border-[#854D0E]/40 px-4 py-2 flex items-center justify-between text-xs text-[#FEF08A]">
+        <div className="bg-[#E8F3FC] border-b border-[#CBD7D1] px-4 py-2 flex items-center justify-between text-xs text-[#2364AA]">
           <div className="flex items-center gap-2">
-            <Radio className="w-4 h-4 text-[#EAB308] shrink-0" />
+            <Radio className="w-4 h-4 text-[#2364AA] shrink-0" />
             <span>
               <strong>Audio-Only Mode Active:</strong> Incoming video tracks unsubscribed at transport layer to conserve cellular data. Audio remains crystal clear.
             </span>
@@ -140,7 +140,7 @@ const ClassroomStage: React.FC<{
           <button
             type="button"
             onClick={() => toggleAudioOnly(false)}
-            className="underline font-semibold hover:text-[#FFFFFF] text-[11px] cursor-pointer ml-3 shrink-0"
+            className="underline font-semibold hover:text-[#0F5B57] text-[11px] cursor-pointer ml-3 shrink-0"
           >
             Switch to Video
           </button>
@@ -154,14 +154,14 @@ const ClassroomStage: React.FC<{
           {isAudioOnly ? (
             /* Audio-Only Visualizer Mode */
             <div className="flex flex-col items-center justify-center p-8 max-w-md text-center">
-              <div className="w-24 h-24 rounded-full bg-[#1A1A1A] border-2 border-[#333333] flex items-center justify-center text-[#FFFFFF] mb-5 shadow-2xl relative">
-                <Volume2 className="w-10 h-10 text-[#22C55E] animate-pulse" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#22C55E] border-2 border-[#000000]" />
+              <div className="w-24 h-24 rounded-full bg-[#121A19] border-2 border-[#374947] flex items-center justify-center text-[#FFFFFF] mb-5 shadow-2xl relative">
+                <Volume2 className="w-10 h-10 text-[#2364AA] animate-pulse" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#2364AA] border-2 border-[#121A19]" />
               </div>
               <h2 className="text-lg font-bold text-[#FFFFFF] mb-1">
                 {classroom.teacher_name || 'Instructor'} Speaking
               </h2>
-              <p className="text-xs text-[#888888] max-w-xs mb-4">
+              <p className="text-xs text-[#84908D] max-w-xs mb-4">
                 Adaptive Low-Bandwidth Mode. Live audio playback stream is actively sustained.
               </p>
               <Badge variant="secondary" size="sm" className="font-mono text-[10px]">
@@ -171,11 +171,11 @@ const ClassroomStage: React.FC<{
           ) : tracks.length > 0 ? (
             /* Video Tracks Grid */
             <div className="w-full h-full max-w-5xl flex items-center justify-center">
-              <div className="w-full aspect-video max-h-[75vh] bg-[#111111] rounded-xl overflow-hidden border border-[#262626] relative shadow-2xl flex items-center justify-center">
+              <div className="w-full aspect-video max-h-[75vh] bg-[#121A19] rounded-xl overflow-hidden border border-[#202B2A] relative shadow-2xl flex items-center justify-center">
                 {tracks[0].publication?.track ? (
                   <VideoTrack trackRef={tracks[0]} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-[#666666]">
+                  <div className="flex flex-col items-center justify-center text-[#84908D]">
                     <User className="w-16 h-16 mb-2" />
                     <span className="text-sm font-medium">{classroom.teacher_name}</span>
                   </div>
@@ -188,11 +188,11 @@ const ClassroomStage: React.FC<{
           ) : (
             /* Waiting for presenter stream */
             <div className="flex flex-col items-center justify-center text-center p-6">
-              <div className="w-16 h-16 rounded-full bg-[#1A1A1A] border border-[#262626] flex items-center justify-center mb-3 text-[#888888]">
-                <Video className="w-8 h-8" />
+              <div className="w-16 h-16 rounded-full bg-[#121A19] border border-[#202B2A] flex items-center justify-center mb-3 text-[#84908D]">
+                <Video className="w-8 h-8 text-[#0F5B57]" />
               </div>
               <h3 className="font-semibold text-base text-[#FFFFFF] mb-1">Waiting for Video Stream</h3>
-              <p className="text-xs text-[#888888] max-w-sm mb-4">
+              <p className="text-xs text-[#84908D] max-w-sm mb-4">
                 Connected to room {classroom.livekit_room_name}. Media will stream when instructor starts video.
               </p>
               {isTeacher && (
@@ -206,16 +206,16 @@ const ClassroomStage: React.FC<{
 
         {/* Desktop Side Summary Panel (Does not disconnect active call!) */}
         {isSummaryPanelOpen && (
-          <aside className="hidden lg:flex flex-col w-96 bg-[#FFFFFF] text-[#111111] border-l border-[#E5E5E5] shrink-0 h-full overflow-hidden">
-            <div className="p-4 border-b border-[#E5E5E5] flex items-center justify-between">
-              <div className="flex items-center gap-2 font-bold text-sm text-[#111111]">
-                <Sparkles className="w-4 h-4" />
+          <aside className="hidden lg:flex flex-col w-96 bg-[#FFFFFF] text-[#202B2A] border-l border-[#E1E8E4] shrink-0 h-full overflow-hidden">
+            <div className="p-4 border-b border-[#E1E8E4] flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-sm text-[#202B2A]">
+                <Sparkles className="w-4 h-4 text-[#0F5B57]" />
                 <span>Live Lecture Notes</span>
               </div>
               <button
                 type="button"
                 onClick={() => setIsSummaryPanelOpen(false)}
-                className="p-1 text-[#666666] hover:text-[#111111] rounded"
+                className="p-1 text-[#687775] hover:text-[#0F5B57] rounded cursor-pointer"
                 aria-label="Close notes"
               >
                 <X className="w-4 h-4" />
@@ -225,8 +225,8 @@ const ClassroomStage: React.FC<{
               {summary ? (
                 <SummaryViewer summary={summary} isCompact={true} isTeacher={isTeacher} />
               ) : (
-                <div className="text-center py-12 text-[#666666] text-xs">
-                  <Sparkles className="w-8 h-8 mx-auto mb-2 text-[#999999]" />
+                <div className="text-center py-12 text-[#687775] text-xs">
+                  <Sparkles className="w-8 h-8 mx-auto mb-2 text-[#0F5B57]" />
                   Lecture notes and AI key concepts will be synthesized as the class concludes.
                 </div>
               )}
@@ -242,12 +242,12 @@ const ClassroomStage: React.FC<{
         title="Live Lecture Notes & Revision"
         position="bottom"
       >
-        <div className="text-left text-[#111111]">
+        <div className="text-left text-[#202B2A]">
           {summary ? (
             <SummaryViewer summary={summary} isCompact={true} isTeacher={isTeacher} />
           ) : (
-            <div className="text-center py-8 text-[#666666] text-xs">
-              <Sparkles className="w-8 h-8 mx-auto mb-2 text-[#999999]" />
+            <div className="text-center py-8 text-[#687775] text-xs">
+              <Sparkles className="w-8 h-8 mx-auto mb-2 text-[#0F5B57]" />
               Lecture summary will appear here once audio analysis completes.
             </div>
           )}
@@ -321,7 +321,7 @@ const RecordingBar: React.FC<{ classId: string; isTeacher: boolean; initiallyRec
 
   if (!isTeacher && !isRecording) return null
   return (
-    <div className="bg-[#111111] text-[#FFFFFF] text-xs px-4 py-2 flex items-center justify-between gap-3 border-b border-[#262626]" role="status">
+    <div className="bg-[#121A19] text-[#FFFFFF] text-xs px-4 py-2 flex items-center justify-between gap-3 border-b border-[#202B2A]" role="status">
       <span>
         {isRecording
           ? 'This session is being recorded, and the audio may be transcribed for lecture summaries.'
@@ -332,7 +332,7 @@ const RecordingBar: React.FC<{ classId: string; isTeacher: boolean; initiallyRec
           type="button"
           onClick={toggle}
           disabled={busy || (isRecording && !recordingId)}
-          className="px-3 py-1.5 rounded-md bg-[#262626] hover:bg-[#333333] disabled:opacity-50 cursor-pointer"
+          className="px-3 py-1.5 rounded-md bg-[#202B2A] hover:bg-[#374947] disabled:opacity-50 cursor-pointer"
         >
           {isRecording ? 'Stop recording' : 'Start recording'}
         </button>
@@ -402,7 +402,7 @@ export const ClassroomPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-white">
+      <div className="min-h-screen bg-[#121A19] flex items-center justify-center text-white">
         <LoadingState message="Verifying class credentials and requesting LiveKit token from server..." />
       </div>
     )
@@ -410,11 +410,11 @@ export const ClassroomPage: React.FC = () => {
 
   if (error || !classroom || !joinData) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4">
-        <div className="bg-[#111111] border border-[#262626] rounded-xl p-6 max-w-md w-full text-center">
+      <div className="min-h-screen bg-[#121A19] flex items-center justify-center p-4">
+        <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 max-w-md w-full text-center shadow-lg">
           <AlertTriangle className="w-10 h-10 text-[#B42318] mx-auto mb-3" />
-          <h2 className="text-base font-bold text-white mb-2">Classroom Access Denied</h2>
-          <p className="text-xs text-[#888888] mb-6">{error || 'Unable to authorize room token'}</p>
+          <h2 className="text-base font-bold text-[#202B2A] mb-2">Classroom Access Denied</h2>
+          <p className="text-xs text-[#687775] mb-6">{error || 'Unable to authorize room token'}</p>
           <Button variant="secondary" onClick={handleLeave}>
             Return to Dashboard
           </Button>

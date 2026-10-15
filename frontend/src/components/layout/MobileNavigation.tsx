@@ -45,7 +45,7 @@ export const MobileNavigation: React.FC<{
     return (
       <nav
         aria-label="Mobile Navigation"
-        className="fixed bottom-0 inset-x-0 z-40 bg-[#FFFFFF] border-t border-[#E5E5E5] lg:hidden safe-bottom"
+        className="fixed bottom-0 inset-x-0 z-40 bg-[#FFFFFF] border-t border-[#E1E8E4] lg:hidden safe-bottom shadow-[0_-2px_6px_rgba(32,43,42,0.03)]"
       >
         <div className="flex items-center justify-around h-14">
           {studentMobileNav.map((item) => {
@@ -57,7 +57,7 @@ export const MobileNavigation: React.FC<{
                 end={item.to === '/student/dashboard'}
                 className={({ isActive }) =>
                   `flex flex-col items-center justify-center flex-1 h-full touch-target transition-colors select-none ${
-                    isActive ? 'text-[#111111] font-semibold' : 'text-[#666666] hover:text-[#111111]'
+                    isActive ? 'text-[#0F5B57] font-bold' : 'text-[#687775] hover:text-[#0F5B57]'
                   }`
                 }
               >
@@ -79,7 +79,7 @@ export const MobileNavigation: React.FC<{
         title="Teacher Navigation"
         position="bottom"
       >
-        <div className="flex flex-col gap-1 pb-4">
+        <div className="flex flex-col gap-1.5 pb-4">
           {teacherNavItems.map((item) => {
             const Icon = item.icon
             return (
@@ -89,10 +89,10 @@ export const MobileNavigation: React.FC<{
                 end={item.to === '/teacher/dashboard'}
                 onClick={onCloseTeacherMenu}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium touch-target transition-colors ${
+                  `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold touch-target transition-colors ${
                     isActive
-                      ? 'bg-[#111111] text-[#FFFFFF]'
-                      : 'text-[#666666] hover:bg-[#F5F5F5] hover:text-[#111111]'
+                      ? 'bg-[#0F5B57] text-[#FFFFFF] shadow-xs'
+                      : 'text-[#687775] hover:bg-[#DDF3EA] hover:text-[#123B39]'
                   }`
                 }
               >

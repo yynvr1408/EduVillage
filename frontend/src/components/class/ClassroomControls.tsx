@@ -44,7 +44,7 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
   connectionState,
 }) => {
   return (
-    <div className="bg-[#111111] text-[#FFFFFF] border-t border-[#262626] p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 safe-bottom">
+    <div className="bg-[#121A19] text-[#FFFFFF] border-t border-[#202B2A] p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 safe-bottom">
       {/* Left: Connection State & Mode Badges */}
       <div className="flex items-center gap-2">
         <Badge
@@ -61,8 +61,8 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
         </Badge>
 
         {isAudioOnly && (
-          <Badge variant={isAdaptiveActive ? 'warning' : 'secondary'} size="sm">
-            <Radio className="w-3 h-3 mr-1" />
+          <Badge variant={isAdaptiveActive ? 'warning' : 'info'} size="sm">
+            <Radio className="w-3 h-3 mr-1 text-[#2364AA]" />
             {isAdaptiveActive ? 'Adaptive Audio-Only' : 'Manual Audio-Only'}
           </Badge>
         )}
@@ -76,7 +76,7 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
           onClick={onToggleMic}
           className={`p-3 rounded-full transition-colors touch-target flex items-center justify-center cursor-pointer ${
             isMicEnabled
-              ? 'bg-[#262626] hover:bg-[#333333] text-[#FFFFFF]'
+              ? 'bg-[#202B2A] hover:bg-[#374947] text-[#FFFFFF]'
               : 'bg-[#B42318] text-[#FFFFFF] hover:bg-[#911C13]'
           }`}
           title={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
@@ -92,7 +92,7 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
             onClick={onToggleCamera}
             className={`p-3 rounded-full transition-colors touch-target flex items-center justify-center cursor-pointer ${
               isCameraEnabled
-                ? 'bg-[#262626] hover:bg-[#333333] text-[#FFFFFF]'
+                ? 'bg-[#202B2A] hover:bg-[#374947] text-[#FFFFFF]'
                 : 'bg-[#B42318] text-[#FFFFFF] hover:bg-[#911C13]'
             }`}
             title={isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
@@ -108,8 +108,8 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
           onClick={onToggleAudioOnly}
           className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors cursor-pointer border ${
             isAudioOnly
-              ? 'bg-[#FFFFFF] text-[#111111] border-[#FFFFFF]'
-              : 'bg-[#262626] text-[#FFFFFF] border-[#333333] hover:bg-[#333333]'
+              ? 'bg-[#2364AA] text-[#FFFFFF] border-[#2364AA]'
+              : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
           }`}
           title="Toggle Audio-Only mode to conserve bandwidth"
           aria-label="Toggle Audio-Only mode"
@@ -126,8 +126,8 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
           onClick={onToggleSummary}
           className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors cursor-pointer border ${
             isSummaryOpen
-              ? 'bg-[#FFFFFF] text-[#111111] border-[#FFFFFF]'
-              : 'bg-[#262626] text-[#FFFFFF] border-[#333333] hover:bg-[#333333]'
+              ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+              : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
           }`}
           title="Open AI Lecture Summary Notes"
           aria-label="Open AI Lecture Summary Notes"

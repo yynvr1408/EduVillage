@@ -16,7 +16,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="relative w-full">
         {leftIcon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#666666]">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#687775]">
             {leftIcon}
           </div>
         )}
@@ -25,9 +25,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           type={inputType}
           className={`w-full h-11 px-3.5 ${leftIcon ? 'pl-10' : ''} ${
             isPassword ? 'pr-11' : ''
-          } bg-[#FFFFFF] text-[#111111] placeholder:text-[#888888] text-sm rounded-md border ${
-            isError ? 'border-[#B42318] focus:border-[#B42318]' : 'border-[#E5E5E5] focus:border-[#111111]'
-          } focus:outline-none transition-colors disabled:bg-[#F5F5F5] disabled:cursor-not-allowed ${className}`}
+          } bg-[#FFFFFF] text-[#202B2A] placeholder:text-[#687775] text-sm rounded-lg border ${
+            isError
+              ? 'border-[#B42318] focus:border-[#B42318] focus:ring-1 focus:ring-[#B42318]'
+              : 'border-[#CBD7D1] focus:border-[#0F5B57] focus:ring-1 focus:ring-[#0F5B57]'
+          } focus:outline-none transition-colors disabled:bg-[#F1F5F2] disabled:cursor-not-allowed ${className}`}
           {...props}
         />
         {isPassword && (
@@ -35,7 +37,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             type="button"
             tabIndex={-1}
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#666666] hover:text-[#111111] focus:outline-none"
+            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#687775] hover:text-[#0F5B57] focus:outline-none"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
           >
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

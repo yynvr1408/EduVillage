@@ -79,17 +79,17 @@ export const TeacherCreateClassPage: React.FC = () => {
       <div className="mb-4">
         <Link
           to="/teacher/classes"
-          className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+          className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1.5"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Class Sessions
         </Link>
       </div>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-[#111111]">
+        <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
           Schedule Class Session
         </h1>
-        <p className="text-xs text-[#666666] mt-1">
+        <p className="text-xs text-[#687775] mt-1">
           Set up a live interactive lecture room. A dedicated LiveKit room token will be issued for you and authorized students.
         </p>
       </div>
@@ -97,7 +97,7 @@ export const TeacherCreateClassPage: React.FC = () => {
       <Card>
         <CardContent className="p-6">
           {error && (
-            <div className="mb-5 p-3 rounded-md bg-[#B42318]/10 text-[#B42318] text-xs flex items-center gap-2">
+            <div className="mb-5 p-3 rounded-lg bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -154,7 +154,7 @@ export const TeacherCreateClassPage: React.FC = () => {
               />
             </FormField>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E5E5E5]">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E1E8E4]">
               <Link to="/teacher/classes">
                 <Button variant="ghost" size="sm">
                   Cancel

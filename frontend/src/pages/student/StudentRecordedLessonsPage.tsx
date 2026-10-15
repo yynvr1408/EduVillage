@@ -93,12 +93,12 @@ export const StudentRecordedLessonsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#E5E5E5] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#E1E8E4] pb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#202B2A]">
             Recorded Lessons Library
           </h1>
-          <p className="text-xs sm:text-sm text-[#666666] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#687775] mt-0.5">
             Watch missed lectures, review full transcripts, and download recordings for offline study.
           </p>
         </div>
@@ -107,7 +107,7 @@ export const StudentRecordedLessonsPage: React.FC = () => {
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#666666]" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#687775]" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -120,30 +120,30 @@ export const StudentRecordedLessonsPage: React.FC = () => {
         <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => setFilterMode('all')}
-            className={`px-3 py-1.5 rounded-sm text-xs font-medium border transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
               filterMode === 'all'
-                ? 'bg-[#111111] text-[#FFFFFF] border-[#111111]'
-                : 'bg-[#FFFFFF] text-[#666666] border-[#E5E5E5] hover:text-[#111111]'
+                ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+                : 'bg-[#FFFFFF] text-[#687775] border-[#CBD7D1] hover:bg-[#DDF3EA] hover:text-[#0F5B57]'
             }`}
           >
             All Lessons ({recordings?.length || 0})
           </button>
           <button
             onClick={() => setFilterMode('ready')}
-            className={`px-3 py-1.5 rounded-sm text-xs font-medium border transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
               filterMode === 'ready'
-                ? 'bg-[#111111] text-[#FFFFFF] border-[#111111]'
-                : 'bg-[#FFFFFF] text-[#666666] border-[#E5E5E5] hover:text-[#111111]'
+                ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+                : 'bg-[#FFFFFF] text-[#687775] border-[#CBD7D1] hover:bg-[#DDF3EA] hover:text-[#0F5B57]'
             }`}
           >
             Ready to Play
           </button>
           <button
             onClick={() => setFilterMode('downloaded')}
-            className={`px-3 py-1.5 rounded-sm text-xs font-medium border transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
               filterMode === 'downloaded'
-                ? 'bg-[#111111] text-[#FFFFFF] border-[#111111]'
-                : 'bg-[#FFFFFF] text-[#666666] border-[#E5E5E5] hover:text-[#111111]'
+                ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+                : 'bg-[#FFFFFF] text-[#687775] border-[#CBD7D1] hover:bg-[#DDF3EA] hover:text-[#0F5B57]'
             }`}
           >
             Downloaded ({downloadedIds.size})
@@ -162,7 +162,7 @@ export const StudentRecordedLessonsPage: React.FC = () => {
         />
       ) : filteredRecordings.length === 0 ? (
         <EmptyState
-          icon={<Video className="w-10 h-10 text-[#666666]" />}
+          icon={<Video className="w-10 h-10 text-[#0F5B57]" />}
           title={searchTerm ? 'No matching recorded lessons' : 'No recorded lessons available'}
           description={
             searchTerm
@@ -182,13 +182,13 @@ export const StudentRecordedLessonsPage: React.FC = () => {
             return (
               <Card
                 key={recording.id}
-                className="flex flex-col justify-between hover:border-[#111111] transition-colors p-4 sm:p-5"
+                className="flex flex-col justify-between hover:border-[#CBD7D1] transition-colors p-4 sm:p-5"
               >
                 <div className="space-y-3">
                   {/* Top metadata tags */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                      <span className="text-[11px] font-mono text-[#666666] uppercase bg-[#F5F5F5] px-2 py-0.5 rounded-sm border border-[#E5E5E5]">
+                      <span className="text-[11px] font-mono text-[#687775] uppercase bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         {recording.course_code || 'Course'}
                       </span>
                       {isProcessing ? (
@@ -206,19 +206,19 @@ export const StudentRecordedLessonsPage: React.FC = () => {
                       )}
                     </div>
 
-                    <span className="text-xs text-[#666666] font-medium flex items-center">
-                      <Clock className="w-3 h-3 mr-1" />
+                    <span className="text-xs text-[#687775] font-medium flex items-center">
+                      <Clock className="w-3 h-3 mr-1 text-[#687775]" />
                       {formatMinutes(recording.duration_seconds)}
                     </span>
                   </div>
 
                   {/* Title & Description */}
                   <div>
-                    <h2 className="text-base font-semibold text-[#111111] line-clamp-2">
+                    <h2 className="text-base font-semibold text-[#202B2A] line-clamp-2">
                       {recording.title}
                     </h2>
                     {recording.description && (
-                      <p className="text-xs text-[#666666] line-clamp-2 mt-1 leading-relaxed">
+                      <p className="text-xs text-[#687775] line-clamp-2 mt-1 leading-relaxed">
                         {recording.description}
                       </p>
                     )}
@@ -227,17 +227,17 @@ export const StudentRecordedLessonsPage: React.FC = () => {
                   {/* Feature badges (Transcript, Summary, Resumed) */}
                   <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
                     {recording.has_transcript && (
-                      <span className="inline-flex items-center text-[11px] text-[#666666] bg-[#F5F5F5] px-2 py-0.5 rounded border border-[#E5E5E5]">
-                        <FileText className="w-3 h-3 mr-1 text-[#111111]" /> Transcript
+                      <span className="inline-flex items-center text-[11px] text-[#687775] bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
+                        <FileText className="w-3 h-3 mr-1 text-[#2364AA]" /> Transcript
                       </span>
                     )}
                     {recording.has_summary && (
-                      <span className="inline-flex items-center text-[11px] text-[#666666] bg-[#F5F5F5] px-2 py-0.5 rounded border border-[#E5E5E5]">
-                        <Sparkles className="w-3 h-3 mr-1 text-[#111111]" /> AI Summary
+                      <span className="inline-flex items-center text-[11px] text-[#687775] bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
+                        <Sparkles className="w-3 h-3 mr-1 text-[#0F5B57]" /> AI Summary
                       </span>
                     )}
                     {hasProgress && !recording.user_completed && (
-                      <span className="inline-flex items-center text-[11px] text-[#854D0E] bg-[#854D0E]/10 px-2 py-0.5 rounded border border-[#854D0E]/20">
+                      <span className="inline-flex items-center text-[11px] text-[#8A5700] bg-[#FFF0CB] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         Resume at {formatDuration(recording.user_progress_seconds!)}
                       </span>
                     )}
@@ -245,9 +245,9 @@ export const StudentRecordedLessonsPage: React.FC = () => {
                 </div>
 
                 {/* Actions bottom row */}
-                <div className="pt-4 mt-4 border-t border-[#E5E5E5] flex items-center justify-between gap-2">
-                  <div className="text-[11px] text-[#666666]">
-                    Instructor: <span className="text-[#111111] font-medium">{recording.teacher_name}</span>
+                <div className="pt-4 mt-4 border-t border-[#E1E8E4] flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-[#687775]">
+                    Instructor: <span className="text-[#202B2A] font-medium">{recording.teacher_name}</span>
                   </div>
 
                   <div className="flex items-center space-x-2">

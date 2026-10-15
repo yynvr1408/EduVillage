@@ -24,12 +24,12 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
       maxWidth="md"
     >
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between p-3 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg">
+        <div className="flex items-center justify-between p-3.5 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl">
           <div>
-            <p className="text-xs font-semibold text-[#111111]">
+            <p className="text-xs font-semibold text-[#202B2A]">
               Status: {isOnline ? 'Connected to EduVillage Server' : 'Offline (Local Only)'}
             </p>
-            <p className="text-[11px] text-[#666666]">
+            <p className="text-[11px] text-[#687775]">
               {lastSyncTime ? `Last synced: ${lastSyncTime.toLocaleTimeString()}` : 'No sync recorded yet this session'}
             </p>
           </div>
@@ -39,8 +39,8 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         </div>
 
         {operations.length === 0 ? (
-          <div className="py-8 text-center text-[#666666] text-xs">
-            <CheckCircle className="w-8 h-8 mx-auto text-[#166534] mb-2" />
+          <div className="py-8 text-center text-[#687775] text-xs">
+            <CheckCircle className="w-8 h-8 mx-auto text-[#247A4D] mb-2" />
             All drafts and submissions are synchronized with the server.
           </div>
         ) : (
@@ -48,23 +48,23 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
             {operations.map((op) => (
               <div
                 key={op.id}
-                className="p-3 border border-[#E5E5E5] rounded-md flex items-center justify-between text-xs"
+                className="p-3 bg-[#FFFFFF] border border-[#E1E8E4] rounded-lg flex items-center justify-between text-xs"
               >
                 <div className="flex items-center gap-2.5">
                   {op.status === 'pending' ? (
-                    <Clock className="w-4 h-4 text-[#854D0E] shrink-0" />
+                    <Clock className="w-4 h-4 text-[#8A5700] shrink-0" />
                   ) : op.status === 'syncing' ? (
-                    <RefreshCw className="w-4 h-4 text-[#111111] animate-spin shrink-0" />
+                    <RefreshCw className="w-4 h-4 text-[#0F5B57] animate-spin shrink-0" />
                   ) : op.status === 'completed' ? (
-                    <CheckCircle className="w-4 h-4 text-[#166534] shrink-0" />
+                    <CheckCircle className="w-4 h-4 text-[#247A4D] shrink-0" />
                   ) : (
                     <AlertCircle className="w-4 h-4 text-[#B42318] shrink-0" />
                   )}
                   <div>
-                    <p className="font-medium text-[#111111]">
+                    <p className="font-medium text-[#202B2A]">
                       {op.operationType === 'submit_assignment' ? 'Assignment Submission' : 'Draft Save'}
                     </p>
-                    <p className="text-[10px] text-[#666666]">
+                    <p className="text-[10px] text-[#687775]">
                       Queued: {new Date(op.createdAt).toLocaleTimeString()}
                       {op.retryCount > 0 && ` • Retries: ${op.retryCount}`}
                     </p>
@@ -93,8 +93,8 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
           </div>
         )}
 
-        <div className="pt-2 flex justify-between items-center border-t border-[#E5E5E5]">
-          <span className="text-[11px] text-[#666666]">
+        <div className="pt-2 flex justify-between items-center border-t border-[#E1E8E4]">
+          <span className="text-[11px] text-[#687775]">
             Uses idempotent keys to guarantee zero duplicates
           </span>
           <Button

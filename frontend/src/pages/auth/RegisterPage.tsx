@@ -55,26 +55,26 @@ export const RegisterPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFFFF] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-[#111111] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
             EV
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
             Create EduVillage Account
           </h1>
-          <p className="text-xs text-[#666666] mt-1 max-w-xs">
+          <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
             Join low-bandwidth classrooms and access downloadable offline curricula.
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl p-6 sm:p-8 shadow-xs">
+        <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs">
           {error && (
             <div
-              className="mb-5 p-3 rounded-md bg-[#B42318]/10 border border-[#B42318]/20 text-[#B42318] text-xs flex items-center gap-2"
+              className="mb-5 p-3 rounded-lg bg-[#FDE8E7] border border-[#B42318]/30 text-[#B42318] text-xs flex items-center gap-2"
               role="alert"
             >
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -174,9 +174,9 @@ export const RegisterPage: React.FC = () => {
           </form>
         </div>
 
-        <p className="text-center text-xs text-[#666666] mt-6">
+        <p className="text-center text-xs text-[#687775] mt-6">
           Already registered?{' '}
-          <Link to="/login" className="font-semibold text-[#111111] hover:underline">
+          <Link to="/login" className="font-semibold text-[#0F5B57] hover:underline">
             Sign in here
           </Link>
         </p>

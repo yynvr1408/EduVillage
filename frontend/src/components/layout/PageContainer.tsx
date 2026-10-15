@@ -29,10 +29,10 @@ export const PageContainer: React.FC<PageContainerProps> = ({
   return (
     <div className={`w-full ${maxWidthStyles[maxWidth]} mx-auto px-4 sm:px-6 py-6 pb-20 lg:pb-8 ${className}`}>
       {(title || action) && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#E5E5E5]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#E1E8E4]">
           <div>
-            {title && <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#111111]">{title}</h1>}
-            {subtitle && <p className="text-xs sm:text-sm text-[#666666] mt-1">{subtitle}</p>}
+            {title && <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#202B2A]">{title}</h1>}
+            {subtitle && <p className="text-xs sm:text-sm text-[#687775] mt-1">{subtitle}</p>}
           </div>
           {action && <div className="shrink-0 flex items-center gap-2">{action}</div>}
         </div>

@@ -132,8 +132,8 @@ export const TeacherAssignmentsPage: React.FC = () => {
       }
     >
       {assignments.length === 0 ? (
-        <div className="p-8 border border-dashed border-[#E5E5E5] rounded-xl text-center text-xs text-[#666666]">
-          <FileCheck className="w-8 h-8 mx-auto text-[#666666] mb-2" />
+        <div className="p-8 border border-dashed border-[#CBD7D1] bg-[#F8FAF7] rounded-xl text-center text-xs text-[#687775]">
+          <FileCheck className="w-8 h-8 mx-auto text-[#0F5B57] mb-2" />
           No assignments authored yet. Click 'Create Assignment' above to create one.
         </div>
       ) : (
@@ -141,17 +141,17 @@ export const TeacherAssignmentsPage: React.FC = () => {
           {assignments.map((a) => (
             <div
               key={a.id}
-              className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+              className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
             >
               <div className="min-w-0 pr-2">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-sm text-[#111111]">{a.title}</span>
+                  <span className="font-bold text-sm text-[#202B2A]">{a.title}</span>
                   <Badge variant="outline" size="sm" className="font-mono">
                     {a.course_title || 'Course'}
                   </Badge>
                 </div>
-                <p className="text-[#666666] line-clamp-2 max-w-2xl mb-1">{a.instructions}</p>
-                <div className="flex items-center gap-2 text-[#888888]">
+                <p className="text-[#687775] line-clamp-2 max-w-2xl mb-1">{a.instructions}</p>
+                <div className="flex items-center gap-2 text-[#84908D]">
                   <span>Due: {new Date(a.due_date).toLocaleDateString()}</span>
                   <span>•</span>
                   <span>Max Score: {a.max_score} pts</span>
@@ -183,7 +183,7 @@ export const TeacherAssignmentsPage: React.FC = () => {
       >
         <form onSubmit={handleCreateAssignment} className="flex flex-col gap-4 text-xs">
           {error && (
-            <div className="p-3 bg-[#B42318]/10 text-[#B42318] rounded-md font-medium">
+            <div className="p-3 bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] rounded-lg font-medium">
               {error}
             </div>
           )}
@@ -240,7 +240,7 @@ export const TeacherAssignmentsPage: React.FC = () => {
             />
           </FormField>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E5E5E5]">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E1E8E4]">
             <Button
               type="button"
               variant="ghost"
@@ -272,31 +272,31 @@ export const TeacherAssignmentsPage: React.FC = () => {
       >
         <div className="flex flex-col gap-3 text-xs">
           {loadingSubmissions ? (
-            <p className="text-center py-6 text-[#666666]">Loading student responses...</p>
+            <p className="text-center py-6 text-[#687775]">Loading student responses...</p>
           ) : submissions.length === 0 ? (
-            <p className="text-center py-6 text-[#666666]">
+            <p className="text-center py-6 text-[#687775]">
               No student submissions received yet for this assignment.
             </p>
           ) : (
             submissions.map((sub) => (
               <div
                 key={sub.id}
-                className="p-4 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg flex flex-col gap-2"
+                className="p-4 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl flex flex-col gap-2"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#111111]">
+                    <span className="font-bold text-[#202B2A]">
                       {sub.student_name || 'Student'}
                     </span>
                     <Badge variant="success" size="sm">
                       {sub.status}
                     </Badge>
                   </div>
-                  <span className="text-[11px] text-[#666666]">
+                  <span className="text-[11px] text-[#687775]">
                     Submitted: {new Date(sub.submitted_at).toLocaleString()}
                   </span>
                 </div>
-                <div className="p-3 bg-[#FFFFFF] border border-[#E5E5E5] rounded text-[#111111] whitespace-pre-wrap leading-relaxed">
+                <div className="p-3 bg-[#FFFFFF] border border-[#E1E8E4] rounded-lg text-[#202B2A] whitespace-pre-wrap leading-relaxed">
                   {sub.content}
                 </div>
               </div>

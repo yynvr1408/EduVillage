@@ -45,11 +45,11 @@ export const TeacherSummariesPage: React.FC = () => {
           {summaries.map((sum) => (
             <div
               key={sum.id}
-              className="p-5 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl flex flex-col gap-4 shadow-2xs"
+              className="p-5 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl flex flex-col gap-4"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#F5F5F5]">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#E1E8E4]">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-[#111111]">
+                  <span className="font-bold text-sm text-[#202B2A]">
                     Class Session: {sum.class_id}
                   </span>
                   <Badge

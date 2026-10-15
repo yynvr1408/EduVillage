@@ -100,12 +100,12 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#E5E5E5] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#E1E8E4] pb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#202B2A]">
             Recorded Lessons & Resource Sharing
           </h1>
-          <p className="text-xs sm:text-sm text-[#666666] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#687775] mt-0.5">
             Manage captured lectures, monitor transcript processing, and reuse recordings across multi-section student cohorts.
           </p>
         </div>
@@ -113,7 +113,7 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
 
       {/* Search */}
       <div className="max-w-md relative">
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#666666]" />
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#687775]" />
         <Input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -133,7 +133,7 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
         />
       ) : filteredRecordings.length === 0 ? (
         <EmptyState
-          icon={<Video className="w-10 h-10 text-[#666666]" />}
+          icon={<Video className="w-10 h-10 text-[#0F5B57]" />}
           title="No recordings in library"
           description="Lectures conducted in LiveKit classrooms will automatically appear here once sessions conclude."
         />
@@ -143,12 +143,12 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
             const isProcessing = recording.status === 'PROCESSING'
 
             return (
-              <Card key={recording.id} className="p-4 sm:p-5 border border-[#E5E5E5]">
+              <Card key={recording.id} className="p-4 sm:p-5 border border-[#E1E8E4]">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   {/* Left Info */}
                   <div className="space-y-2 max-w-2xl">
                     <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                      <span className="text-[11px] font-mono text-[#666666] uppercase bg-[#F5F5F5] px-2 py-0.5 rounded-sm border border-[#E5E5E5]">
+                      <span className="text-[11px] font-mono text-[#687775] uppercase bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         {recording.course_code || 'Course'}
                       </span>
                       {isProcessing ? (
@@ -165,37 +165,37 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
                         </Badge>
                       )}
 
-                      <span className="text-xs text-[#666666]">
+                      <span className="text-xs text-[#687775]">
                         {Math.round(recording.duration_seconds / 60)} mins
                       </span>
                     </div>
 
-                    <h2 className="text-base sm:text-lg font-semibold text-[#111111]">
+                    <h2 className="text-base sm:text-lg font-semibold text-[#202B2A]">
                       {recording.title}
                     </h2>
 
                     {recording.description && (
-                      <p className="text-xs text-[#666666] line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-[#687775] line-clamp-2 leading-relaxed">
                         {recording.description}
                       </p>
                     )}
 
                     {/* Shared Sections pill list */}
-                    <div className="flex items-center space-x-2 text-xs text-[#666666] pt-1">
-                      <Users className="w-3.5 h-3.5 text-[#111111]" />
+                    <div className="flex items-center space-x-2 text-xs text-[#687775] pt-1">
+                      <Users className="w-3.5 h-3.5 text-[#0F5B57]" />
                       <span>Authorized Cohorts:</span>
                       <div className="flex items-center space-x-1 flex-wrap">
                         {recording.section_ids && recording.section_ids.length > 0 ? (
                           recording.section_ids.map((secId) => (
                             <span
                               key={secId}
-                              className="text-[10px] font-mono bg-[#F5F5F5] px-1.5 py-0.5 rounded border border-[#E5E5E5]"
+                              className="text-[10px] font-mono bg-[#F1F5F2] px-1.5 py-0.5 rounded border border-[#CBD7D1] text-[#202B2A]"
                             >
                               {secId}
                             </span>
                           ))
                         ) : (
-                          <span className="text-[11px] text-[#854D0E] italic">
+                          <span className="text-[11px] text-[#8A5700] italic">
                             All enrolled students in course
                           </span>
                         )}
@@ -261,33 +261,33 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
         >
           <div className="space-y-4 text-xs sm:text-sm">
             <div>
-              <p className="font-semibold text-[#111111]">{reuseModalRecording.title}</p>
-              <p className="text-xs text-[#666666] mt-0.5">
+              <p className="font-semibold text-[#202B2A]">{reuseModalRecording.title}</p>
+              <p className="text-xs text-[#687775] mt-0.5">
                 Select the authorized student cohorts / sections that should have access to this lecture.
               </p>
             </div>
 
-            <div className="space-y-2 border border-[#E5E5E5] rounded p-3 bg-[#F5F5F5]/40 max-h-48 overflow-y-auto">
+            <div className="space-y-2 border border-[#E1E8E4] rounded-lg p-3 bg-[#F1F5F2] max-h-48 overflow-y-auto">
               {!sections || sections.length === 0 ? (
-                <p className="text-xs text-[#666666] italic">No multi-section cohorts configured for this course.</p>
+                <p className="text-xs text-[#687775] italic">No multi-section cohorts configured for this course.</p>
               ) : (
                 sections.map((sec) => {
                   const isChecked = selectedSectionIds.includes(sec.id)
                   return (
                     <label
                       key={sec.id}
-                      className="flex items-center justify-between p-2 rounded hover:bg-[#FFFFFF] cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-2 rounded-lg hover:bg-[#FFFFFF] cursor-pointer transition-colors"
                     >
                       <div className="flex items-center space-x-2">
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => handleToggleSection(sec.id)}
-                          className="rounded border-[#CCCCCC] text-[#111111] focus:ring-[#111111]"
+                          className="rounded border-[#CBD7D1] text-[#0F5B57] focus:ring-[#0F5B57]"
                         />
-                        <span className="font-medium text-[#111111]">{sec.name}</span>
+                        <span className="font-medium text-[#202B2A]">{sec.name}</span>
                       </div>
-                      <span className="text-[11px] font-mono text-[#666666]">
+                      <span className="text-[11px] font-mono text-[#687775]">
                         {sec.student_count} students
                       </span>
                     </label>
@@ -296,11 +296,11 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
               )}
             </div>
 
-            <div className="p-2.5 bg-[#166534]/10 rounded border border-[#166534]/20 text-[11px] text-[#166534] leading-relaxed">
+            <div className="p-2.5 bg-[#E5F5EB] rounded-lg border border-[#CBD7D1] text-[11px] text-[#247A4D] leading-relaxed">
               <strong>Bandwidth & Storage Efficient:</strong> Reusing an authorized recording creates lightweight permission references without duplicating large media files or consuming storage quotas.
             </div>
 
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#E5E5E5]">
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#E1E8E4]">
               <Button
                 variant="outline"
                 size="sm"

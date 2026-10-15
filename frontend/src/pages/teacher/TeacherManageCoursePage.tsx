@@ -105,7 +105,7 @@ export const TeacherManageCoursePage: React.FC = () => {
         <div className="mb-4">
           <Link
             to="/teacher/courses"
-            className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+            className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Courses
           </Link>
@@ -120,14 +120,14 @@ export const TeacherManageCoursePage: React.FC = () => {
       <div className="mb-4">
         <Link
           to="/teacher/courses"
-          className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+          className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1.5"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Courses
         </Link>
       </div>
 
       {/* Header Info */}
-      <div className="p-6 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Badge variant="outline" className="font-mono">
@@ -137,10 +137,10 @@ export const TeacherManageCoursePage: React.FC = () => {
               {course.lessons?.length || 0} Lessons
             </Badge>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
             {course.title}
           </h1>
-          <p className="text-xs text-[#666666] mt-1 max-w-2xl">{course.description}</p>
+          <p className="text-xs text-[#687775] mt-1 max-w-2xl">{course.description}</p>
         </div>
 
         <Button
@@ -155,12 +155,12 @@ export const TeacherManageCoursePage: React.FC = () => {
 
       {/* Lessons List */}
       <section className="mb-8">
-        <h2 className="text-base font-bold text-[#111111] mb-3 flex items-center gap-2">
-          <BookOpen className="w-4 h-4" /> Curriculum Lessons
+        <h2 className="text-base font-bold text-[#202B2A] mb-3 flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-[#0F5B57]" /> Curriculum Lessons
         </h2>
 
         {(!course.lessons || course.lessons.length === 0) ? (
-          <div className="p-8 border border-dashed border-[#E5E5E5] rounded-xl text-center text-xs text-[#666666]">
+          <div className="p-8 border border-dashed border-[#CBD7D1] bg-[#F8FAF7] rounded-xl text-center text-xs text-[#687775]">
             No lessons created yet. Click 'Add New Lesson' to author curriculum notes.
           </div>
         ) : (
@@ -168,23 +168,23 @@ export const TeacherManageCoursePage: React.FC = () => {
             {course.lessons.map((lesson, idx) => (
               <div
                 key={lesson.id}
-                className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg flex items-center justify-between gap-4 text-xs"
+                className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl flex items-center justify-between gap-4 text-xs"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-[#666666] font-semibold">{idx + 1}.</span>
-                    <span className="font-bold text-[#111111] text-sm">{lesson.title}</span>
+                    <span className="font-mono text-[#687775] font-semibold">{idx + 1}.</span>
+                    <span className="font-bold text-[#202B2A] text-sm">{lesson.title}</span>
                     <Badge variant="secondary" size="sm" className="text-[10px]">
                       Offline Ready
                     </Badge>
                   </div>
                   {lesson.description && (
-                    <p className="text-[#666666] line-clamp-1">{lesson.description}</p>
+                    <p className="text-[#687775] line-clamp-1">{lesson.description}</p>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-[#666666]">
+                  <span className="text-[11px] text-[#687775]">
                     {lesson.content ? `${lesson.content.length} chars` : 'Empty'}
                   </span>
                 </div>
@@ -204,7 +204,7 @@ export const TeacherManageCoursePage: React.FC = () => {
       >
         <form onSubmit={handleAddLesson} className="flex flex-col gap-4 text-xs">
           {lessonError && (
-            <div className="p-3 bg-[#B42318]/10 text-[#B42318] rounded-md font-medium">
+            <div className="p-3 bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] rounded-lg font-medium">
               {lessonError}
             </div>
           )}
@@ -238,7 +238,7 @@ export const TeacherManageCoursePage: React.FC = () => {
             />
           </FormField>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E5E5E5]">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E1E8E4]">
             <Button
               type="button"
               variant="ghost"

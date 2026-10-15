@@ -80,15 +80,15 @@ export const TeacherDashboard: React.FC = () => {
   return (
     <PageContainer maxWidth="2xl">
       {/* Header Banner & Quick Action Bar */}
-      <div className="mb-6 p-6 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-6 p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
         <div>
-          <span className="text-xs font-semibold text-[#666666] uppercase tracking-wider block mb-1">
+          <span className="text-[11px] font-bold text-[#0F5B57] bg-[#DDF3EA] px-2.5 py-0.5 rounded-full uppercase tracking-wider inline-block mb-1.5 border border-[#CBD7D1]">
             Teacher Console
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
             Welcome, {user?.full_name}
           </h1>
-          <p className="text-xs sm:text-sm text-[#666666] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#687775] mt-1 leading-relaxed">
             Manage your courses, broadcast live audio/video sessions, and review AI summaries.
           </p>
         </div>
@@ -115,25 +115,25 @@ export const TeacherDashboard: React.FC = () => {
 
       {/* Stats Summary Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
-        <div className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg">
-          <p className="text-xs text-[#666666]">Active Courses</p>
-          <p className="text-xl sm:text-2xl font-bold text-[#111111] mt-1">{courses.length}</p>
+        <div className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl shadow-xs">
+          <p className="text-xs text-[#687775] font-medium">Active Courses</p>
+          <p className="text-xl sm:text-2xl font-bold text-[#202B2A] mt-1">{courses.length}</p>
         </div>
-        <div className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg">
-          <p className="text-xs text-[#666666]">Live / Scheduled</p>
-          <p className="text-xl sm:text-2xl font-bold text-[#111111] mt-1">
+        <div className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl shadow-xs">
+          <p className="text-xs text-[#687775] font-medium">Live / Scheduled</p>
+          <p className="text-xl sm:text-2xl font-bold text-[#202B2A] mt-1">
             {liveClasses.length + upcomingClasses.length}
           </p>
         </div>
-        <div className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg">
-          <p className="text-xs text-[#666666]">Pending Reviews</p>
-          <p className="text-xl sm:text-2xl font-bold text-[#B42318] mt-1">
+        <div className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl shadow-xs">
+          <p className="text-xs text-[#687775] font-medium">Pending Reviews</p>
+          <p className="text-xl sm:text-2xl font-bold text-[#8A5700] mt-1">
             {pendingSummaries.length}
           </p>
         </div>
-        <div className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg">
-          <p className="text-xs text-[#666666]">Assignments</p>
-          <p className="text-xl sm:text-2xl font-bold text-[#111111] mt-1">
+        <div className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl shadow-xs">
+          <p className="text-xs text-[#687775] font-medium">Assignments</p>
+          <p className="text-xl sm:text-2xl font-bold text-[#202B2A] mt-1">
             {assignments.length}
           </p>
         </div>
@@ -142,19 +142,21 @@ export const TeacherDashboard: React.FC = () => {
       <div className="flex flex-col gap-8">
         {/* Pending AI Summary Reviews Alert Section */}
         {pendingSummaries.length > 0 && (
-          <section className="p-5 bg-[#FFFFFF] border-2 border-[#111111] rounded-xl">
+          <section className="p-5 sm:p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl shadow-xs">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#111111]" />
-                <h2 className="text-base font-bold text-[#111111]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#DDF3EA] border border-[#CBD7D1] flex items-center justify-center text-[#0F5B57]">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-[#202B2A]">
                   AI Lecture Summaries Requiring Review ({pendingSummaries.length})
                 </h2>
               </div>
-              <Link to="/teacher/summaries" className="text-xs font-semibold text-[#111111] hover:underline">
+              <Link to="/teacher/summaries" className="text-xs font-semibold text-[#0F5B57] hover:underline">
                 View All
               </Link>
             </div>
-            <p className="text-xs text-[#666666] mb-4">
+            <p className="text-xs text-[#687775] mb-4 leading-relaxed">
               AI has synthesized lecture transcripts for completed sessions. Review and edit the key concepts and formulas before releasing to students.
             </p>
 
@@ -162,18 +164,18 @@ export const TeacherDashboard: React.FC = () => {
               {pendingSummaries.slice(0, 2).map((sum) => (
                 <div
                   key={sum.id}
-                  className="p-3.5 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  className="p-3.5 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant="warning" size="sm">
                         Needs Review
                       </Badge>
-                      <span className="text-[11px] text-[#666666]">
+                      <span className="text-[11px] text-[#687775]">
                         {new Date(sum.created_at).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className="font-semibold text-[#111111] line-clamp-1">{sum.overview}</p>
+                    <p className="font-semibold text-[#202B2A] line-clamp-1">{sum.overview}</p>
                   </div>
                   <Button
                     size="sm"
@@ -195,10 +197,10 @@ export const TeacherDashboard: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#111111]">Classroom Sessions</h2>
-              <p className="text-xs text-[#666666]">Start scheduled classrooms or enter live WebRTC rooms</p>
+              <h2 className="text-lg font-bold text-[#202B2A]">Classroom Sessions</h2>
+              <p className="text-xs text-[#687775]">Start scheduled classrooms or enter live WebRTC rooms</p>
             </div>
-            <Link to="/teacher/classes" className="text-xs font-semibold text-[#111111] hover:underline flex items-center gap-1">
+            <Link to="/teacher/classes" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
               All Sessions <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -209,7 +211,7 @@ export const TeacherDashboard: React.FC = () => {
               <SkeletonCard />
             </div>
           ) : classes.length === 0 ? (
-            <div className="p-8 border border-dashed border-[#E5E5E5] rounded-xl text-center text-xs text-[#666666]">
+            <div className="p-8 border border-dashed border-[#CBD7D1] rounded-2xl bg-[#F8FAF7] text-center text-xs text-[#687775]">
               No classes scheduled yet. Click 'Schedule Class' above to create one.
             </div>
           ) : (
@@ -231,10 +233,10 @@ export const TeacherDashboard: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#111111]">Curriculum Management</h2>
-              <p className="text-xs text-[#666666]">Add modules, manage lessons, and inspect student access</p>
+              <h2 className="text-lg font-bold text-[#202B2A]">Curriculum Management</h2>
+              <p className="text-xs text-[#687775]">Add modules, manage lessons, and inspect student access</p>
             </div>
-            <Link to="/teacher/courses" className="text-xs font-semibold text-[#111111] hover:underline flex items-center gap-1">
+            <Link to="/teacher/courses" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
               All Courses <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>

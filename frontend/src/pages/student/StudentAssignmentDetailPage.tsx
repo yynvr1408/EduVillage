@@ -46,7 +46,7 @@ export const StudentAssignmentDetailPage: React.FC = () => {
         <div className="mb-4">
           <Link
             to="/student/assignments"
-            className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+            className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Assignments
           </Link>
@@ -67,21 +67,21 @@ export const StudentAssignmentDetailPage: React.FC = () => {
       <div className="mb-4">
         <Link
           to="/student/assignments"
-          className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+          className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1.5"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Assignments
         </Link>
       </div>
 
       {/* Assignment Header Card */}
-      <div className="p-6 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl mb-6">
+      <div className="p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl mb-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <span className="text-xs font-semibold text-[#666666]">
+          <span className="text-xs font-semibold text-[#687775]">
             {assignment.course_title || 'Course Assignment'}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#666666] flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />
+            <span className="text-xs text-[#687775] flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-[#687775]" />
               Due: {new Date(assignment.due_date).toLocaleDateString()}
             </span>
             <Badge variant={isServerSubmitted ? 'success' : 'outline'}>
@@ -90,24 +90,24 @@ export const StudentAssignmentDetailPage: React.FC = () => {
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#111111] mb-4">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#202B2A] mb-4">
           {assignment.title}
         </h1>
 
         {/* Instructions */}
-        <div className="p-4 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg text-xs sm:text-sm text-[#111111] leading-relaxed whitespace-pre-wrap font-sans">
+        <div className="p-4 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl text-xs sm:text-sm text-[#202B2A] leading-relaxed whitespace-pre-wrap font-sans">
           {assignment.instructions}
         </div>
       </div>
 
       {/* Existing Server Submission Banner if Graded / Submitted */}
       {isServerSubmitted && (
-        <div className="p-4 bg-[#166534]/10 border border-[#166534]/20 rounded-xl mb-6 text-xs text-[#166534] flex items-center justify-between">
+        <div className="p-4 bg-[#E5F5EB] border border-[#CBD7D1] rounded-2xl mb-6 text-xs text-[#247A4D] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-[#247A4D]" />
             <div>
-              <p className="font-bold">Submission Confirmed by Server</p>
-              <p className="text-[11px] text-[#166534]/80">
+              <p className="font-bold text-[#247A4D]">Submission Confirmed by Server</p>
+              <p className="text-[11px] text-[#247A4D]">
                 Submitted on {new Date(assignment.my_submission!.submitted_at).toLocaleString()}
                 {assignment.my_submission!.score !== null &&
                   ` • Score: ${assignment.my_submission!.score} / ${assignment.max_score}`}
@@ -116,8 +116,8 @@ export const StudentAssignmentDetailPage: React.FC = () => {
           </div>
           {assignment.my_submission!.feedback && (
             <div className="text-right">
-              <span className="font-semibold block">Teacher Feedback:</span>
-              <span>{assignment.my_submission!.feedback}</span>
+              <span className="font-semibold block text-[#247A4D]">Teacher Feedback:</span>
+              <span className="text-[#202B2A]">{assignment.my_submission!.feedback}</span>
             </div>
           )}
         </div>
@@ -125,8 +125,8 @@ export const StudentAssignmentDetailPage: React.FC = () => {
 
       {/* Offline-Capable Draft & Submission Editor */}
       <section>
-        <h2 className="text-base font-bold text-[#111111] mb-2 flex items-center gap-2">
-          <FileText className="w-4 h-4" /> Your Response & Calculations
+        <h2 className="text-base font-bold text-[#202B2A] mb-2 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-[#0F5B57]" /> Your Response & Calculations
         </h2>
         <OfflineDraftEditor
           assignment={assignment}

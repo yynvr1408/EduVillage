@@ -100,20 +100,20 @@ export const StudentDashboard: React.FC = () => {
   return (
     <PageContainer maxWidth="2xl">
       {/* Welcome & Connectivity State Banner */}
-      <div className="mb-6 p-5 sm:p-6 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-6 p-5 sm:p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[11px] font-bold text-[#0F5B57] bg-[#DDF3EA] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-[#CBD7D1]">
               Student Workspace
             </span>
-            <Badge variant={isOnline ? 'success' : 'default'} size="sm">
+            <Badge variant={isOnline ? 'success' : 'warning'} size="sm">
               {isOnline ? 'Online' : 'Offline Mode'}
             </Badge>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#202B2A]">
             Welcome back, {user?.full_name || 'Student'}
           </h1>
-          <p className="text-xs sm:text-sm text-[#666666] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#687775] mt-1 leading-relaxed">
             {isOnline
               ? `Connected to EduVillage. Latency: ${latencyMs}ms (${quality}). All features active.`
               : 'Working offline. Saved downloads and local assignment drafts remain fully accessible.'}
@@ -123,11 +123,11 @@ export const StudentDashboard: React.FC = () => {
         {/* Quick Sync & Offline Status Widget */}
         <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
           {pendingCount > 0 ? (
-            <div className="flex items-center gap-2 p-2 px-3 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg text-xs">
-              <Clock className="w-4 h-4 text-[#854D0E]" />
+            <div className="flex items-center gap-2.5 p-2.5 px-3 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl text-xs">
+              <Clock className="w-4 h-4 text-[#8A5700]" />
               <div>
-                <p className="font-semibold text-[#111111]">{pendingCount} Waiting to Sync</p>
-                <p className="text-[10px] text-[#666666]">Local drafts queued</p>
+                <p className="font-semibold text-[#202B2A]">{pendingCount} Waiting to Sync</p>
+                <p className="text-[10px] text-[#687775]">Local drafts queued</p>
               </div>
               <Button
                 size="sm"
@@ -140,11 +140,11 @@ export const StudentDashboard: React.FC = () => {
               </Button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 p-2 px-3 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg text-xs">
-              <CheckCircle2 className="w-4 h-4 text-[#166534]" />
+            <div className="flex items-center gap-2.5 p-2.5 px-3.5 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl text-xs">
+              <CheckCircle2 className="w-4 h-4 text-[#247A4D]" />
               <div>
-                <p className="font-semibold text-[#111111]">Up to Date</p>
-                <p className="text-[10px] text-[#666666]">{downloads.length} items offline</p>
+                <p className="font-semibold text-[#202B2A]">Up to Date</p>
+                <p className="text-[10px] text-[#687775]">{downloads.length} items offline</p>
               </div>
             </div>
           )}
@@ -153,20 +153,20 @@ export const StudentDashboard: React.FC = () => {
 
       {/* Live Class Alert (If any class is actively LIVE) */}
       {liveClasses.length > 0 && (
-        <div className="mb-8 p-4 sm:p-5 bg-[#111111] text-[#FFFFFF] rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-[#B42318] animate-ping" />
+        <div className="mb-8 p-5 sm:p-6 bg-[#0F5B57] text-[#FFFFFF] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <span className="w-3.5 h-3.5 rounded-full bg-[#E5F5EB] border-2 border-[#247A4D] animate-ping shrink-0" />
             <div>
               <div className="flex items-center gap-2">
                 <Badge variant="live" size="sm">
                   LIVE CLASS NOW
                 </Badge>
-                <span className="text-xs text-[#AAAAAA]">{liveClasses[0].course_code}</span>
+                <span className="text-xs text-[#DDF3EA] font-mono">{liveClasses[0].course_code}</span>
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-[#FFFFFF] mt-0.5">
+              <h2 className="text-base sm:text-lg font-bold text-[#FFFFFF] mt-1">
                 {liveClasses[0].title}
               </h2>
-              <p className="text-xs text-[#CCCCCC]">Instructor: {liveClasses[0].teacher_name}</p>
+              <p className="text-xs text-[#DDF3EA] opacity-90">Instructor: {liveClasses[0].teacher_name}</p>
             </div>
           </div>
 
@@ -184,10 +184,10 @@ export const StudentDashboard: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#111111]">My Enrolled Courses</h2>
-              <p className="text-xs text-[#666666]">Access curriculum modules, lessons, and offline assets</p>
+              <h2 className="text-lg font-bold text-[#202B2A]">My Enrolled Courses</h2>
+              <p className="text-xs text-[#687775]">Access curriculum modules, lessons, and offline assets</p>
             </div>
-            <Link to="/student/courses" className="text-xs font-semibold text-[#111111] hover:underline flex items-center gap-1">
+            <Link to="/student/courses" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
               Browse All <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -216,10 +216,10 @@ export const StudentDashboard: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#111111]">Live Classes Timetable</h2>
-              <p className="text-xs text-[#666666]">Join sessions or review synthesized lecture summaries</p>
+              <h2 className="text-lg font-bold text-[#202B2A]">Live Classes Timetable</h2>
+              <p className="text-xs text-[#687775]">Join sessions or review synthesized lecture summaries</p>
             </div>
-            <Link to="/student/classes" className="text-xs font-semibold text-[#111111] hover:underline flex items-center gap-1">
+            <Link to="/student/classes" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
               Full Schedule <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -248,10 +248,10 @@ export const StudentDashboard: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#111111]">Recent Recorded Lessons</h2>
-              <p className="text-xs text-[#666666]">Watch lecture replays, read AI summaries, or download for offline revision</p>
+              <h2 className="text-lg font-bold text-[#202B2A]">Recent Recorded Lessons</h2>
+              <p className="text-xs text-[#687775]">Watch lecture replays, read AI summaries, or download for offline revision</p>
             </div>
-            <Link to="/student/recorded-lessons" className="text-xs font-semibold text-[#111111] hover:underline flex items-center gap-1">
+            <Link to="/student/recorded-lessons" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
               All Recordings <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -272,11 +272,11 @@ export const StudentDashboard: React.FC = () => {
               {recordings.slice(0, 2).map((rec) => (
                 <div
                   key={rec.id}
-                  className="bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-[#111111] transition-colors"
+                  className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-[#CBD7D1] transition-all shadow-xs"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono font-semibold px-2 py-0.5 bg-[#F5F5F5] border border-[#E5E5E5] rounded text-[#111111]">
+                      <span className="text-[11px] font-mono font-semibold px-2 py-0.5 bg-[#DDF3EA] border border-[#CBD7D1] rounded text-[#0F5B57]">
                         {rec.course_code || 'Recorded'}
                       </span>
                       <Badge variant={rec.status === 'READY' ? 'success' : 'default'} size="sm">
@@ -284,30 +284,30 @@ export const StudentDashboard: React.FC = () => {
                       </Badge>
                     </div>
 
-                    <h3 className="font-bold text-sm sm:text-base text-[#111111] line-clamp-2">
+                    <h3 className="font-bold text-sm sm:text-base text-[#202B2A] line-clamp-2">
                       {rec.title}
                     </h3>
 
-                    <div className="flex items-center gap-3 text-xs text-[#666666] flex-wrap">
+                    <div className="flex items-center gap-3 text-xs text-[#687775] flex-wrap">
                       <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
+                        <Clock className="w-3.5 h-3.5 text-[#687775]" />
                         {Math.floor(rec.duration_seconds / 60)} min
                       </span>
                       {rec.transcript && (
-                        <span className="flex items-center gap-1 text-[#111111]">
-                          <FileText className="w-3.5 h-3.5" /> Transcript
+                        <span className="flex items-center gap-1 text-[#202B2A]">
+                          <FileText className="w-3.5 h-3.5 text-[#687775]" /> Transcript
                         </span>
                       )}
                       {rec.summary && (
-                        <span className="flex items-center gap-1 text-[#111111]">
-                          <Sparkles className="w-3.5 h-3.5" /> AI Summary
+                        <span className="flex items-center gap-1 text-[#0F5B57] font-medium">
+                          <Sparkles className="w-3.5 h-3.5 text-[#0F5B57]" /> AI Summary
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-[#E5E5E5] flex items-center justify-between">
-                    <span className="text-xs text-[#666666]">
+                  <div className="mt-4 pt-3 border-t border-[#E1E8E4] flex items-center justify-between">
+                    <span className="text-xs text-[#687775]">
                       {rec.user_progress_seconds && rec.user_progress_seconds > 0
                         ? `Resume at ${Math.floor(rec.user_progress_seconds / 60)}m`
                         : 'Not started'}
@@ -328,10 +328,10 @@ export const StudentDashboard: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-[#111111]">Pending Assignments</h2>
-              <p className="text-xs text-[#666666]">Complete and save drafts offline; syncs automatically when online</p>
+              <h2 className="text-lg font-bold text-[#202B2A]">Pending Assignments</h2>
+              <p className="text-xs text-[#687775]">Complete and save drafts offline; syncs automatically when online</p>
             </div>
-            <Link to="/student/assignments" className="text-xs font-semibold text-[#111111] hover:underline flex items-center gap-1">
+            <Link to="/student/assignments" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
               All Assignments <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -342,8 +342,8 @@ export const StudentDashboard: React.FC = () => {
               <SkeletonCard />
             </div>
           ) : pendingAssignments.length === 0 ? (
-            <div className="p-6 border border-[#E5E5E5] rounded-xl bg-[#FAFAFA] text-center text-xs text-[#666666]">
-              <CheckCircle2 className="w-8 h-8 mx-auto text-[#166534] mb-2" />
+            <div className="p-6 border border-[#E1E8E4] rounded-2xl bg-[#FFFFFF] text-center text-xs text-[#687775]">
+              <CheckCircle2 className="w-8 h-8 mx-auto text-[#247A4D] mb-2" />
               All assignments have been submitted. Great job!
             </div>
           ) : (
@@ -356,14 +356,14 @@ export const StudentDashboard: React.FC = () => {
         </section>
 
         {/* Offline Resources Section */}
-        <section className="p-5 bg-[#F5F5F5] border border-[#E5E5E5] rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#FFFFFF] border border-[#E5E5E5] flex items-center justify-center text-[#111111] shrink-0">
+        <section className="p-5 bg-[#F1F5F2] border border-[#E1E8E4] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#DDF3EA] border border-[#CBD7D1] flex items-center justify-center text-[#0F5B57] shrink-0">
               <DownloadCloud className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-[#111111]">Offline Learning Hub</h3>
-              <p className="text-xs text-[#666666]">
+              <h3 className="font-bold text-sm text-[#202B2A]">Offline Learning Hub</h3>
+              <p className="text-xs text-[#687775]">
                 You have {downloads.length} resource{downloads.length === 1 ? '' : 's'} saved on this device for offline study.
               </p>
             </div>

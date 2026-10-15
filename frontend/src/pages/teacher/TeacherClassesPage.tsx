@@ -66,8 +66,8 @@ export const TeacherClassesPage: React.FC = () => {
             onClick={() => setFilter(tab)}
             className={`px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer ${
               filter === tab
-                ? 'bg-[#111111] text-[#FFFFFF]'
-                : 'bg-[#F5F5F5] text-[#666666] hover:text-[#111111] border border-[#E5E5E5]'
+                ? 'bg-[#0F5B57] text-[#FFFFFF]'
+                : 'bg-[#F1F5F2] text-[#687775] hover:text-[#0F5B57] hover:bg-[#DDF3EA] border border-[#E1E8E4]'
             }`}
           >
             {tab === 'all' ? 'All Classes' : tab}

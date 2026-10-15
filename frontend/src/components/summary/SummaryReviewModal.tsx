@@ -56,7 +56,7 @@ export const SummaryReviewModal: React.FC<SummaryReviewModalProps> = ({
     >
       <div className="flex flex-col gap-4 text-xs">
         {error && (
-          <div className="p-3 bg-[#B42318]/10 text-[#B42318] rounded-md font-medium">
+          <div className="p-3 bg-[#FDE8E7] text-[#B42318] border border-[#B42318]/30 rounded-lg font-medium">
             {error}
           </div>
         )}
@@ -79,7 +79,7 @@ export const SummaryReviewModal: React.FC<SummaryReviewModalProps> = ({
           />
         </FormField>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E5E5E5]">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E1E8E4]">
           <Button
             size="sm"
             variant="outline"

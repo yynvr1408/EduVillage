@@ -17,27 +17,27 @@ export const ForgotPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFFFF] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-[#111111] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
             EV
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
             Password Recovery
           </h1>
-          <p className="text-xs text-[#666666] mt-1 max-w-xs">
+          <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
             Enter your registered email to receive access recovery instructions.
           </p>
         </div>
 
-        <div className="bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl p-6 sm:p-8 shadow-xs">
+        <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs">
           {submitted ? (
             <div className="text-center py-4 flex flex-col items-center">
-              <CheckCircle2 className="w-12 h-12 text-[#166534] mb-3" />
-              <h2 className="text-base font-bold text-[#111111] mb-1">Recovery Instructions Sent</h2>
-              <p className="text-xs text-[#666666] mb-6">
-                If an account exists for <strong className="text-[#111111]">{email}</strong>, you will receive password reset instructions.
+              <CheckCircle2 className="w-12 h-12 text-[#247A4D] mb-3" />
+              <h2 className="text-base font-bold text-[#202B2A] mb-1">Recovery Instructions Sent</h2>
+              <p className="text-xs text-[#687775] mb-6 leading-relaxed">
+                If an account exists for <strong className="text-[#202B2A]">{email}</strong>, you will receive password reset instructions.
               </p>
               <Link to="/login" className="w-full">
                 <Button fullWidth variant="outline" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -67,7 +67,7 @@ export const ForgotPasswordPage: React.FC = () => {
               <div className="text-center pt-2">
                 <Link
                   to="/login"
-                  className="text-xs text-[#666666] hover:text-[#111111] inline-flex items-center gap-1 font-medium"
+                  className="text-xs text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1 font-semibold"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
                 </Link>

@@ -73,10 +73,12 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
   return (
     <div className={`flex flex-col gap-4 ${isCompact ? 'text-xs' : 'text-sm'}`}>
       {/* Header bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg">
+      <div className="flex flex-wrap items-center justify-between gap-2 p-3.5 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-[#111111]" />
-          <span className="font-semibold text-[#111111]">
+          <div className="w-7 h-7 rounded-lg bg-[#DDF3EA] border border-[#CBD7D1] flex items-center justify-center text-[#0F5B57]">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <span className="font-semibold text-[#202B2A]">
             {isCompact ? 'Live Lecture Notes' : 'AI-Assisted Lecture Summary'}
           </span>
           <Badge
@@ -109,8 +111,8 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
 
       {/* Teacher notice banner */}
       {!isApproved && (
-        <div className="p-3 bg-[#854D0E]/10 border border-[#854D0E]/30 rounded-md text-xs text-[#854D0E] flex items-center gap-2">
-          <Clock className="w-4 h-4 shrink-0" />
+        <div className="p-3 bg-[#FFF0CB] border border-[#CBD7D1] rounded-lg text-xs text-[#8A5700] flex items-center gap-2">
+          <Clock className="w-4 h-4 shrink-0 text-[#8A5700]" />
           <span>
             {isPendingReview
               ? 'This summary was synthesized from the lecture audio and is pending teacher validation.'
@@ -122,11 +124,11 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
       {/* Overview */}
       {summary.overview && (
         <Card>
-          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#666666] flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#111111]" />
+          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#687775] flex items-center gap-2 border-b border-[#E1E8E4]">
+            <FileText className="w-4 h-4 text-[#0F5B57]" />
             Overview
           </CardHeader>
-          <CardContent className="py-3 px-4 text-[#111111] leading-relaxed">
+          <CardContent className="py-3 px-4 text-[#202B2A] leading-relaxed">
             {summary.overview}
           </CardContent>
         </Card>
@@ -135,12 +137,12 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
       {/* Key Concepts */}
       {summary.key_concepts && summary.key_concepts.length > 0 && (
         <Card>
-          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#666666] flex items-center gap-2">
-            <Lightbulb className="w-4 h-4 text-[#111111]" />
+          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#687775] flex items-center gap-2 border-b border-[#E1E8E4]">
+            <Lightbulb className="w-4 h-4 text-[#0F5B57]" />
             Key Concepts
           </CardHeader>
           <CardContent className="py-3 px-4">
-            <ul className="list-disc pl-5 flex flex-col gap-1.5 text-[#111111]">
+            <ul className="list-disc pl-5 flex flex-col gap-1.5 text-[#202B2A]">
               {summary.key_concepts.map((concept, idx) => (
                 <li key={idx} className="leading-relaxed">
                   {concept}
@@ -154,15 +156,15 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
       {/* Definitions */}
       {summary.definitions && summary.definitions.length > 0 && (
         <Card>
-          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#666666] flex items-center gap-2">
-            <BookMarked className="w-4 h-4 text-[#111111]" />
+          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#687775] flex items-center gap-2 border-b border-[#E1E8E4]">
+            <BookMarked className="w-4 h-4 text-[#0F5B57]" />
             Key Definitions & Terms
           </CardHeader>
           <CardContent className="py-3 px-4 flex flex-col gap-2.5">
             {summary.definitions.map((item, idx) => (
-              <div key={idx} className="border-b border-[#F5F5F5] pb-2 last:border-0 last:pb-0">
-                <span className="font-semibold text-[#111111] block mb-0.5">{item.term}</span>
-                <p className="text-xs text-[#666666] leading-relaxed">{item.definition}</p>
+              <div key={idx} className="border-b border-[#E1E8E4] pb-2 last:border-0 last:pb-0">
+                <span className="font-semibold text-[#202B2A] block mb-0.5">{item.term}</span>
+                <p className="text-xs text-[#687775] leading-relaxed">{item.definition}</p>
               </div>
             ))}
           </CardContent>
@@ -172,12 +174,12 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
       {/* Revision Questions */}
       {summary.revision_questions && summary.revision_questions.length > 0 && (
         <Card>
-          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#666666] flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-[#111111]" />
+          <CardHeader className="py-2.5 px-4 font-semibold text-xs text-[#687775] flex items-center gap-2 border-b border-[#E1E8E4]">
+            <HelpCircle className="w-4 h-4 text-[#2364AA]" />
             Revision & Self-Assessment Questions
           </CardHeader>
           <CardContent className="py-3 px-4">
-            <ol className="list-decimal pl-5 flex flex-col gap-2 text-[#111111]">
+            <ol className="list-decimal pl-5 flex flex-col gap-2 text-[#202B2A]">
               {summary.revision_questions.map((q, idx) => (
                 <li key={idx} className="leading-relaxed pl-1">
                   {q}

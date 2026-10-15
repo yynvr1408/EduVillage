@@ -43,14 +43,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#FFFFFF] border-b border-[#E5E5E5] h-14 sm:h-16 px-4 sm:px-6 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-[#FFFFFF] border-b border-[#E1E8E4] h-14 sm:h-16 px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_2px_rgba(32,43,42,0.03)]">
         {/* Left: Menu toggle (mobile teacher) + Brand */}
         <div className="flex items-center gap-3">
           {onToggleMobileMenu && (
             <button
               type="button"
               onClick={onToggleMobileMenu}
-              className="p-2 -ml-2 text-[#111111] hover:bg-[#F5F5F5] rounded-md lg:hidden"
+              className="p-2 -ml-2 text-[#202B2A] hover:bg-[#DDF3EA] hover:text-[#0F5B57] rounded-lg lg:hidden transition-colors"
               aria-label="Open navigation menu"
             >
               <Menu className="w-5 h-5" />
@@ -59,12 +59,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
 
           <Link
             to={isTeacher ? '/teacher/dashboard' : '/student/dashboard'}
-            className="flex items-center gap-2 group"
+            className="flex items-center gap-2.5 group"
           >
-            <div className="w-8 h-8 rounded-md bg-[#111111] text-[#FFFFFF] flex items-center justify-center font-bold text-sm tracking-tighter">
+            <div className="w-8 h-8 rounded-lg bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-sm tracking-tight shadow-xs">
               EV
             </div>
-            <span className="font-bold text-base sm:text-lg tracking-tight text-[#111111]">
+            <span className="font-bold text-base sm:text-lg tracking-tight text-[#202B2A]">
               EduVillage
             </span>
           </Link>
@@ -77,15 +77,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
         </div>
 
         {/* Right: Network status, Sync indicator, Profile & Logout */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Network Pill */}
           <div
             className={`hidden xs:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
               isOnline
                 ? quality === 'poor'
-                  ? 'border-[#854D0E] text-[#854D0E] bg-[#854D0E]/5'
-                  : 'border-[#166534] text-[#166534] bg-[#166534]/5'
-                : 'border-[#111111] text-[#111111] bg-[#F5F5F5]'
+                  ? 'border-[#8A5700]/30 text-[#8A5700] bg-[#FFF0CB]'
+                  : 'border-[#247A4D]/30 text-[#247A4D] bg-[#E5F5EB]'
+                : 'border-[#CBD7D1] text-[#8A5700] bg-[#FFF0CB]'
             }`}
             title={isOnline ? `Online (${quality} connectivity)` : 'Offline mode'}
           >
@@ -94,7 +94,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
             ) : (
               <WifiOff className="w-3.5 h-3.5" />
             )}
-            <span className="font-medium text-[11px]">
+            <span className="font-semibold text-[11px]">
               {isOnline ? (quality === 'poor' ? 'Low Bandwidth' : 'Online') : 'Offline'}
             </span>
           </div>
@@ -103,14 +103,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
           <button
             type="button"
             onClick={() => setIsSyncModalOpen(true)}
-            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 rounded-md text-xs font-medium text-[#111111] hover:bg-[#F5F5F5] border border-[#E5E5E5] transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-semibold text-[#202B2A] hover:bg-[#DDF3EA] hover:text-[#0F5B57] border border-[#CBD7D1] transition-colors cursor-pointer"
             title="View synchronization queue"
             aria-label="View synchronization queue"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${pendingCount > 0 ? 'text-[#854D0E]' : 'text-[#666666]'}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${pendingCount > 0 ? 'text-[#8A5700]' : 'text-[#687775]'}`} />
             <span className="hidden sm:inline">Sync</span>
             {pendingCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-[#111111] text-[#FFFFFF] text-[10px] flex items-center justify-center font-bold">
+              <span className="w-4 h-4 rounded-full bg-[#0F5B57] text-[#FFFFFF] text-[10px] flex items-center justify-center font-bold">
                 {pendingCount}
               </span>
             )}
@@ -118,12 +118,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
 
           {/* User Profile Info & Logout */}
           {user && (
-            <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-[#E5E5E5]">
+            <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-[#E1E8E4]">
               <div className="hidden md:flex flex-col text-right">
-                <span className="text-xs font-semibold text-[#111111] leading-tight truncate max-w-30">
+                <span className="text-xs font-semibold text-[#202B2A] leading-tight truncate max-w-30">
                   {user.full_name}
                 </span>
-                <span className="text-[10px] text-[#666666] leading-tight truncate max-w-30">
+                <span className="text-[10px] text-[#687775] leading-tight truncate max-w-30">
                   {user.email}
                 </span>
               </div>
@@ -131,7 +131,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
               {isSharedDevice && (
                 <span
                   title="Shared Device Mode Active"
-                  className="hidden lg:inline text-[10px] font-medium bg-[#854D0E]/10 text-[#854D0E] border border-[#854D0E]/20 px-2 py-0.5 rounded"
+                  className="hidden lg:inline text-[10px] font-semibold bg-[#FFF0CB] text-[#8A5700] border border-[#8A5700]/30 px-2 py-0.5 rounded-md"
                 >
                   Shared Device
                 </span>
@@ -139,7 +139,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
 
               <Link
                 to={isTeacher ? '/teacher/profile' : '/student/profile'}
-                className="w-8 h-8 rounded-full bg-[#F5F5F5] border border-[#E5E5E5] flex items-center justify-center text-[#111111] hover:border-[#111111] transition-colors"
+                className="w-8 h-8 rounded-full bg-[#F1F5F2] border border-[#E1E8E4] flex items-center justify-center text-[#687775] hover:text-[#0F5B57] hover:border-[#0F5B57] transition-colors"
                 title="View Profile"
                 aria-label="View Profile"
               >
@@ -149,7 +149,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
               <button
                 type="button"
                 onClick={handleLogoutClick}
-                className="p-1.5 sm:p-2 text-[#666666] hover:text-[#111111] hover:bg-[#F5F5F5] rounded-md transition-colors"
+                className="p-1.5 sm:p-2 text-[#687775] hover:text-[#B42318] hover:bg-[#FDE8E7] rounded-lg transition-colors cursor-pointer"
                 title="Log out or switch user"
                 aria-label="Log out or switch user"
               >
@@ -180,17 +180,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
           </div>
 
           <div>
-            <p className="font-semibold text-[#111111] mb-1.5">Unsaved / Pending Drafts:</p>
-            <ul className="list-disc pl-5 space-y-1 text-xs text-[#666666]">
+            <p className="font-semibold text-[#202B2A] mb-1.5">Unsaved / Pending Drafts:</p>
+            <ul className="list-disc pl-5 space-y-1 text-xs text-[#687775]">
               {unsavedDrafts.map((title, i) => (
-                <li key={i} className="font-medium text-[#111111]">
+                <li key={i} className="font-medium text-[#202B2A]">
                   {title}
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E5E5E5]">
+          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#E1E8E4]">
             <Button
               variant="outline"
               size="sm"

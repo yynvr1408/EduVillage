@@ -38,7 +38,7 @@ export const ClassCard: React.FC<ClassCardProps> = ({
   })
 
   return (
-    <Card className="flex flex-col h-full border-[#E5E5E5]">
+    <Card className="flex flex-col h-full border-[#E1E8E4]">
       <CardHeader className="flex items-center justify-between gap-2">
         <Badge variant="outline" size="sm" className="font-mono">
           {classroom.course_code || 'EDU'}
@@ -54,30 +54,30 @@ export const ClassCard: React.FC<ClassCardProps> = ({
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col">
-        <h3 className="font-bold text-base text-[#111111] line-clamp-2 mb-2">
+        <h3 className="font-bold text-base text-[#202B2A] line-clamp-2 mb-2">
           {classroom.title}
         </h3>
         {classroom.course_title && (
-          <p className="text-xs text-[#666666] mb-2">
-            Course: <strong className="font-medium text-[#111111]">{classroom.course_title}</strong>
+          <p className="text-xs text-[#687775] mb-2">
+            Course: <strong className="font-semibold text-[#202B2A]">{classroom.course_title}</strong>
           </p>
         )}
 
         {classroom.section_name && (
           <div className="flex items-center gap-1.5 mb-3">
-            <span className="text-[11px] font-medium bg-[#F5F5F5] text-[#111111] px-2 py-0.5 rounded border border-[#E5E5E5]">
+            <span className="text-[11px] font-semibold bg-[#DDF3EA] text-[#0F5B57] px-2 py-0.5 rounded-md border border-[#CBD7D1]">
               Section: {classroom.section_name}
             </span>
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5 text-xs text-[#666666] mt-auto pt-2 border-t border-[#F5F5F5]">
+        <div className="flex flex-col gap-1.5 text-xs text-[#687775] mt-auto pt-2 border-t border-[#E1E8E4]">
           <div className="flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <Calendar className="w-3.5 h-3.5 shrink-0 text-[#687775]" />
             <span>{formattedDate}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <Clock className="w-3.5 h-3.5 shrink-0 text-[#687775]" />
             <span>{formattedTime}</span>
           </div>
         </div>
@@ -94,7 +94,7 @@ export const ClassCard: React.FC<ClassCardProps> = ({
                 </Button>
               </Link>
             ) : isScheduled ? (
-              <span className="text-xs text-[#666666] italic">Room opens when teacher starts class</span>
+              <span className="text-xs text-[#687775] italic">Room opens when teacher starts class</span>
             ) : (
               <Link to={`/student/classes/${classroom.id}/summary`} className="w-full sm:w-auto">
                 <Button size="sm" variant="secondary" icon={<Sparkles className="w-3.5 h-3.5" />}>

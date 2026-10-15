@@ -178,7 +178,7 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
   return (
     <div className="flex flex-col gap-4">
       {/* Status Bar */}
-      <div className="p-3 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="p-3 bg-[#F1F5F2] border border-[#E1E8E4] rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
           {saveStatus === 'server_confirmed' ? (
             <Badge variant="success" size="sm">
@@ -202,14 +202,14 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
           )}
 
           {lastSavedAt && (
-            <span className="text-[#666666] text-[11px] flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+            <span className="text-[#687775] text-[11px] flex items-center gap-1">
+              <Clock className="w-3 h-3 text-[#687775]" />
               Saved: {new Date(lastSavedAt).toLocaleTimeString()}
             </span>
           )}
         </div>
 
-        <div className="text-[11px] text-[#666666] font-medium">
+        <div className="text-[11px] text-[#687775] font-medium">
           {wordCount} Words • IndexedDB Persistence Active
         </div>
       </div>
@@ -227,15 +227,15 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
       </div>
 
       {errorMessage && (
-        <div className="p-3 bg-[#B42318]/10 border border-[#B42318]/20 rounded-md text-xs text-[#B42318] flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
+        <div className="p-3 bg-[#FDE8E7] border border-[#CBD7D1] rounded-lg text-xs text-[#B42318] flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-[#B42318]" />
           <span>{errorMessage}</span>
         </div>
       )}
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-        <p className="text-xs text-[#666666]">
+        <p className="text-xs text-[#687775]">
           {isServerSubmitted ? (
             'Your submission has been received and locked for grading.'
           ) : isOnline ? (
