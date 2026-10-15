@@ -68,7 +68,10 @@ export const StudentRecordedLessonsPage: React.FC = () => {
     e.stopPropagation()
     try {
       setDownloadingId(recording.id)
-      await downloadManager.downloadRecording(recording)
+      // The library list never carries a playback URL (it's a signed URL, fetched only on the
+      // detail endpoint) — fetch the real detail record first so downloadRecording has one.
+      const withPlaybackUrl = await api.getRecording(recording.id)
+      await downloadManager.downloadRecording(withPlaybackUrl)
       setDownloadedIds((prev) => new Set([...prev, recording.id]))
     } catch (err: any) {
       alert(err.message || 'Failed to download recording')

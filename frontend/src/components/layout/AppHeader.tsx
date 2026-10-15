@@ -9,6 +9,7 @@ import { Badge } from '../ui/Badge'
 
 import { Dialog } from '../ui/Dialog'
 import { Button } from '../ui/Button'
+import { Logo } from '../ui/Logo'
 import { AlertCircle, Users } from 'lucide-react'
 
 export interface AppHeaderProps {
@@ -67,9 +68,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
             to={isTeacher ? '/teacher/dashboard' : '/student/dashboard'}
             className="flex items-center gap-2.5 group"
           >
-            <div className="w-8 h-8 rounded-lg bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-sm tracking-tight shadow-xs">
-              EV
-            </div>
+            <Logo size={32} />
             <span className="font-bold text-base sm:text-lg tracking-tight text-[#202B2A]">
               EduVillage
             </span>

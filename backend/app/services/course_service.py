@@ -218,12 +218,25 @@ def _course_has_activity(db: Session, course_id: str) -> bool:
     return any(db.execute(stmt.limit(1)).first() is not None for stmt in checks)
 
 
-def delete_or_archive_course(db: Session, teacher: User, course: Course) -> tuple[bool, Course | None]:
+def delete_or_archive_course(db: Session, teacher: User, course: Course, *, force: bool = False) -> tuple[bool, Course | None]:
     """The real delete action. A genuinely empty, untouched draft is permanently removed
     (returns (True, None)); anything with real activity is archived instead, same as
     archive_course (returns (False, course)) — this is the hard guardrail the plan itself
-    calls for: "do not cascade-delete ... simply because a course is deleted"."""
+    calls for: "do not cascade-delete ... simply because a course is deleted".
+
+    force=True is a second, more deliberate action only honored when the course is ALREADY
+    archived: it has no active role left (out of the catalog, out of self-enrollment, already a
+    teacher's conscious decision to retire it), so a teacher explicitly asking to permanently
+    remove it from that state is let through even with historical activity attached. force on a
+    still-active course is ignored — that path keeps the automatic archive fallback."""
     assert_owns_course(db, teacher, course)
+    if force and course.status == CourseStatus.archived:
+        course_id = course.id
+        db.delete(course)
+        db.commit()
+        audit_service.record(db, actor_id=teacher.id, action="course_force_deleted", resource_type="course", resource_id=course_id)
+        return True, None
+
     if _course_has_activity(db, course.id):
         return False, archive_course(db, teacher, course)
 

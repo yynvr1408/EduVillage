@@ -361,9 +361,13 @@ export const api = {
       })
     ),
   /** Permanently deletes an empty, untouched course; archives (never destroys) anything with
-   * real activity — see the backend's course_service.delete_or_archive_course. */
-  deleteCourse: async (id: string): Promise<{ deleted: boolean; course: Course | null }> => {
-    const res = await apiRequest<{ deleted: boolean; course: Raw | null }>(`/courses/${id}`, { method: 'DELETE' })
+   * real activity. force=true permanently deletes an already-archived course regardless of its
+   * history — the backend only honors force once a course is already archived. See
+   * course_service.delete_or_archive_course. */
+  deleteCourse: async (id: string, force: boolean = false): Promise<{ deleted: boolean; course: Course | null }> => {
+    const res = await apiRequest<{ deleted: boolean; course: Raw | null }>(`/courses/${id}${force ? '?force=true' : ''}`, {
+      method: 'DELETE',
+    })
     return { deleted: res.deleted, course: res.course ? mapCourse(res.course) : null }
   },
   createLesson: async (courseId: string, data: { title: string; content?: string; order_index?: number }) =>

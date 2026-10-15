@@ -50,11 +50,6 @@ export const TeacherSidebar: React.FC = () => {
           )
         })}
       </nav>
-
-      <div className="mt-auto pt-4 border-t border-[#E1E8E4] text-xs text-[#687775] px-3">
-        <p className="font-semibold text-[#202B2A]">Low-Bandwidth Optimized</p>
-        <p className="text-xs mt-0.5 leading-relaxed">Live audio/video adapts automatically for remote students.</p>
-      </div>
     </aside>
   )
 }

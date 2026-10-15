@@ -139,7 +139,10 @@ export const TeacherManageCoursePage: React.FC = () => {
     setIsDeleting(true)
     setDeleteError(null)
     try {
-      const result = await courseService.deleteCourse(courseId)
+      // The backend only ever honors force=true once a course is already archived — on an
+      // active course it's ignored and the normal smart archive-or-delete logic still applies.
+      // Always passing it is safe: the server, not this cached client state, decides.
+      const result = await courseService.deleteCourse(courseId, true)
       navigate('/teacher/courses', {
         state: {
           flashMessage: result.deleted
@@ -214,19 +217,17 @@ export const TeacherManageCoursePage: React.FC = () => {
           <Button size="sm" variant="outline" onClick={openEdit} icon={<Pencil className="w-3.5 h-3.5" />}>
             Edit Course
           </Button>
-          {course.status !== 'archived' && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setDeleteError(null)
-                setIsDeleteConfirmOpen(true)
-              }}
-              icon={<Trash2 className="w-3.5 h-3.5" />}
-            >
-              Delete Course
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setDeleteError(null)
+              setIsDeleteConfirmOpen(true)
+            }}
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+          >
+            {course.status === 'archived' ? 'Permanently Delete' : 'Delete Course'}
+          </Button>
           <Button
             size="sm"
             variant="primary"
@@ -382,8 +383,12 @@ export const TeacherManageCoursePage: React.FC = () => {
       <Dialog
         isOpen={isDeleteConfirmOpen}
         onClose={() => !isDeleting && setIsDeleteConfirmOpen(false)}
-        title="Delete This Course?"
-        description="If this course has no students, lessons or other activity yet, it will be permanently deleted. If it already has enrollments, lessons, assignments or classes, it will be archived instead — removed from the catalog and new self-enrollment, but nothing of value is ever destroyed."
+        title={course.status === 'archived' ? 'Permanently Delete This Course?' : 'Delete This Course?'}
+        description={
+          course.status === 'archived'
+            ? 'This course is already archived. Deleting it now is final — it will permanently remove the course and any lessons, enrollments, assignments or class history still attached to it. This cannot be undone.'
+            : 'If this course has no students, lessons or other activity yet, it will be permanently deleted. If it already has enrollments, lessons, assignments or classes, it will be archived instead — removed from the catalog and new self-enrollment, but nothing of value is ever destroyed.'
+        }
         maxWidth="md"
       >
         <div className="flex flex-col gap-4 text-xs">
@@ -397,7 +402,7 @@ export const TeacherManageCoursePage: React.FC = () => {
               Cancel
             </Button>
             <Button type="button" size="sm" variant="primary" isLoading={isDeleting} onClick={handleDelete}>
-              Delete Course
+              {course.status === 'archived' ? 'Permanently Delete' : 'Delete Course'}
             </Button>
           </div>
         </div>

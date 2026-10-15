@@ -80,11 +80,15 @@ def update_course(
 
 
 @router.delete("/courses/{course_id}", response_model=CourseDeleteOut)
-def delete_course(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_course(
+    course_id: str, force: bool = False, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     """Permanently deletes an empty, untouched draft; archives (never destroys) anything with
-    real activity — see course_service.delete_or_archive_course."""
+    real activity. force=true permanently deletes an already-archived course regardless of its
+    history — only honored once a course is already archived. See
+    course_service.delete_or_archive_course."""
     course = course_service.get_course_or_404(db, course_id)
-    deleted, remaining = course_service.delete_or_archive_course(db, user, course)
+    deleted, remaining = course_service.delete_or_archive_course(db, user, course, force=force)
     return CourseDeleteOut(deleted=deleted, course=_course_out(db, remaining) if remaining else None)
 
 

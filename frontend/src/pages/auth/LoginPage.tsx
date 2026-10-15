@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { FormField } from '../../components/ui/FormField'
+import { Logo } from '../../components/ui/Logo'
 
 export interface LoginPageProps {
   /** Set by the /login/student and /login/teacher routes to theme the form and enforce that the
@@ -62,9 +63,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
-            EV
-          </div>
+          <Logo size={48} className="mb-3" />
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
             EduVillage
           </h1>

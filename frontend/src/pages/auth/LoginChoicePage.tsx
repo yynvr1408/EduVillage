@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { GraduationCap, BookOpen, ArrowRight } from 'lucide-react'
+import { Logo } from '../../components/ui/Logo'
 
 /**
  * Landing step before either role's login form. Keeps /login/student and /login/teacher as
@@ -12,9 +13,7 @@ export const LoginChoicePage: React.FC = () => {
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-lg px-4">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-[#0F5B57] text-[#FFFFFF] flex items-center justify-center font-bold text-xl mb-3 shadow-sm">
-            EV
-          </div>
+          <Logo size={48} className="mb-3" />
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">EduVillage</h1>
           <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
             Offline-first educational learning platform for reliable learning in low-bandwidth regions.
