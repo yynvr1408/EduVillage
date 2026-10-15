@@ -1,4 +1,4 @@
-def _upload_file(client, course_id, *, filename="notes.txt", mime_type="text/plain", content=b"hello world", size=None):
+def _upload_file(client, course_id, *, filename="notes.txt", mime_type="text/plain", content=b"hello world", size=None, publish=True):
     init = client.post(
         "/api/v1/resources/upload-init",
         json={"course_id": course_id, "filename": filename, "mime_type": mime_type, "size_bytes": size or len(content)},
@@ -9,6 +9,10 @@ def _upload_file(client, course_id, *, filename="notes.txt", mime_type="text/pla
     assert put.status_code == 204, put.text
     complete = client.post(f"/api/v1/resources/{body['resource_id']}/complete")
     assert complete.status_code == 200, complete.text
+    if publish:  # students only see resources a teacher has published
+        published = client.patch(f"/api/v1/resources/{body['resource_id']}", json={"is_published": True})
+        assert published.status_code == 200, published.text
+        return published.json()
     return complete.json()
 
 
@@ -45,7 +49,7 @@ def test_disallowed_mime_type_rejected(teacher, published_course):
         },
     )
     assert resp.status_code == 422
-    assert resp.json()["error"]["code"] == "VALIDATION_FAILED"
+    assert resp.json()["error"]["code"] == "UNSUPPORTED_FILE_TYPE"
 
 
 def test_oversized_declared_size_rejected(teacher, published_course):

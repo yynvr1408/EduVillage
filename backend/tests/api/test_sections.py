@@ -83,11 +83,12 @@ def test_resources_can_be_shared_with_a_section_without_copying(teacher, make_us
     section = _section(tclient, course2["id"])
     init = tclient.post(
         "/api/v1/resources/upload-init",
-        json={"course_id": course1["id"], "filename": "notes.pdf", "mime_type": "application/pdf", "size_bytes": 10},
+        json={"course_id": course1["id"], "filename": "notes.pdf", "mime_type": "application/pdf", "size_bytes": 12},
     ).json()
     storage_key = init["upload"]["url"].split("/upload-content/")[1]
-    assert tclient.put(f"/api/v1/resources/upload-content/{storage_key}", content=b"0123456789").status_code == 204
+    assert tclient.put(f"/api/v1/resources/upload-content/{storage_key}", content=b"%PDF-1.4 abc").status_code == 204
     assert tclient.post(f"/api/v1/resources/{init['resource_id']}/complete").status_code == 200
+    assert tclient.patch(f"/api/v1/resources/{init['resource_id']}", json={"is_published": True}).status_code == 200
 
     sclient, suser = make_user(role="student", prefix="target")
     sclient.post(f"/api/v1/courses/{course2['id']}/enrollments", json={})
@@ -107,10 +108,10 @@ def test_local_upload_rejects_empty_body_and_double_upload(teacher, published_co
     tclient, _ = teacher
     init = tclient.post(
         "/api/v1/resources/upload-init",
-        json={"course_id": published_course["id"], "filename": "a.pdf", "mime_type": "application/pdf", "size_bytes": 3},
+        json={"course_id": published_course["id"], "filename": "a.pdf", "mime_type": "application/pdf", "size_bytes": 6},
     ).json()
     key = init["upload"]["url"].split("/upload-content/")[1]
     assert tclient.put(f"/api/v1/resources/upload-content/{key}", content=b"").status_code == 422
-    assert tclient.put(f"/api/v1/resources/upload-content/{key}", content=b"abc").status_code == 204
+    assert tclient.put(f"/api/v1/resources/upload-content/{key}", content=b"%PDF-1").status_code == 204
     tclient.post(f"/api/v1/resources/{init['resource_id']}/complete")
     assert tclient.put(f"/api/v1/resources/upload-content/{key}", content=b"zzz").status_code == 409

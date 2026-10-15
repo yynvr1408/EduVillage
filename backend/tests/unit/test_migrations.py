@@ -37,6 +37,9 @@ def test_upgrade_preserves_existing_rows_and_applies_safe_defaults(tmp_path):
           VALUES ('r1','k1','u1','eg-1','recordings/k1/r1.mp4','available','2026-01-02','2026-01-02','2026-01-02');
         INSERT INTO lecture_transcripts (id, class_id, language, content, status, created_at, updated_at)
           VALUES ('t1','k1','en','hello','ready','2026-01-02','2026-01-02');
+        INSERT INTO learning_resources (id, course_id, uploaded_by, storage_key, filename, mime_type, size_bytes, status, created_at, updated_at)
+          VALUES ('lr1','c1','u1','c1/lr1-notes.pdf','notes.pdf','application/pdf',10,'available','2026-01-01','2026-01-01'),
+                 ('lr2','c1','u1','c1/lr2-wip.pdf','wip.pdf','application/pdf',0,'pending','2026-01-01','2026-01-01');
         INSERT INTO sync_operations (id, user_id, operation_id, operation_type, status, result_json, created_at)
           VALUES ('s1','u1','op-1','assignment_submission','accepted','{}','2026-01-02');
         """
@@ -52,6 +55,10 @@ def test_upgrade_preserves_existing_rows_and_applies_safe_defaults(tmp_path):
     assert recording == [("r1", "available", "eg-1", 0, 0, 0)]
     assert con.execute("SELECT content, content_hash, recording_id FROM lecture_transcripts").fetchall() == [("hello", None, None)]
     assert con.execute("SELECT operation_id, payload_hash FROM sync_operations").fetchall() == [("op-1", None)]
+    # Files students could already download stay downloadable; unfinished uploads stay hidden.
+    assert con.execute(
+        "SELECT id, is_published, processing_status, version, title FROM learning_resources ORDER BY id"
+    ).fetchall() == [("lr1", 1, "ready", 1, "notes.pdf"), ("lr2", 0, "pending", 1, "wip.pdf")]
     assert con.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 1
     tables = {row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"sections", "section_members", "class_sections", "recording_sections", "resource_sections", "recording_progress"} <= tables

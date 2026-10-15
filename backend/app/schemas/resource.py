@@ -1,6 +1,8 @@
 from pydantic import BaseModel, ConfigDict
 
-from app.db.models.enums import ResourceStatus
+from datetime import datetime
+
+from app.db.models.enums import ProcessingStatus, ResourceStatus, ResourceType
 
 
 class UploadInitRequest(BaseModel):
@@ -9,6 +11,15 @@ class UploadInitRequest(BaseModel):
     filename: str
     mime_type: str
     size_bytes: int
+    title: str | None = None
+    description: str | None = None
+    resource_type: ResourceType | None = None  # inferred from the file's contents when omitted
+
+
+class ResourceUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    is_published: bool | None = None
 
 
 class UploadInitResponse(BaseModel):
@@ -26,6 +37,16 @@ class ResourceOut(BaseModel):
     mime_type: str
     size_bytes: int
     status: ResourceStatus
+    title: str | None = None
+    description: str | None = None
+    resource_type: ResourceType | None = None
+    is_published: bool = False
+    processing_status: ProcessingStatus = ProcessingStatus.pending
+    processing_error: str | None = None
+    version: int = 1
+    checksum_sha256: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class DownloadResponse(BaseModel):

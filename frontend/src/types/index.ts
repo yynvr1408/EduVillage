@@ -35,7 +35,17 @@ export interface Material {
   file_size: number
   is_published: boolean
   created_at: string
+  description?: string
+  resource_type?: MaterialType
+  /** pending (uploading) → processing → ready | failed. Students only ever see ready + published. */
+  processing_status?: 'pending' | 'processing' | 'ready' | 'failed'
+  processing_error?: string
+  /** Bumped whenever the file or its metadata changes; downloads compare it to detect stale copies. */
+  version?: number
+  checksum_sha256?: string
 }
+
+export type MaterialType = 'video' | 'audio' | 'document' | 'presentation' | 'notes' | 'other'
 
 export interface Course {
   id: string

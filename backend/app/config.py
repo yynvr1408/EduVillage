@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     signed_url_ttl_seconds: int = 300
 
 
+    max_upload_mb: int = 500  # per file; large media is streamed to storage, never held in memory
+
     llm_api_key: str | None = None
     llm_model: str = "gpt-4o-mini"
     speech_to_text_api_key: str | None = None

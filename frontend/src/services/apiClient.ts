@@ -15,6 +15,7 @@ import type {
   JoinTokenResponse,
   Lesson,
   Material,
+  MaterialType,
   Recording,
   RecordingStatus,
   Section,
@@ -143,11 +144,17 @@ function mapResource(r: Raw): Material {
     id: r.id,
     course_id: r.course_id,
     lesson_id: r.lesson_id ?? undefined,
-    title: r.filename,
+    title: r.title || r.filename,
+    description: r.description ?? undefined,
+    resource_type: r.resource_type ?? undefined,
+    processing_status: r.processing_status,
+    processing_error: r.processing_error ?? undefined,
+    version: r.version ?? 1,
+    checksum_sha256: r.checksum_sha256 ?? undefined,
     file_url: `${API_PREFIX}/resources/${r.id}/download`,
     file_type: r.mime_type,
     file_size: r.size_bytes,
-    is_published: r.status === 'available',
+    is_published: Boolean(r.is_published) && r.status === 'available',
     created_at: r.created_at ?? '',
   }
 }
@@ -482,14 +489,21 @@ export const api = {
     const lists = await Promise.all(ids.map((id) => apiRequest<Raw[]>(`/courses/${id}/resources`).catch(() => [] as Raw[])))
     return lists.flat().map(mapResource)
   },
-  uploadMaterial: async (courseId: string, file: File, lessonId?: string): Promise<Material> => {
+  uploadMaterial: async (
+    courseId: string,
+    file: File,
+    options: { lessonId?: string; title?: string; description?: string; resourceType?: MaterialType } = {}
+  ): Promise<Material> => {
     const init = await apiRequest<{ resource_id: string; upload: { method: string; url: string; fields: Record<string, string> } }>(
       '/resources/upload-init',
       {
         method: 'POST',
         body: JSON.stringify({
           course_id: courseId,
-          lesson_id: lessonId,
+          lesson_id: options.lessonId,
+          title: options.title || undefined,
+          description: options.description || undefined,
+          resource_type: options.resourceType || undefined,
           filename: file.name,
           mime_type: file.type || 'application/octet-stream',
           size_bytes: file.size,
@@ -512,6 +526,9 @@ export const api = {
     }
     return mapResource(await apiRequest<Raw>(`/resources/${init.resource_id}/complete`, { method: 'POST' }))
   },
+
+  setMaterialPublished: async (resourceId: string, published: boolean) =>
+    mapResource(await apiRequest<Raw>(`/resources/${resourceId}`, { method: 'PATCH', body: JSON.stringify({ is_published: published }) })),
 
   // --- Assignments & submissions ---
   getAssignments: async (courseId?: string) => {

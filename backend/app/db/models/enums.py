@@ -34,6 +34,24 @@ class ResourceStatus(str, enum.Enum):
     deleted = "deleted"
 
 
+class ResourceType(str, enum.Enum):
+    video = "video"
+    audio = "audio"
+    document = "document"
+    presentation = "presentation"
+    notes = "notes"
+    other = "other"
+
+
+class ProcessingStatus(str, enum.Enum):
+    """Post-upload processing (validation now; audio extraction / transcription later)."""
+
+    pending = "pending"
+    processing = "processing"
+    ready = "ready"
+    failed = "failed"
+
+
 class ClassStatus(str, enum.Enum):
     scheduled = "scheduled"
     live = "live"

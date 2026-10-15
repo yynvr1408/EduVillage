@@ -39,6 +39,14 @@ class ObjectStorage(ABC):
     @abstractmethod
     def delete(self, storage_key: str) -> None: ...
 
+    @abstractmethod
+    def read_head(self, storage_key: str, nbytes: int = 8192) -> bytes:
+        """The first bytes of an object (for content sniffing) without reading all of it."""
+
+    @abstractmethod
+    def checksum_sha256(self, storage_key: str) -> str | None:
+        """Hex SHA-256 of the stored bytes, or None if it can't be computed cheaply."""
+
 
 class LocalObjectStorage(ObjectStorage):
     def _path(self, storage_key: str) -> Path:
@@ -63,6 +71,41 @@ class LocalObjectStorage(ObjectStorage):
         path = self._path(storage_key)
         if path.exists():
             path.unlink()
+
+    def read_head(self, storage_key: str, nbytes: int = 8192) -> bytes:
+        with open(self._path(storage_key), "rb") as f:
+            return f.read(nbytes)
+
+    def checksum_sha256(self, storage_key: str) -> str | None:
+        import hashlib
+
+        digest = hashlib.sha256()
+        with open(self._path(storage_key), "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    async def write_stream(self, storage_key: str, chunks, max_bytes: int) -> int:
+        """Streams an upload to disk chunk by chunk (never holding the file in memory) and
+        enforces the size cap while writing. Returns the number of bytes written."""
+        path = self._path(storage_key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".part")
+        written = 0
+        try:
+            with open(tmp, "wb") as f:
+                async for chunk in chunks:
+                    written += len(chunk)
+                    if written > max_bytes:
+                        raise ValueError("too_large")
+                    f.write(chunk)
+            if written == 0:
+                raise ValueError("empty")
+            tmp.replace(path)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
+        return written
 
     def write(self, storage_key: str, content: bytes) -> None:
         path = self._path(storage_key)
@@ -115,6 +158,13 @@ class S3ObjectStorage(ObjectStorage):
 
     def delete(self, storage_key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=storage_key)
+
+    def read_head(self, storage_key: str, nbytes: int = 8192) -> bytes:
+        response = self.client.get_object(Bucket=self.bucket, Key=storage_key, Range=f"bytes=0-{nbytes - 1}")
+        return response["Body"].read()
+
+    def checksum_sha256(self, storage_key: str) -> str | None:
+        return None  # hashing a large remote object would mean downloading it; the S3 ETag is not a SHA-256
 
 
 def get_storage() -> ObjectStorage:

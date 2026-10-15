@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
@@ -10,10 +12,11 @@ from app.db.models.enums import ResourceStatus, UserRole
 from app.db.models.lesson import LearningResource
 from app.db.models.user import User
 from app.integrations.object_storage import LocalObjectStorage, get_storage
-from app.schemas.resource import ResourceOut, UploadInitRequest, UploadInitResponse
+from app.schemas.resource import ResourceOut, ResourceUpdate, UploadInitRequest, UploadInitResponse
 from app.schemas.classroom import ShareRequest
 from app.services import course_service, resource_service, section_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["resources"])
 
 
@@ -21,9 +24,7 @@ router = APIRouter(tags=["resources"])
 def list_course_resources(
     course_id: str, limit: int = 50, offset: int = 0, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    course = course_service.get_course_or_404(db, course_id)
-    course_service.assert_enrolled(db, user, course)
-    resources = resource_service.list_resources(db, course_id, limit=limit, offset=offset)
+    resources = resource_service.list_resources(db, user, course_id, limit=limit, offset=offset)
     return [ResourceOut.model_validate(r) for r in resources]
 
 
@@ -38,6 +39,9 @@ def upload_init(payload: UploadInitRequest, user: User = Depends(get_current_use
         filename=payload.filename,
         mime_type=payload.mime_type,
         size_bytes=payload.size_bytes,
+        title=payload.title,
+        description=payload.description,
+        resource_type=payload.resource_type.value if payload.resource_type else None,
     )
     return UploadInitResponse(resource_id=resource.id, upload=upload_target)
 
@@ -61,10 +65,16 @@ async def upload_content(storage_key: str, request: Request, user: User = Depend
 
     if resource.status != ResourceStatus.pending:
         raise ConflictError("This upload has already been completed.", code="UPLOAD_ALREADY_COMPLETE")
-    body = await request.body()
-    if len(body) == 0 or len(body) > resource_service.MAX_UPLOAD_BYTES:
-        raise ValidationFailedError(f"File size must be between 1 byte and {resource_service.MAX_UPLOAD_BYTES} bytes.")
-    storage.write(storage_key, body)
+    # Stream to disk with the size cap enforced while writing: large videos are never held in memory.
+    try:
+        written = await storage.write_stream(storage_key, request.stream(), resource_service.MAX_UPLOAD_BYTES)
+    except ValueError as exc:
+        if str(exc) == "too_large":
+            raise ValidationFailedError(
+                f"File size must be between 1 byte and {resource_service.MAX_UPLOAD_BYTES} bytes.", code="FILE_TOO_LARGE"
+            )
+        raise ValidationFailedError("The uploaded file is empty.", code="EMPTY_FILE")
+    logger.info("upload stored resource=%s bytes=%s", resource.id, written)
     return None
 
 
@@ -108,6 +118,16 @@ def download_content(storage_key: str, user: User = Depends(get_current_user), d
     if not path.exists():
         raise NotFoundError("File not found in storage.")
     return FileResponse(path, media_type=resource.mime_type, filename=resource.filename)
+
+
+@router.patch("/resources/{resource_id}", response_model=ResourceOut)
+def update_resource(resource_id: str, payload: ResourceUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Edit title/description and publish or unpublish. Publishing requires a fully processed resource."""
+    resource = resource_service.get_resource_or_404(db, resource_id)
+    resource = resource_service.update_resource(
+        db, user, resource, title=payload.title, description=payload.description, is_published=payload.is_published
+    )
+    return ResourceOut.model_validate(resource)
 
 
 @router.post("/resources/{resource_id}/sections", response_model=ResourceOut, status_code=201)
