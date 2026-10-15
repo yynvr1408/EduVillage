@@ -94,7 +94,7 @@ export const StudentRecordedLessonsPage: React.FC = () => {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-[110rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#E1E8E4] pb-4">
         <div>
@@ -109,7 +109,7 @@ export const StudentRecordedLessonsPage: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative w-full sm:flex-1 sm:max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#687775]" />
           <Input
             value={searchTerm}
@@ -120,7 +120,7 @@ export const StudentRecordedLessonsPage: React.FC = () => {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setFilterMode('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
@@ -248,12 +248,12 @@ export const StudentRecordedLessonsPage: React.FC = () => {
                 </div>
 
                 {/* Actions bottom row */}
-                <div className="pt-4 mt-4 border-t border-[#E1E8E4] flex items-center justify-between gap-2">
+                <div className="pt-4 mt-4 border-t border-[#E1E8E4] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                   <div className="text-xs text-[#687775]">
                     Instructor: <span className="text-[#202B2A] font-medium">{recording.teacher_name}</span>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
                     {/* Download button */}
                     {!isProcessing && !isDown && (
                       <Button
@@ -261,18 +261,17 @@ export const StudentRecordedLessonsPage: React.FC = () => {
                         size="sm"
                         onClick={(e) => handleDownload(recording, e)}
                         disabled={downloadingId === recording.id}
-                        className="text-xs h-8 px-2.5"
+                        className="text-xs h-10 sm:h-8 px-2.5 flex-1 sm:flex-none"
+                        icon={<Download className="w-3.5 h-3.5" />}
                         title={`Download for offline study (~${Math.round(recording.file_size_bytes / (1024 * 1024))} MB)`}
                       >
-                        <Download className="w-3.5 h-3.5 mr-1" />
                         {downloadingId === recording.id ? 'Saving...' : 'Download'}
                       </Button>
                     )}
 
                     {/* Watch Button */}
-                    <Link to={`/student/recorded-lessons/${recording.id}`}>
-                      <Button size="sm" className="text-xs h-8 px-3">
-                        <Play className="w-3.5 h-3.5 mr-1.5" />
+                    <Link to={`/student/recorded-lessons/${recording.id}`} className="flex-1 sm:flex-none">
+                      <Button size="sm" className="text-xs h-10 sm:h-8 px-3 w-full sm:w-auto" icon={<Play className="w-3.5 h-3.5" />}>
                         {hasProgress ? 'Resume' : 'Watch'}
                       </Button>
                     </Link>

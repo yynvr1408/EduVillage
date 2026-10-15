@@ -47,8 +47,9 @@ async function mock(page: Page, opts: { classes?: unknown[]; courses?: unknown[]
 }
 
 async function signIn(page: Page) {
-  await page.goto('/login')
-  await page.click('text=Student Demo')
+  await page.goto('/login/student')
+  await page.fill('#email', 'student@eduvillage.org')
+  await page.fill('#password', 'student123')
   await page.click('button:has-text("Sign In")')
   await page.waitForURL(/\/student\/dashboard/)
 }
@@ -184,3 +185,50 @@ test.describe('sparse data (one course, nothing scheduled)', () => {
     })
   }
 })
+
+for (const vp of VIEWPORTS) {
+  test.describe(`recorded lessons page at ${vp.name}`, () => {
+    test.use({ viewport: { width: vp.width, height: vp.height } })
+
+    test('has page padding, wraps its filters, and keeps button icons beside their labels', async ({ page }) => {
+      await mock(page)
+      await signIn(page)
+      await page.goto('/student/recorded-lessons')
+      await expect(page.getByText('Recorded Lessons Library')).toBeVisible()
+      await expect(page.getByText('Soil Lab Walkthrough')).toBeVisible()
+      await page.waitForTimeout(300)
+      await page.screenshot({ path: `${SHOTS}/${TAG}-recorded-${vp.name}.png` })
+
+      const facts = await page.evaluate(() => {
+        const main = document.querySelector('main') as HTMLElement
+        const mainRect = main.getBoundingClientRect()
+        const title = [...main.querySelectorAll('h1')].find((h) => /recorded lessons library/i.test(h.textContent || '')) as HTMLElement
+        const t = title.getBoundingClientRect()
+        const pills = [...main.querySelectorAll('button')].filter((b) => /all lessons|ready to play|downloaded \(/i.test(b.textContent || ''))
+        const pillsInside = pills.every((b) => b.getBoundingClientRect().right <= mainRect.right + 0.5 && b.getBoundingClientRect().left >= mainRect.left - 0.5)
+        const actionButtons = [...main.querySelectorAll('button, a button')].filter((b) => /^(download|saving|watch|resume)(?![a-z])/i.test((b.textContent || '').trim()))
+        const iconBesideLabel = actionButtons.map((b) => {
+          const svg = b.querySelector('svg')!.getBoundingClientRect()
+          const label = (b.querySelector('span:last-child') as HTMLElement).getBoundingClientRect()
+          return Math.abs(svg.top + svg.height / 2 - (label.top + label.height / 2)) < 8
+        })
+        return {
+          topPad: Math.round(t.top - mainRect.top),
+          leftPad: Math.round(t.left - mainRect.left),
+          pillsInside,
+          iconBesideLabel,
+          buttons: actionButtons.length,
+          allButtons: [...main.querySelectorAll('button')].map((b) => (b.textContent || '').trim()).slice(0, 12),
+          docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        }
+      })
+      console.log(vp.name, 'recorded', JSON.stringify(facts))
+      expect(facts.docOverflow).toBeLessThanOrEqual(0)
+      expect(facts.leftPad).toBeGreaterThanOrEqual(16) // no longer glued to the sidebar / screen edge
+      expect(facts.topPad).toBeGreaterThanOrEqual(16)
+      expect(facts.pillsInside).toBe(true) // filter buttons no longer run off the screen
+      expect(facts.buttons).toBeGreaterThan(0)
+      expect(facts.iconBesideLabel.every(Boolean)).toBe(true) // icon sits beside the text, not above it
+    })
+  })
+}
