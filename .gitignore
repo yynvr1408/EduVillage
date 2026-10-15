@@ -34,3 +34,8 @@ Thumbs.db
 template_src/
 qa1/
 qa2/
+
+# Test outputs
+playwright-report/
+test-results/
+

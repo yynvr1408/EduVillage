@@ -1,0 +1,208 @@
+export type Role = 'student' | 'teacher'
+
+export interface User {
+  id: string
+  email: string
+  full_name: string
+  role: Role
+  created_at: string
+}
+
+export interface TokenResponse {
+  access_token: string
+  token_type: string
+  user: User
+}
+
+export interface Lesson {
+  id: string
+  course_id: string
+  title: string
+  description?: string
+  order_index: number
+  content?: string
+  offline_ready: boolean
+  created_at: string
+}
+
+export interface Material {
+  id: string
+  course_id: string
+  lesson_id?: string
+  title: string
+  file_url: string
+  file_type: string
+  file_size: number
+  is_published: boolean
+  created_at: string
+}
+
+export interface Course {
+  id: string
+  title: string
+  code: string
+  description?: string
+  teacher_id: string
+  teacher_name?: string
+  created_at: string
+  lessons_count?: number
+  lessons?: Lesson[]
+}
+
+export interface Section {
+  id: string
+  course_id: string
+  name: string
+  code: string
+  student_count: number
+  created_at: string
+}
+
+export type RecordingStatus = 'PROCESSING' | 'READY' | 'FAILED' | 'ARCHIVED'
+
+export interface Recording {
+  id: string
+  course_id: string
+  course_title?: string
+  course_code?: string
+  class_id?: string
+  teacher_id: string
+  teacher_name?: string
+  title: string
+  description?: string
+  duration_seconds: number
+  video_url?: string
+  download_url?: string
+  file_size_bytes: number
+  status: RecordingStatus
+  has_transcript: boolean
+  has_summary: boolean
+  summary_id?: string
+  section_ids: string[]
+  is_published: boolean
+  created_at: string
+  user_progress_seconds?: number
+  user_completed?: boolean
+  transcript?: string
+  summary?: Summary
+}
+
+export type ClassStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED'
+
+export interface ClassRoom {
+  id: string
+  course_id: string
+  section_id?: string
+  section_name?: string
+  course_title?: string
+  course_code?: string
+  teacher_id: string
+  teacher_name?: string
+  title: string
+  status: ClassStatus
+  scheduled_at: string
+  livekit_room_name: string
+  started_at?: string
+  ended_at?: string
+}
+
+export interface JoinTokenResponse {
+  token: string
+  url: string
+  room_name: string
+  participant_identity: string
+  participant_name: string
+  is_publisher: boolean
+}
+
+export interface Submission {
+  id: string
+  assignment_id: string
+  student_id: string
+  student_name?: string
+  content: string
+  status: 'SUBMITTED' | 'GRADED'
+  score?: number
+  feedback?: string
+  submitted_at: string
+  idempotency_key?: string
+}
+
+export interface Assignment {
+  id: string
+  course_id: string
+  course_title?: string
+  title: string
+  instructions: string
+  due_date: string
+  max_score: number
+  created_at: string
+  submissions_count?: number
+  my_submission?: Submission | null
+}
+
+export type SummaryStatus = 'QUEUED' | 'PROCESSING' | 'NEEDS_REVIEW' | 'COMPLETED' | 'FAILED'
+export type SummaryReviewStatus = 'PENDING' | 'APPROVED' | 'REVISION_REQUESTED'
+
+export interface SummaryDefinition {
+  term: string
+  definition: string
+}
+
+export interface Summary {
+  id: string
+  class_id: string
+  course_id: string
+  status: SummaryStatus
+  review_status: SummaryReviewStatus
+  overview?: string
+  key_concepts?: string[]
+  definitions?: SummaryDefinition[]
+  examples?: string[]
+  revision_questions?: string[]
+  teacher_notes?: string
+  created_at: string
+}
+
+export type SyncOperationType = 'submit_assignment' | 'save_draft'
+export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'completed'
+
+export interface SyncOperation {
+  id: string
+  operationType: SyncOperationType
+  entityId: string
+  payload: any
+  status: SyncStatus
+  idempotencyKey: string
+  createdAt: string
+  retryCount: number
+  lastError?: string
+}
+
+export interface AssignmentDraft {
+  id: string // assignment_id
+  assignmentId: string
+  studentId: string
+  courseId: string
+  assignmentTitle: string
+  content: string
+  wordCount: number
+  savedAt: string
+  syncStatus: 'local_only' | 'pending_sync' | 'synced'
+  lastServerSubmissionId?: string
+}
+
+export interface DownloadedResource {
+  id: string
+  resourceId: string
+  courseId: string
+  lessonId?: string
+  title: string
+  fileType: string
+  sizeBytes: number
+  blob?: Blob
+  content?: string
+  downloadedAt: string
+}
+
+export type NetworkQuality = 'excellent' | 'good' | 'poor' | 'offline'

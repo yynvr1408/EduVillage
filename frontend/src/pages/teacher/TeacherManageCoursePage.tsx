@@ -1,0 +1,258 @@
+import React, { useState, useEffect } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Plus,
+  BookOpen,
+  FileText,
+  Users,
+  CheckCircle2,
+  FolderOpen,
+  AlertCircle,
+} from 'lucide-react'
+import { courseService } from '../../services/courseService'
+import type { Course, Lesson } from '../../types'
+import { PageContainer } from '../../components/layout/PageContainer'
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  Badge,
+  Button,
+  Dialog,
+  FormField,
+  Input,
+  Textarea,
+  LoadingState,
+  ErrorState,
+} from '../../components/ui'
+
+export const TeacherManageCoursePage: React.FC = () => {
+  const { courseId } = useParams<{ courseId: string }>()
+
+  const [course, setCourse] = useState<Course | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Add Lesson Modal state
+  const [isAddLessonOpen, setIsAddLessonOpen] = useState(false)
+  const [lessonTitle, setLessonTitle] = useState('')
+  const [lessonDescription, setLessonDescription] = useState('')
+  const [lessonContent, setLessonContent] = useState('')
+  const [isSavingLesson, setIsSavingLesson] = useState(false)
+  const [lessonError, setLessonError] = useState<string | null>(null)
+
+  const loadData = async () => {
+    if (!courseId) return
+    setIsLoading(true)
+    setError(null)
+    try {
+      const c = await courseService.getCourseById(courseId)
+      setCourse(c)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load course')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [courseId])
+
+  const handleAddLesson = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!lessonTitle.trim()) {
+      setLessonError('Lesson title is required.')
+      return
+    }
+
+    if (!courseId) return
+    setIsSavingLesson(true)
+    setLessonError(null)
+
+    try {
+      await courseService.createLesson(courseId, {
+        title: lessonTitle,
+        description: lessonDescription,
+        order_index: (course?.lessons?.length || 0) + 1,
+        content: lessonContent,
+        offline_ready: true,
+      })
+      setIsAddLessonOpen(false)
+      setLessonTitle('')
+      setLessonDescription('')
+      setLessonContent('')
+      loadData()
+    } catch (err: any) {
+      setLessonError(err.message || 'Failed to save lesson.')
+    } finally {
+      setIsSavingLesson(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <PageContainer>
+        <LoadingState message="Loading course curriculum and enrolled students..." />
+      </PageContainer>
+    )
+  }
+
+  if (error || !course) {
+    return (
+      <PageContainer>
+        <div className="mb-4">
+          <Link
+            to="/teacher/courses"
+            className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Courses
+          </Link>
+        </div>
+        <ErrorState title="Course Not Found" message={error || 'Unable to retrieve course.'} />
+      </PageContainer>
+    )
+  }
+
+  return (
+    <PageContainer>
+      <div className="mb-4">
+        <Link
+          to="/teacher/courses"
+          className="text-xs font-semibold text-[#666666] hover:text-[#111111] inline-flex items-center gap-1.5"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to Courses
+        </Link>
+      </div>
+
+      {/* Header Info */}
+      <div className="p-6 bg-[#FFFFFF] border border-[#E5E5E5] rounded-xl mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="outline" className="font-mono">
+              {course.code}
+            </Badge>
+            <Badge variant="secondary" size="sm">
+              {course.lessons?.length || 0} Lessons
+            </Badge>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">
+            {course.title}
+          </h1>
+          <p className="text-xs text-[#666666] mt-1 max-w-2xl">{course.description}</p>
+        </div>
+
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => setIsAddLessonOpen(true)}
+          icon={<Plus className="w-4 h-4" />}
+        >
+          Add New Lesson
+        </Button>
+      </div>
+
+      {/* Lessons List */}
+      <section className="mb-8">
+        <h2 className="text-base font-bold text-[#111111] mb-3 flex items-center gap-2">
+          <BookOpen className="w-4 h-4" /> Curriculum Lessons
+        </h2>
+
+        {(!course.lessons || course.lessons.length === 0) ? (
+          <div className="p-8 border border-dashed border-[#E5E5E5] rounded-xl text-center text-xs text-[#666666]">
+            No lessons created yet. Click 'Add New Lesson' to author curriculum notes.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {course.lessons.map((lesson, idx) => (
+              <div
+                key={lesson.id}
+                className="p-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg flex items-center justify-between gap-4 text-xs"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-[#666666] font-semibold">{idx + 1}.</span>
+                    <span className="font-bold text-[#111111] text-sm">{lesson.title}</span>
+                    <Badge variant="secondary" size="sm" className="text-[10px]">
+                      Offline Ready
+                    </Badge>
+                  </div>
+                  {lesson.description && (
+                    <p className="text-[#666666] line-clamp-1">{lesson.description}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] text-[#666666]">
+                    {lesson.content ? `${lesson.content.length} chars` : 'Empty'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Add Lesson Dialog */}
+      <Dialog
+        isOpen={isAddLessonOpen}
+        onClose={() => setIsAddLessonOpen(false)}
+        title="Author Lesson"
+        description="Add a lesson with rich text notes, formulas, and offline content."
+        maxWidth="lg"
+      >
+        <form onSubmit={handleAddLesson} className="flex flex-col gap-4 text-xs">
+          {lessonError && (
+            <div className="p-3 bg-[#B42318]/10 text-[#B42318] rounded-md font-medium">
+              {lessonError}
+            </div>
+          )}
+
+          <FormField label="Lesson Title" htmlFor="lessonTitle" required>
+            <Input
+              id="lessonTitle"
+              value={lessonTitle}
+              onChange={(e) => setLessonTitle(e.target.value)}
+              placeholder="e.g. 1. Photovoltaic Cell Physics & Irradiance Variation"
+              required
+            />
+          </FormField>
+
+          <FormField label="Short Summary / Subtitle" htmlFor="lessonDesc">
+            <Input
+              id="lessonDesc"
+              value={lessonDescription}
+              onChange={(e) => setLessonDescription(e.target.value)}
+              placeholder="Core takeaways..."
+            />
+          </FormField>
+
+          <FormField label="Lesson Body (Markdown / LaTeX Supported)" htmlFor="lessonContent">
+            <Textarea
+              id="lessonContent"
+              value={lessonContent}
+              onChange={(e) => setLessonContent(e.target.value)}
+              rows={8}
+              placeholder="# Lesson Topic&#10;&#10;Key principles, diagrams, and equations..."
+            />
+          </FormField>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E5E5E5]">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsAddLessonOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" variant="primary" isLoading={isSavingLesson}>
+              Save Lesson
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    </PageContainer>
+  )
+}

@@ -1,0 +1,58 @@
+import React from 'react'
+import { Link } from 'react-router-dom'
+import { BookOpen, User, ArrowRight } from 'lucide-react'
+import type { Course } from '../../types'
+import { Card, CardHeader, CardContent, CardFooter } from '../ui/Card'
+import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
+
+export interface CourseCardProps {
+  course: Course
+  isTeacher?: boolean
+}
+
+export const CourseCard: React.FC<CourseCardProps> = ({ course, isTeacher = false }) => {
+  const detailLink = isTeacher
+    ? `/teacher/courses/${course.id}/manage`
+    : `/student/courses/${course.id}`
+
+  return (
+    <Card hoverable className="flex flex-col h-full">
+      <CardHeader className="flex items-center justify-between gap-2">
+        <Badge variant="outline" size="sm" className="font-mono">
+          {course.code}
+        </Badge>
+        <span className="text-xs text-[#666666] flex items-center gap-1">
+          <BookOpen className="w-3.5 h-3.5" />
+          {course.lessons_count || course.lessons?.length || 0} Lessons
+        </span>
+      </CardHeader>
+
+      <CardContent className="flex-1 flex flex-col">
+        <h3 className="font-bold text-base text-[#111111] line-clamp-1 mb-1">
+          {course.title}
+        </h3>
+        {course.teacher_name && (
+          <p className="text-xs text-[#666666] flex items-center gap-1.5 mb-3">
+            <User className="w-3.5 h-3.5 shrink-0" />
+            <span>{course.teacher_name}</span>
+          </p>
+        )}
+        <p className="text-xs text-[#666666] line-clamp-3 leading-relaxed mt-auto">
+          {course.description || 'Comprehensive curriculum engineered for low-bandwidth rural learning.'}
+        </p>
+      </CardContent>
+
+      <CardFooter>
+        <span className="text-[11px] text-[#666666]">
+          {isTeacher ? 'Manage Curriculum' : 'Offline Ready'}
+        </span>
+        <Link to={detailLink}>
+          <Button size="sm" variant={isTeacher ? 'outline' : 'primary'} icon={<ArrowRight className="w-3.5 h-3.5" />}>
+            {isTeacher ? 'Manage' : 'View Course'}
+          </Button>
+        </Link>
+      </CardFooter>
+    </Card>
+  )
+}
