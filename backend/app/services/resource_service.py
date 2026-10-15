@@ -6,7 +6,7 @@ from app.db.models.enums import ResourceStatus
 from app.db.models.lesson import LearningResource
 from app.db.models.user import User
 from app.integrations.object_storage import get_storage, make_storage_key
-from app.services import course_service
+from app.services import audit_service, course_service
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB — raise once large video/audio needs are confirmed
 ALLOWED_MIME_PREFIXES = ("application/pdf", "text/", "image/", "audio/", "video/", "application/msword", "application/vnd.")
@@ -53,8 +53,9 @@ def get_resource_or_404(db: Session, resource_id: str) -> LearningResource:
 
 
 def assert_can_access_resource(db: Session, user: User, resource: LearningResource) -> None:
+    # Downloading actual course material requires enrollment, not just published-course preview access.
     course = course_service.get_course_or_404(db, resource.course_id)
-    course_service.assert_can_view_course(db, user, course)
+    course_service.assert_enrolled(db, user, course)
 
 
 def complete_upload(db: Session, teacher: User, resource: LearningResource) -> LearningResource:
@@ -82,10 +83,13 @@ def delete_resource(db: Session, teacher: User, resource: LearningResource) -> N
     get_storage().delete(resource.storage_key)
     resource.status = ResourceStatus.deleted
     db.commit()
+    audit_service.record(db, actor_id=teacher.id, action="resource_deleted", resource_type="resource", resource_id=resource.id)
 
 
-def list_resources(db: Session, course_id: str) -> list[LearningResource]:
+def list_resources(db: Session, course_id: str, *, limit: int = 50, offset: int = 0) -> list[LearningResource]:
+    from app.utils.pagination import paginate
+
     stmt = select(LearningResource).where(
         LearningResource.course_id == course_id, LearningResource.status == ResourceStatus.available
     )
-    return list(db.execute(stmt).scalars())
+    return paginate(db, stmt, limit=limit, offset=offset)

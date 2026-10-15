@@ -14,6 +14,7 @@ from app.core.security import (
 from app.db.base import utcnow
 from app.db.models.enums import UserRole, UserStatus
 from app.db.models.user import PasswordResetToken, User, UserSession
+from app.services import audit_service
 
 settings = get_settings()
 
@@ -48,6 +49,7 @@ def register_user(db: Session, *, full_name: str, email: str, password: str, rol
     db.add(user)
     db.commit()
     db.refresh(user)
+    audit_service.record(db, actor_id=user.id, action="register", resource_type="user", resource_id=user.id)
     return user
 
 
@@ -57,9 +59,11 @@ def authenticate_user(db: Session, *, email: str, password: str) -> User:
 
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if not user or not verify_password(password, user.password_hash):
+        audit_service.record(db, actor_id=user.id if user else None, action="login_failed", resource_type="user")
         raise UnauthorizedError("Incorrect email or password.", code="INVALID_CREDENTIALS")
     if user.status != UserStatus.active:
         raise UnauthorizedError("This account is not active.", code="ACCOUNT_INACTIVE")
+    audit_service.record(db, actor_id=user.id, action="login", resource_type="user", resource_id=user.id)
     return user
 
 
@@ -94,12 +98,15 @@ def revoke_session(db: Session, token: str) -> None:
     if session and session.revoked_at is None:
         session.revoked_at = utcnow()
         db.commit()
+        audit_service.record(db, actor_id=session.user_id, action="logout", resource_type="user", resource_id=session.user_id)
 
 
 def request_password_reset(db: Session, email: str) -> str | None:
     """Returns the raw reset token only in non-production so the team can test the flow
     without an email provider wired up yet. In production this must be emailed, never returned."""
     normalized_email = email.strip().lower()
+    _check_rate_limit(f"reset:{normalized_email}")
+
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if not user:
         # Do not reveal whether the email exists.

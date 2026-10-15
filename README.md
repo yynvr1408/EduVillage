@@ -31,7 +31,7 @@ Backend runs at `http://localhost:8000`. Check `http://localhost:8000/health` an
 
 The default `.env` uses `sqlite:///./dev.db` — zero setup needed to start building. Switch `DATABASE_URL` to a Postgres URL (or run `docker compose up` from `backend/`, which starts Postgres + the API together) when you want parity with production. LiveKit and LLM/STT features degrade gracefully with clear `503`/stub responses until their keys are set in `.env` — they are not required to run the rest of the API.
 
-Run the test suite:
+Run the test suite (69 tests covering every module — auth, authorization boundaries, courses/lessons/enrollments, classes + LiveKit tokens, resources, assignments, sync idempotency, summaries, dashboards, audit logging, pagination):
 
 ```bash
 cd backend
@@ -47,6 +47,15 @@ npm run dev
 ```
 
 Frontend runs at `http://localhost:5173`.
+
+Run the frontend test suite:
+
+```bash
+cd frontend
+npm test
+```
+
+This currently has only a harness smoke test — the app is still the Vite starter template, so there's nothing feature-specific to test yet. Add real component tests as EduVillage screens get built.
 
 ## Backend architecture
 
@@ -68,8 +77,9 @@ backend/
     api/v1/                   # route handlers, one file per domain, mounted under /api/v1
   alembic/                     # migrations (versioned, run with `alembic upgrade head`)
   tests/
-    conftest.py                 # test DB + auth fixtures
-    api/                          # endpoint tests, including the sync idempotency suite
+    conftest.py                 # test DB + auth/role fixtures (teacher, student, enrolled_student, ...)
+    api/                          # endpoint tests, one file per domain
+    unit/                          # service-level tests (audit logging, pagination helper)
   compose.yaml                     # Postgres + API for local parity with production
 ```
 
@@ -80,10 +90,13 @@ backend/
 - **The assignment workflow is the most important reliability boundary.** A `PUT /assignments/{id}/submissions/me` with `submit: false` is a draft; `submit: true` finalizes it. The `/sync/operations` endpoint is what the frontend calls once it reconnects — it's idempotent on `(user_id, operation_id)`, so retrying a dropped response never creates a duplicate submission. See `tests/api/test_sync.py`, which specifically tests retry-many-times-still-one-record.
 - **External providers (LiveKit, S3, speech-to-text, LLM) fail loudly, never silently.** If a key isn't configured, the relevant endpoint returns a `503` with a clear `error.code` (e.g. `LIVEKIT_NOT_CONFIGURED`) instead of pretending to succeed. The one exception is the LLM summary pipeline, which has an explicitly-labeled stub (`"source": "stub"` in the response) so the summary flow is demoable without an API key — never presented as a real AI result.
 - **Object storage is one interface, two implementations** (`app/integrations/object_storage.py`): `LocalObjectStorage` (writes to `backend/media/`, zero setup) and `S3ObjectStorage` (presigned POST/GET, for AWS S3, MinIO, or R2). Switch with `STORAGE_BACKEND=local|s3` in `.env`.
+- **"Published" ≠ "enrolled."** A published course's title/description/lesson list is a public preview (so students can browse before committing). Anything that's actual coursework — downloading a resource, joining a live class, viewing a lecture summary, submitting an assignment — requires real enrollment, checked via `course_service.assert_enrolled`. Two earlier bugs where a non-enrolled student could join a class or download resources were caught by the test suite, not by inspection — see the git history for `app/services/classroom_service.py` and `resource_service.py` if you're curious what that class of bug looks like.
+- **Security-relevant actions write an audit trail** (`app/services/audit_service.py` → the `audit_events` table): register, login/login-failed, logout, course creation, class start/end, resource deletion, summary approval. It only ever logs who-did-what-to-which-resource, never request payloads or credentials.
+- **List endpoints are paginated** (`limit`/`offset` query params, default 50, capped at 200 — see `app/utils/pagination.py`) on courses, classes, submissions, and resources.
 
 ### API surface
 
-All endpoints are under `/api/v1`. See `app/api/v1/*.py` for the full list; the main groups are `auth`, `users`, `courses` (+ lessons + enrollments), `classes` (+ LiveKit join-token), `resources` (upload/download), `assignments` (+ submissions), `summaries` (+ jobs + approval), `sync` (offline operations), and `student`/`teacher` `dashboard`.
+All endpoints are under `/api/v1`. See `app/api/v1/*.py` for the full list; the main groups are `auth`, `users`, `courses` (+ lessons + enrollments), `classes` (+ LiveKit join-token + participants), `resources` (list/upload/download/delete), `assignments` (+ submissions), `summaries` (+ jobs + approval), `sync` (offline operations), and `student`/`teacher` `dashboard`.
 
 Errors always come back as:
 

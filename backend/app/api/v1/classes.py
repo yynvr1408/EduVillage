@@ -12,8 +12,9 @@ router = APIRouter(prefix="/classes", tags=["classes"])
 
 
 @router.get("", response_model=list[ClassOut])
-def list_classes(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return [ClassOut.model_validate(c) for c in classroom_service.list_classes_for_user(db, user)]
+def list_classes(limit: int = 50, offset: int = 0, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    classes = classroom_service.list_classes_for_user(db, user, limit=limit, offset=offset)
+    return [ClassOut.model_validate(c) for c in classes]
 
 
 @router.post("", response_model=ClassOut, status_code=201)

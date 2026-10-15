@@ -13,8 +13,9 @@ router = APIRouter(tags=["courses"])
 
 
 @router.get("/courses", response_model=list[CourseOut])
-def list_courses(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return [CourseOut.model_validate(c) for c in course_service.list_courses_for_user(db, user)]
+def list_courses(limit: int = 50, offset: int = 0, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    courses = course_service.list_courses_for_user(db, user, limit=limit, offset=offset)
+    return [CourseOut.model_validate(c) for c in courses]
 
 
 @router.post("/courses", response_model=CourseOut, status_code=201)

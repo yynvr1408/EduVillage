@@ -60,6 +60,9 @@ def save_my_submission(assignment_id: str, payload: SubmissionSave, user: User =
 
 
 @router.get("/{assignment_id}/submissions", response_model=list[SubmissionOut])
-def list_submissions(assignment_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_submissions(
+    assignment_id: str, limit: int = 50, offset: int = 0, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     assignment = assignment_service.get_assignment_or_404(db, assignment_id)
-    return [SubmissionOut.model_validate(s) for s in assignment_service.list_submissions(db, user, assignment)]
+    submissions = assignment_service.list_submissions(db, user, assignment, limit=limit, offset=offset)
+    return [SubmissionOut.model_validate(s) for s in submissions]

@@ -101,8 +101,10 @@ def save_submission(db: Session, student: User, assignment: Assignment, *, answe
     return submission
 
 
-def list_submissions(db: Session, teacher: User, assignment: Assignment) -> list[AssignmentSubmission]:
+def list_submissions(db: Session, teacher: User, assignment: Assignment, *, limit: int = 50, offset: int = 0) -> list[AssignmentSubmission]:
+    from app.utils.pagination import paginate
+
     course = course_service.get_course_or_404(db, assignment.course_id)
     course_service.assert_owns_course(teacher, course)
     stmt = select(AssignmentSubmission).where(AssignmentSubmission.assignment_id == assignment.id)
-    return list(db.execute(stmt).scalars())
+    return paginate(db, stmt, limit=limit, offset=offset)

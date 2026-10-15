@@ -11,13 +11,13 @@ from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscri
 from app.db.models.user import User
 from app.db.session import SessionLocal
 from app.integrations import llm_provider
-from app.services import classroom_service
+from app.services import audit_service, classroom_service
 
 logger = logging.getLogger(__name__)
 
 
 def request_summary(db: Session, user: User, cls: Class, *, transcript_text: str | None, resource_id: str | None) -> BackgroundJob:
-    classroom_service.assert_can_view_class(db, user, cls)
+    classroom_service.assert_enrolled_in_class(db, user, cls)
     if not transcript_text and not resource_id:
         raise ConflictError("Provide either transcript_text or resource_id.", code="MISSING_TRANSCRIPT_SOURCE")
 
@@ -110,7 +110,7 @@ def get_job_or_404(db: Session, job_id: str) -> BackgroundJob:
 
 
 def get_summary_for_class(db: Session, user: User, cls: Class) -> LectureSummary:
-    classroom_service.assert_can_view_class(db, user, cls)
+    classroom_service.assert_enrolled_in_class(db, user, cls)
     summary = db.execute(
         select(LectureSummary).where(LectureSummary.class_id == cls.id).order_by(LectureSummary.created_at.desc())
     ).scalars().first()
@@ -133,6 +133,7 @@ def approve_summary(db: Session, teacher: User, summary: LectureSummary) -> Lect
     summary.reviewed_at = utcnow()
     db.commit()
     db.refresh(summary)
+    audit_service.record(db, actor_id=teacher.id, action="summary_approved", resource_type="summary", resource_id=summary.id)
     return summary
 
 

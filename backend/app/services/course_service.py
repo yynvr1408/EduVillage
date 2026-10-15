@@ -6,6 +6,7 @@ from app.db.models.course import Course, CourseEnrollment
 from app.db.models.enums import CourseStatus, EnrollmentStatus, UserRole
 from app.db.models.lesson import Lesson
 from app.db.models.user import User
+from app.services import audit_service
 
 
 def _is_enrolled(db: Session, course_id: str, student_id: str) -> bool:
@@ -51,7 +52,9 @@ def assert_owns_course(user: User, course: Course) -> None:
         raise ForbiddenError("Only the owning teacher can manage this course.")
 
 
-def list_courses_for_user(db: Session, user: User) -> list[Course]:
+def list_courses_for_user(db: Session, user: User, *, limit: int = 50, offset: int = 0) -> list[Course]:
+    from app.utils.pagination import paginate
+
     if user.role == UserRole.teacher:
         stmt = select(Course).where(Course.teacher_id == user.id)
     else:
@@ -60,7 +63,7 @@ def list_courses_for_user(db: Session, user: User) -> list[Course]:
             .join(CourseEnrollment, CourseEnrollment.course_id == Course.id)
             .where(CourseEnrollment.student_id == user.id, CourseEnrollment.status == EnrollmentStatus.active)
         )
-    return list(db.execute(stmt.order_by(Course.created_at.desc())).scalars())
+    return paginate(db, stmt.order_by(Course.created_at.desc()), limit=limit, offset=offset)
 
 
 def create_course(db: Session, teacher: User, *, title: str, description: str | None, subject: str | None, status: CourseStatus) -> Course:
@@ -68,6 +71,7 @@ def create_course(db: Session, teacher: User, *, title: str, description: str | 
     db.add(course)
     db.commit()
     db.refresh(course)
+    audit_service.record(db, actor_id=teacher.id, action="course_created", resource_type="course", resource_id=course.id)
     return course
 
 
