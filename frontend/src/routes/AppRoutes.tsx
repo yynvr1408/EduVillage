@@ -9,6 +9,7 @@ import { TeacherLayout } from '../components/layout/TeacherLayout'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { LoginChoicePage } from '../pages/auth/LoginChoicePage'
 import { RegisterPage } from '../pages/auth/RegisterPage'
+import { RegisterChoicePage } from '../pages/auth/RegisterChoicePage'
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage'
 
 // Student Pages
@@ -62,7 +63,9 @@ export const AppRoutes: React.FC = () => {
       <Route path="/login" element={<LoginChoicePage />} />
       <Route path="/login/student" element={<LoginPage portal="student" />} />
       <Route path="/login/teacher" element={<LoginPage portal="teacher" />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/register" element={<RegisterChoicePage />} />
+      <Route path="/register/student" element={<RegisterPage portal="student" />} />
+      <Route path="/register/teacher" element={<RegisterPage portal="teacher" />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Real-time Classroom Route (Shared, Role-Scoped) */}

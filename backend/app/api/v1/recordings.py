@@ -34,6 +34,7 @@ def _get_visible(db: Session, user: User, recording_id: str):
 
 @router.get("", response_model=list[RecordingLibraryItem])
 async def list_recordings(
+    background_tasks: BackgroundTasks,
     course_id: str | None = None,
     section_id: str | None = None,
     user: User = Depends(get_current_user),
@@ -44,7 +45,11 @@ async def list_recordings(
     refreshed = []
     for r in recordings:
         try:
-            r = await recording_service.refresh_status(db, r)
+            r, auto_job = await recording_service.refresh_status(db, r)
+            if auto_job is not None:
+                # Real audio -> transcript -> summary, queued the moment this recording became
+                # available — runs after this response is sent, never blocking the page load.
+                background_tasks.add_task(summary_service.process_summary_job, auto_job.id)
         except Exception as exc:  # noqa: BLE001 - listing must not fail because the media provider is down
             logger.warning("recording_refresh_failed recording=%s egress=%s error=%s", r.id, r.egress_id, exc)
         refreshed.append(r)

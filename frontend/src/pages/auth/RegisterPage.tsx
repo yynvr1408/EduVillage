@@ -9,7 +9,14 @@ import { FormField } from '../../components/ui/FormField'
 import { Select } from '../../components/ui/Select'
 import { Logo } from '../../components/ui/Logo'
 
-export const RegisterPage: React.FC = () => {
+export interface RegisterPageProps {
+  /** Set by the /register/student and /register/teacher routes to fix the role and drop the
+   * role-selection dropdown entirely. Left unset, this renders the original generic form with
+   * a role dropdown — kept only as a safe fallback, nothing currently routes to it bare. */
+  portal?: 'student' | 'teacher'
+}
+
+export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
   const { register } = useAuth()
   const navigate = useNavigate()
 
@@ -17,7 +24,7 @@ export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [role, setRole] = useState<Role>('student')
+  const [role, setRole] = useState<Role>(portal ?? 'student')
   const [inviteCode, setInviteCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,12 +69,27 @@ export const RegisterPage: React.FC = () => {
         <div className="flex flex-col items-center text-center mb-6">
           <Logo size={48} className="mb-3" />
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
-            Create EduVillage Account
+            {portal === 'teacher'
+              ? 'Create Teacher Account'
+              : portal === 'student'
+              ? 'Create Student Account'
+              : 'Create EduVillage Account'}
           </h1>
           <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
             Join low-bandwidth classrooms and access downloadable offline curricula.
           </p>
         </div>
+
+        {portal && (
+          <div className="flex justify-center mb-4">
+            <Link
+              to="/register"
+              className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1"
+            >
+              ← Not a {portal === 'teacher' ? 'teacher' : 'student'}? Switch portal
+            </Link>
+          </div>
+        )}
 
         {/* Card */}
         <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs">
@@ -106,17 +128,19 @@ export const RegisterPage: React.FC = () => {
               />
             </FormField>
 
-            <FormField label="Role Selection" htmlFor="role" required hint="Choose your primary portal role">
-              <Select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                options={[
-                  { value: 'student', label: 'Student (Access courses, classes, offline downloads)' },
-                  { value: 'teacher', label: 'Teacher (Schedule classes, manage materials & assignments)' },
-                ]}
-              />
-            </FormField>
+            {!portal && (
+              <FormField label="Role Selection" htmlFor="role" required hint="Choose your primary portal role">
+                <Select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as Role)}
+                  options={[
+                    { value: 'student', label: 'Student (Access courses, classes, offline downloads)' },
+                    { value: 'teacher', label: 'Teacher (Schedule classes, manage materials & assignments)' },
+                  ]}
+                />
+              </FormField>
+            )}
 
             {role === 'teacher' && (
               <FormField
@@ -175,7 +199,7 @@ export const RegisterPage: React.FC = () => {
 
         <p className="text-center text-xs text-[#687775] mt-6">
           Already registered?{' '}
-          <Link to="/login" className="font-semibold text-[#0F5B57] hover:underline">
+          <Link to={portal ? `/login/${portal}` : '/login'} className="font-semibold text-[#0F5B57] hover:underline">
             Sign in here
           </Link>
         </p>

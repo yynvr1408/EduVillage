@@ -47,18 +47,12 @@ def _latest_job_for(db: Session, summary_id: str) -> BackgroundJob | None:
     ).scalars().first()
 
 
-def request_summary(
-    db: Session,
-    user: User,
-    cls: Class,
-    *,
-    transcript_text: str | None,
-    resource_id: str | None,
-    recording_id: str | None = None,
+def _queue_summary_job(
+    db: Session, cls: Class, *, transcript_text: str | None, resource_id: str | None, recording_id: str | None
 ) -> BackgroundJob:
-    """Teacher-initiated. Idempotent per source: asking again for the same transcript/recording
-    returns the existing job instead of creating (and paying for) a duplicate."""
-    classroom_service.assert_teaches_class(db, user, cls)
+    """Shared core for both the teacher-initiated and the automatic (recording-ready) paths.
+    Idempotent per source: asking again for the same transcript/recording returns the existing
+    job instead of creating (and paying for) a duplicate."""
     if not transcript_text and not resource_id and not recording_id:
         raise ConflictError("Provide transcript_text, resource_id or a recording.", code="MISSING_TRANSCRIPT_SOURCE")
 
@@ -104,6 +98,38 @@ def request_summary(
     db.commit()
     db.refresh(job)
     return job
+
+
+def request_summary(
+    db: Session,
+    user: User,
+    cls: Class,
+    *,
+    transcript_text: str | None,
+    resource_id: str | None,
+    recording_id: str | None = None,
+) -> BackgroundJob:
+    """Teacher-initiated summary generation."""
+    classroom_service.assert_teaches_class(db, user, cls)
+    return _queue_summary_job(db, cls, transcript_text=transcript_text, resource_id=resource_id, recording_id=recording_id)
+
+
+def auto_request_summary_for_recording(db: Session, recording: ClassRecording) -> BackgroundJob | None:
+    """System-triggered: called the moment a recording finalizes to `available`, so a summary is
+    ready for students without a teacher having to remember to click anything. No teacher-auth
+    check (nothing initiated this besides the recording becoming ready) — everything else is
+    identical to the manual path, including the idempotency guard, so a webhook replay or a
+    concurrent poll-refresh can never double-queue the same recording."""
+    cls = db.get(Class, recording.class_id)
+    if cls is None:
+        return None
+    try:
+        return _queue_summary_job(db, cls, transcript_text=None, resource_id=None, recording_id=recording.id)
+    except (ConflictError, NotFoundError):
+        # Nothing to transcribe, or the recording isn't really ready after all — stay silent;
+        # a teacher can still request one manually later, same as for a recording that never
+        # auto-triggered.
+        return None
 
 
 def _claim(db: Session, job_id: str) -> bool:

@@ -94,3 +94,41 @@ def test_failed_recording_is_not_resurrected_by_a_late_complete_event(client, pr
 def test_event_for_unknown_egress_is_ignored(client, processing_recording):
     body = _egress_ended("not-ours", "EGRESS_COMPLETE")
     assert client.post("/api/v1/webhooks/livekit", content=body, headers=_signed_headers(body)).status_code == 200
+
+
+def test_recording_available_automatically_queues_a_summary_with_no_teacher_action(client, processing_recording):
+    """The webhook alone — never a POST to /summary-jobs — must be enough to start the
+    transcribe-and-summarize pipeline, so a student has something to read without the teacher
+    remembering to click Generate Summary."""
+    rec, storage, tclient, cls = (
+        processing_recording["rec"],
+        processing_recording["storage"],
+        processing_recording["tclient"],
+        processing_recording["cls"],
+    )
+    storage.put(rec["id"], cls["id"], size=4321)
+    body = _egress_ended(processing_recording["egress"], "EGRESS_COMPLETE")
+    assert client.post("/api/v1/webhooks/livekit", content=body, headers=_signed_headers(body)).status_code == 200
+
+    summary = tclient.get(f"/api/v1/classes/{cls['id']}/summary")
+    assert summary.status_code == 200
+    body_json = summary.json()
+    assert body_json["class_id"] == cls["id"]
+    assert body_json["status"] in ("queued", "processing", "needs_review", "completed", "failed")
+
+
+def test_a_replayed_webhook_never_double_queues_the_summary(client, processing_recording):
+    rec, storage, tclient, cls = (
+        processing_recording["rec"],
+        processing_recording["storage"],
+        processing_recording["tclient"],
+        processing_recording["cls"],
+    )
+    storage.put(rec["id"], cls["id"], size=4321)
+    body = _egress_ended(processing_recording["egress"], "EGRESS_COMPLETE")
+    for _ in range(2):  # LiveKit retries the same event
+        client.post("/api/v1/webhooks/livekit", content=body, headers=_signed_headers(body))
+
+    summaries = tclient.get("/api/v1/summaries").json()
+    matching = [s for s in summaries if s["class_id"] == cls["id"]]
+    assert len(matching) == 1

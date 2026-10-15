@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -7,7 +7,7 @@ from app.dependencies import get_current_user, get_db
 from app.db.models.enums import UserRole
 from app.db.models.user import User
 from app.schemas.classroom import ClassCreate, ClassOut, ClassUpdate, JoinTokenResponse, ParticipantOut, RecordingOut
-from app.services import classroom_service, recording_service
+from app.services import classroom_service, recording_service, summary_service
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
@@ -91,11 +91,18 @@ async def stop_recording(class_id: str, recording_id: str, user: User = Depends(
 
 
 @router.get("/{class_id}/recordings", response_model=list[RecordingOut])
-async def list_recordings(class_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def list_recordings(
+    class_id: str, background_tasks: BackgroundTasks, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     cls = classroom_service.get_class_or_404(db, class_id)
     classroom_service.assert_enrolled_in_class(db, user, cls)
     recordings = [r for r in recording_service.list_recordings_for_class(db, cls) if recording_service.can_access(db, user, r)]
-    refreshed = [await recording_service.refresh_status(db, r) for r in recordings]
+    refreshed = []
+    for r in recordings:
+        r, auto_job = await recording_service.refresh_status(db, r)
+        if auto_job is not None:
+            background_tasks.add_task(summary_service.process_summary_job, auto_job.id)
+        refreshed.append(r)
     return [RecordingOut.model_validate(r) for r in refreshed]
 
 

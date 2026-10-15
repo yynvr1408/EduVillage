@@ -25,7 +25,7 @@ from app.db.models.summary import LectureSummary, LectureTranscript
 from app.db.models.user import User
 from app.integrations import livekit
 from app.integrations.object_storage import get_storage
-from app.services import audit_service, classroom_service, course_service, section_service
+from app.services import audit_service, classroom_service, course_service, section_service, summary_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -174,32 +174,46 @@ def finalize_from_provider(
     return recording
 
 
-async def refresh_status(db: Session, recording: ClassRecording) -> ClassRecording:
+def _auto_summary_if_just_finalized(db: Session, recording: ClassRecording, was_terminal: bool):
+    """Fires exactly once, at the moment a recording transitions into `available` — not on a
+    replayed webhook or a repeated poll for an already-finished recording. Real speech-to-text +
+    AI summary, no teacher click required. Returns the queued job (for the caller to hand to
+    BackgroundTasks) or None if nothing was triggered."""
+    if was_terminal or recording.status != RecordingStatus.available:
+        return None
+    return summary_service.auto_request_summary_for_recording(db, recording)
+
+
+async def refresh_status(db: Session, recording: ClassRecording):
     """Polling fallback for when the LiveKit webhook hasn't arrived. The webhook
-    (POST /webhooks/livekit) is the primary path."""
+    (POST /webhooks/livekit) is the primary path. Returns (recording, auto_summary_job_or_None)."""
     if recording.status not in (RecordingStatus.recording, RecordingStatus.processing) or not recording.egress_id:
-        return recording
+        return recording, None
 
     info = await livekit.get_egress_status(recording.egress_id)
     if info is None:
-        return recording
+        return recording, None
 
     from livekit.api import EgressStatus
 
-    return finalize_from_provider(
+    was_terminal = recording.status in _TERMINAL
+    recording = finalize_from_provider(
         db,
         recording,
         complete=info.status == EgressStatus.EGRESS_COMPLETE,
         failed=info.status in (EgressStatus.EGRESS_FAILED, EgressStatus.EGRESS_ABORTED),
         error=getattr(info, "error", None) or None,
     )
+    return recording, _auto_summary_if_just_finalized(db, recording, was_terminal)
 
 
-def handle_egress_webhook(db: Session, *, egress_id: str, status_name: str, duration_seconds: int, error: str | None) -> bool:
+def handle_egress_webhook(db: Session, *, egress_id: str, status_name: str, duration_seconds: int, error: str | None):
+    """Returns (handled: bool, auto_summary_job_or_None)."""
     recording = db.execute(select(ClassRecording).where(ClassRecording.egress_id == egress_id)).scalar_one_or_none()
     if recording is None:
-        return False
-    finalize_from_provider(
+        return False, None
+    was_terminal = recording.status in _TERMINAL
+    recording = finalize_from_provider(
         db,
         recording,
         complete=status_name == "EGRESS_COMPLETE",
@@ -207,7 +221,7 @@ def handle_egress_webhook(db: Session, *, egress_id: str, status_name: str, dura
         duration_seconds=duration_seconds,
         error=error,
     )
-    return True
+    return True, _auto_summary_if_just_finalized(db, recording, was_terminal)
 
 
 # --------------------------------------------------------------------------- access control

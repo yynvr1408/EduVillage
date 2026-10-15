@@ -1,19 +1,19 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
 from app.integrations import livekit
-from app.services import recording_service
+from app.services import recording_service, summary_service
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 logger = logging.getLogger(__name__)
 
 
 @router.post("/livekit")
-async def livekit_webhook(request: Request, db: Session = Depends(get_db)):
+async def livekit_webhook(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """LiveKit -> us. Authenticated by LiveKit's signed JWT (not by a user session); an
     unsigned or tampered call is rejected before any state changes."""
     body = (await request.body()).decode("utf-8")
@@ -35,7 +35,7 @@ async def livekit_webhook(request: Request, db: Session = Depends(get_db)):
         duration = 0
         if info.file_results:
             duration = int(info.file_results[0].duration // 1_000_000_000)  # LiveKit reports nanoseconds
-        handled = recording_service.handle_egress_webhook(
+        handled, auto_job = recording_service.handle_egress_webhook(
             db,
             egress_id=info.egress_id,
             status_name=EgressStatus.Name(info.status),
@@ -44,4 +44,8 @@ async def livekit_webhook(request: Request, db: Session = Depends(get_db)):
         )
         if not handled:
             logger.info("egress_ended for unknown egress %s (ignored)", info.egress_id)
+        elif auto_job is not None:
+            # Real audio -> transcript -> summary, queued the moment this recording became
+            # available — runs after this response is sent, so LiveKit's webhook call isn't held up.
+            background_tasks.add_task(summary_service.process_summary_job, auto_job.id)
     return {"status": "ok"}

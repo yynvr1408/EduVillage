@@ -71,47 +71,72 @@ export interface ApiRequestOptions extends RequestInit {
   timeoutMs?: number
 }
 
+// Render's free tier fully spins down after ~15 min idle; the first request after that can hit
+// a 502/503/504 (or a dropped connection) for a few seconds while the container boots. Retrying
+// a couple of times makes that invisible instead of surfacing as a real error — but only for GET:
+// retrying a write risks applying it twice, so only reads get this treatment.
+const RETRYABLE_STATUSES = new Set([502, 503, 504])
+const RETRY_DELAYS_MS = [800, 1800]
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export async function apiRequest<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options
   options = init
+  const method = (options.method || 'GET').toUpperCase()
+  const canRetry = method === 'GET'
   const headers = new Headers(options.headers || {})
   if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
 
-  // A server that never answers (black-holed connection) must not leave the UI loading forever.
-  const controller = new AbortController()
-  options.signal?.addEventListener('abort', () => controller.abort())
-  const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined
+  for (let attempt = 0; ; attempt++) {
+    // A server that never answers (black-holed connection) must not leave the UI loading forever.
+    const controller = new AbortController()
+    options.signal?.addEventListener('abort', () => controller.abort())
+    let timedOut = false
+    const timer = timeoutMs > 0 ? setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs) : undefined
 
-  let response: Response
-  try {
-    response = await fetch(apiUrl(endpoint), { ...options, headers, credentials: 'include', signal: controller.signal })
-  } catch {
-    // Network failure (server down, offline, DNS failure, timeout, etc.)
-    throw new ApiError('Unable to connect to EduVillage server. Operating in offline mode.', 0, true)
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null)
-    if (response.status === 401 && body?.error?.code !== 'INVALID_CREDENTIALS') {
-      // The server no longer recognizes this session (expired, revoked, signed out elsewhere).
-      sessionStorage.removeItem('eduvillage_user')
-      localStorage.removeItem('eduvillage_user')
-      window.dispatchEvent(new CustomEvent('eduvillage:auth:expired'))
+    let response: Response
+    try {
+      response = await fetch(apiUrl(endpoint), { ...options, headers, credentials: 'include', signal: controller.signal })
+    } catch {
+      // A deliberate timeout must surface immediately, never be retried into a longer hang.
+      if (canRetry && !timedOut && attempt < RETRY_DELAYS_MS.length) {
+        await sleep(RETRY_DELAYS_MS[attempt])
+        continue
+      }
+      // Network failure (server down, offline, DNS failure, timeout, etc.)
+      throw new ApiError('Unable to connect to EduVillage server. Operating in offline mode.', 0, true)
+    } finally {
+      if (timer) clearTimeout(timer)
     }
-    throw new ApiError(
-      messageFrom(body, response.status === 401 ? 'Session expired. Please log in again.' : `HTTP Error ${response.status}`),
-      response.status,
-      false,
-      body?.error?.code
-    )
-  }
 
-  if (response.status === 204) return {} as T
-  return (await response.json()) as T
+    if (!response.ok) {
+      if (canRetry && RETRYABLE_STATUSES.has(response.status) && attempt < RETRY_DELAYS_MS.length) {
+        await sleep(RETRY_DELAYS_MS[attempt])
+        continue
+      }
+      const body = await response.json().catch(() => null)
+      if (response.status === 401 && body?.error?.code !== 'INVALID_CREDENTIALS') {
+        // The server no longer recognizes this session (expired, revoked, signed out elsewhere).
+        sessionStorage.removeItem('eduvillage_user')
+        localStorage.removeItem('eduvillage_user')
+        window.dispatchEvent(new CustomEvent('eduvillage:auth:expired'))
+      }
+      throw new ApiError(
+        messageFrom(body, response.status === 401 ? 'Session expired. Please log in again.' : `HTTP Error ${response.status}`),
+        response.status,
+        false,
+        body?.error?.code
+      )
+    }
+
+    if (response.status === 204) return {} as T
+    return (await response.json()) as T
+  }
 }
 
 // =============================================================================

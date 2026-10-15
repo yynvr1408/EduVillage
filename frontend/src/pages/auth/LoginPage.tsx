@@ -168,7 +168,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
         {/* Footer Link */}
         <p className="text-center text-xs text-[#687775] mt-6">
           Don't have an account yet?{' '}
-          <Link to="/register" className="font-semibold text-[#0F5B57] hover:underline">
+          <Link to={portal ? `/register/${portal}` : '/register'} className="font-semibold text-[#0F5B57] hover:underline">
             Register here
           </Link>
         </p>
