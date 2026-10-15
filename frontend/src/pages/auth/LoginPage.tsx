@@ -6,8 +6,15 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { FormField } from '../../components/ui/FormField'
 
-export const LoginPage: React.FC = () => {
-  const { login, isSharedDevice, setSharedDevice } = useAuth()
+export interface LoginPageProps {
+  /** Set by the /login/student and /login/teacher routes to theme the form and enforce that the
+   * account signing in actually has that role. Left unset, this renders the original generic form
+   * (both demo buttons, no role check) — used directly by existing tests and as a fallback. */
+  portal?: 'student' | 'teacher'
+}
+
+export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
+  const { login, logout, isSharedDevice, setSharedDevice } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -30,6 +37,13 @@ export const LoginPage: React.FC = () => {
 
     try {
       const user = await login(email, password)
+      if (portal && user.role !== portal) {
+        await logout()
+        setError(
+          `This account is registered as a ${user.role}. Please use the ${user.role === 'teacher' ? 'Teacher' : 'Student'} login instead.`
+        )
+        return
+      }
       if (from && from !== '/') {
         navigate(from, { replace: true })
       } else {
@@ -71,9 +85,22 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
+        {portal && (
+          <div className="flex justify-center mb-4">
+            <Link
+              to="/login"
+              className="text-xs font-semibold text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1"
+            >
+              ← Not a {portal === 'teacher' ? 'teacher' : 'student'}? Switch portal
+            </Link>
+          </div>
+        )}
+
         {/* Card */}
         <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs">
-          <h2 className="text-lg font-bold text-[#202B2A] mb-5">Sign In to Your Account</h2>
+          <h2 className="text-lg font-bold text-[#202B2A] mb-5">
+            {portal === 'teacher' ? 'Teacher Sign In' : portal === 'student' ? 'Student Sign In' : 'Sign In to Your Account'}
+          </h2>
 
           {error && (
             <div
@@ -154,23 +181,27 @@ export const LoginPage: React.FC = () => {
             <p className="text-xs font-bold text-[#687775] uppercase tracking-wider mb-2.5 text-center">
               Quick Demo Accounts
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoFill('student')}
-                className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
-              >
-                <strong className="block text-[#0F5B57]">Student Demo</strong>
-                <span className="text-xs text-[#687775]">Amina Diallo</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoFill('teacher')}
-                className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
-              >
-                <strong className="block text-[#0F5B57]">Teacher Demo</strong>
-                <span className="text-xs text-[#687775]">Dr. Elena Rostova</span>
-              </button>
+            <div className={`grid gap-2 ${portal ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {(!portal || portal === 'student') && (
+                <button
+                  type="button"
+                  onClick={() => handleDemoFill('student')}
+                  className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
+                >
+                  <strong className="block text-[#0F5B57]">Student Demo</strong>
+                  <span className="text-xs text-[#687775]">Amina Diallo</span>
+                </button>
+              )}
+              {(!portal || portal === 'teacher') && (
+                <button
+                  type="button"
+                  onClick={() => handleDemoFill('teacher')}
+                  className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
+                >
+                  <strong className="block text-[#0F5B57]">Teacher Demo</strong>
+                  <span className="text-xs text-[#687775]">Dr. Elena Rostova</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
