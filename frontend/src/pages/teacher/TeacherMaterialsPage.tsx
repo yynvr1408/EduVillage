@@ -9,12 +9,11 @@ import {
   Plus,
 } from 'lucide-react'
 import { courseService } from '../../services/courseService'
-import { apiRequest } from '../../services/apiClient'
+import { api } from '../../services/apiClient'
 import type { Course, Material } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { Card, CardHeader, CardContent } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { FormField } from '../../components/ui/FormField'
 import { Badge } from '../../components/ui/Badge'
@@ -28,10 +27,7 @@ export const TeacherMaterialsPage: React.FC = () => {
   // Upload dialog state
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [courseId, setCourseId] = useState('')
-  const [title, setTitle] = useState('')
-  const [fileType, setFileType] = useState('pdf')
-  const [fileUrl, setFileUrl] = useState('')
-  const [fileSize, setFileSize] = useState<number>(1500000)
+  const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
@@ -41,7 +37,7 @@ export const TeacherMaterialsPage: React.FC = () => {
     try {
       const [coursesList, materialsList] = await Promise.allSettled([
         courseService.getCourses(),
-        apiRequest<Material[]>('/api/materials'),
+        api.getMaterials(),
       ])
 
       if (coursesList.status === 'fulfilled') {
@@ -64,8 +60,8 @@ export const TeacherMaterialsPage: React.FC = () => {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !courseId) {
-      setUploadError('Title and course are required.')
+    if (!file || !courseId) {
+      setUploadError('Choose a course and a file to upload.')
       return
     }
 
@@ -73,27 +69,18 @@ export const TeacherMaterialsPage: React.FC = () => {
     setUploadError(null)
 
     try {
-      await apiRequest<Material>('/api/materials', {
-        method: 'POST',
-        body: JSON.stringify({
-          course_id: courseId,
-          title,
-          file_type: fileType,
-          file_url: fileUrl || `/downloads/${title.toLowerCase().replace(/\s+/g, '-')}.${fileType}`,
-          file_size: fileSize,
-        }),
-      })
+      // Real upload: the file goes to object storage, then the server verifies it before publishing.
+      await api.uploadMaterial(courseId, file)
 
       setUploadSuccess(true)
       setTimeout(() => {
         setIsUploadOpen(false)
         setUploadSuccess(false)
-        setTitle('')
-        setFileUrl('')
+        setFile(null)
         loadData()
       }, 1000)
     } catch (err: any) {
-      setUploadError(err.message || 'Failed to upload material metadata')
+      setUploadError(err.message || 'Failed to upload the file')
     } finally {
       setIsUploading(false)
     }
@@ -128,7 +115,7 @@ export const TeacherMaterialsPage: React.FC = () => {
         <div className="flex flex-col gap-3">
           {materials.map((mat) => {
             const course = courses.find((c) => c.id === mat.course_id)
-            const isAudio = mat.file_type === 'audio' || mat.file_type === 'mp3'
+            const isAudio = mat.file_type.startsWith('audio')
 
             return (
               <div
@@ -146,7 +133,7 @@ export const TeacherMaterialsPage: React.FC = () => {
                       <span>•</span>
                       <span>{course ? `${course.code}: ${course.title}` : 'General Course'}</span>
                       <span>•</span>
-                      <span>Published {new Date(mat.created_at).toLocaleDateString()}</span>
+                      <span>{(mat.file_size / 1024).toFixed(0)} KB</span>
                     </div>
                   </div>
                 </div>
@@ -189,35 +176,13 @@ export const TeacherMaterialsPage: React.FC = () => {
             />
           </FormField>
 
-          <FormField label="Resource Title" htmlFor="matTitle" required>
-            <Input
-              id="matTitle"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Inverter Sizing Calculation Worksheet"
+          <FormField label="File" htmlFor="matFile" required hint="PDF, documents, audio or video — up to 50 MB">
+            <input
+              id="matFile"
+              type="file"
               required
-            />
-          </FormField>
-
-          <FormField label="Resource Type" htmlFor="matType" required>
-            <Select
-              id="matType"
-              value={fileType}
-              onChange={(e) => setFileType(e.target.value)}
-              options={[
-                { value: 'pdf', label: 'PDF Document / Study Guide' },
-                { value: 'audio', label: 'Audio Lecture (MP3/OPUS)' },
-                { value: 'doc', label: 'Reference Worksheet' },
-              ]}
-            />
-          </FormField>
-
-          <FormField label="File Size (Bytes)" htmlFor="matSize" hint="Estimated storage requirement">
-            <Input
-              id="matSize"
-              type="number"
-              value={fileSize}
-              onChange={(e) => setFileSize(Number(e.target.value))}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-xs text-[#111111] file:mr-3 file:rounded-md file:border file:border-[#E5E5E5] file:bg-[#F5F5F5] file:px-3 file:py-2 file:text-xs"
             />
           </FormField>
 

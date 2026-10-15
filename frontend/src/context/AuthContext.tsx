@@ -2,10 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { User, Role } from '../types'
 import { authService } from '../services/authService'
 import { db } from '../db/db'
+import { ApiError } from '../services/apiClient'
 
 interface AuthContextType {
   user: User | null
-  token: string | null
   isAuthenticated: boolean
   isTeacher: boolean
   isStudent: boolean
@@ -13,7 +13,7 @@ interface AuthContextType {
   isSharedDevice: boolean
   setSharedDevice: (enabled: boolean) => void
   login: (email: string, password: string) => Promise<User>
-  register: (email: string, fullName: string, password: string, role: Role) => Promise<User>
+  register: (email: string, fullName: string, password: string, role: Role, inviteCode?: string) => Promise<User>
   logout: () => Promise<void>
   switchUser: () => Promise<void>
   checkUnsavedWork: () => Promise<{ hasUnsaved: boolean; count: number; draftTitles: string[] }>
@@ -24,7 +24,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(authService.getStoredUser())
-  const [token, setToken] = useState<string | null>(authService.getToken())
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isSharedDevice, setIsSharedDeviceState] = useState<boolean>(authService.isSharedDevice())
 
@@ -33,28 +32,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsSharedDeviceState(enabled)
   }
 
-  // Verify stored session on mount
+  // The server cookie is the source of truth: ask it who we are. A cached user is only trusted when offline.
   useEffect(() => {
     let isMounted = true
 
     async function initAuth() {
-      const storedToken = authService.getToken()
-      if (storedToken) {
-        try {
-          const freshUser = await authService.getMe()
-          if (isMounted) {
-            setUser(freshUser)
-            setToken(storedToken)
-            const storage = authService.getStorage()
-            storage.setItem('eduvillage_user', JSON.stringify(freshUser))
-          }
-        } catch {
-          // If offline or failed, fallback to stored user
-          const cachedUser = authService.getStoredUser()
-          if (isMounted && cachedUser) {
-            setUser(cachedUser)
-          }
+      try {
+        const freshUser = await authService.getMe()
+        if (isMounted) {
+          setUser(freshUser)
+          authService.cacheUser(freshUser)
         }
+      } catch (err) {
+        if (isMounted && err instanceof ApiError && !err.isNetworkError) {
+          // Session expired or revoked: the cached profile must not keep the UI "signed in".
+          authService.clearLocalSession()
+          setUser(null)
+        }
+        // Network error: keep showing the cached user so the app stays usable offline.
       }
       if (isMounted) {
         setIsLoading(false)
@@ -65,7 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleExpired = () => {
       setUser(null)
-      setToken(null)
     }
 
     window.addEventListener('eduvillage:auth:expired', handleExpired)
@@ -78,7 +72,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<User> => {
     const res = await authService.login(email, password)
     setUser(res.user)
-    setToken(res.access_token)
     return res.user
   }
 
@@ -86,11 +79,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string,
     fullName: string,
     password: string,
-    role: Role
+    role: Role,
+    inviteCode?: string
   ): Promise<User> => {
-    const res = await authService.register(email, fullName, password, role)
+    const res = await authService.register(email, fullName, password, role, inviteCode)
     setUser(res.user)
-    setToken(res.access_token)
     return res.user
   }
 
@@ -110,11 +103,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const logout = async (): Promise<void> => {
-    authService.logout()
+    // Revoke the server session first: a cookie left behind on a shared machine must be dead.
+    await authService.logout()
     setUser(null)
-    setToken(null)
-    // Clear private draft and queue data on shared device
-    await db.clearPrivateUserData().catch(() => {})
+    // Clear private draft and queue data; on a shared device also the downloads and caches.
+    await db.clearPrivateUserData({ includeDownloads: isSharedDevice }).catch(() => {})
   }
 
   const switchUser = async (): Promise<void> => {
@@ -126,8 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const freshUser = await authService.getMe()
       setUser(freshUser)
-      const storage = authService.getStorage()
-      storage.setItem('eduvillage_user', JSON.stringify(freshUser))
+      authService.cacheUser(freshUser)
     } catch {
       // Keep cached user
     }
@@ -135,13 +127,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isTeacher = user?.role === 'teacher'
   const isStudent = user?.role === 'student'
-  const isAuthenticated = Boolean(user && token)
+  const isAuthenticated = Boolean(user)
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token,
         isAuthenticated,
         isTeacher,
         isStudent,

@@ -5,12 +5,12 @@ export interface User {
   email: string
   full_name: string
   role: Role
-  created_at: string
+  status?: string
+  created_at?: string
 }
 
-export interface TokenResponse {
-  access_token: string
-  token_type: string
+/** Sessions are httpOnly cookies set by the server; JavaScript never holds a token. */
+export interface AuthResponse {
   user: User
 }
 
@@ -85,6 +85,8 @@ export interface Recording {
   user_completed?: boolean
   transcript?: string
   summary?: Summary
+  /** Present only for teachers when the server reports a recording failure. */
+  error_message?: string
 }
 
 export type ClassStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED'
@@ -110,9 +112,9 @@ export interface JoinTokenResponse {
   token: string
   url: string
   room_name: string
-  participant_identity: string
-  participant_name: string
   is_publisher: boolean
+  /** True when the session is being recorded; participants must be told. */
+  recording_active: boolean
 }
 
 export interface Submission {
@@ -161,6 +163,9 @@ export interface Summary {
   examples?: string[]
   revision_questions?: string[]
   teacher_notes?: string
+  /** 'llm' for a real model, 'stub' for the labeled no-provider fallback. */
+  generator?: string
+  teacher_edited?: boolean
   created_at: string
 }
 

@@ -1,4 +1,5 @@
 import { db, type DownloadedRecording } from '../db/db'
+import { apiUrl } from './apiClient'
 import type { DownloadedResource, Material, Recording } from '../types'
 
 export interface StorageEstimateInfo {
@@ -6,6 +7,8 @@ export interface StorageEstimateInfo {
   quotaBytes: number
   percentageUsed: number
   availableMB: number
+  /** false when the browser exposes no storage estimate; the numbers are then meaningless. */
+  supported: boolean
 }
 
 export const downloadManager = {
@@ -18,26 +21,14 @@ export const downloadManager = {
     onProgress?: (percent: number) => void
   ): Promise<DownloadedResource> {
     try {
-      // Simulate/fetch the resource data
-      // In production or demo, if remote URL is a mock or local file, fetch it
-      let blob: Blob
-      let textContent: string | undefined
-
-      try {
-        const response = await fetch(material.file_url)
-        if (response.ok) {
-          blob = await response.blob()
-        } else {
-          // If the relative file URL is not yet hosted, synthesize representative educational resource content
-          const simulatedContent = `EduVillage Learning Resource: ${material.title}\nCourse: ${courseTitle || material.course_id}\nDownloaded for offline study.\n\nKey Study Concepts and Reference Notes:\n- Comprehensive formulas and diagrams for field maintenance.\n- Low-power troubleshooting protocols.\n- Reference documentation verified by instructor.`
-          blob = new Blob([simulatedContent], { type: material.file_type === 'pdf' ? 'application/pdf' : 'text/plain' })
-          textContent = simulatedContent
-        }
-      } catch {
-        const simulatedContent = `EduVillage Offline Study Package: ${material.title}\nSaved securely to IndexedDB for continuous offline learning without cellular data.`
-        blob = new Blob([simulatedContent], { type: 'text/plain' })
-        textContent = simulatedContent
+      // Authenticated fetch of the real file (the server redirects to a short-lived signed URL or streams it).
+      // A failed download is reported as a failure — never replaced by placeholder content.
+      const response = await fetch(apiUrl(material.file_url), { credentials: 'include' })
+      if (!response.ok) {
+        throw new Error(response.status === 403 || response.status === 404 ? 'You no longer have access to this file.' : `Server returned ${response.status}`)
       }
+      const blob = await response.blob()
+      const textContent: string | undefined = undefined
 
       const record: DownloadedResource = {
         id: material.id,
@@ -119,21 +110,12 @@ export const downloadManager = {
     }
 
     const downloadUrl = recording.download_url || recording.video_url!
-    let blob: Blob
-
-    try {
-      const response = await fetch(downloadUrl)
-      if (response.ok) {
-        blob = await response.blob()
-      } else {
-        // Fallback for sample demo streaming links
-        const dummyMedia = `EduVillage Offline Recorded Lecture: ${recording.title}\nCourse: ${recording.course_title || recording.course_code}\nDuration: ${Math.round(recording.duration_seconds / 60)} minutes.`
-        blob = new Blob([dummyMedia], { type: 'video/mp4' })
-      }
-    } catch {
-      const dummyMedia = `EduVillage Offline Recorded Lecture: ${recording.title}\nSaved securely to IndexedDB for offline viewing.`
-      blob = new Blob([dummyMedia], { type: 'video/mp4' })
+    // Signed storage URL: no credentials are sent. A failure surfaces as an error, never as a fake file.
+    const response = await fetch(downloadUrl)
+    if (!response.ok) {
+      throw new Error(`Could not download the recording (server returned ${response.status}). Try again while online.`)
     }
+    const blob = await response.blob()
 
     const record: DownloadedRecording = {
       id: recording.id,
@@ -192,17 +174,14 @@ export const downloadManager = {
           quotaBytes,
           percentageUsed,
           availableMB,
+          supported: true,
         }
       } catch {
         // Fallback
       }
     }
 
-    return {
-      usageBytes: 25 * 1024 * 1024,
-      quotaBytes: 1024 * 1024 * 1024,
-      percentageUsed: 2,
-      availableMB: 999,
-    }
+    // The browser can't report storage: say so (zeroes) rather than inventing numbers.
+    return { usageBytes: 0, quotaBytes: 0, percentageUsed: 0, availableMB: Number.MAX_SAFE_INTEGER, supported: false }
   },
 }

@@ -7,9 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "preview": "vite preview"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.24",

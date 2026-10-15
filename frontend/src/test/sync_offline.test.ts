@@ -88,15 +88,12 @@ describe('Offline-First Architecture & IndexedDB Sync', () => {
       'Ready to submit.'
     )
 
-    // Mock API client response for batch sync
-    vi.spyOn(apiClient, 'apiRequest').mockResolvedValueOnce({
-      processed_count: 1,
+    // Mock the server's idempotent sync response (statuses: accepted | rejected | conflict)
+    vi.spyOn(apiClient.api, 'syncOperations').mockResolvedValueOnce({
       results: [
         {
           operation_id: (await db.syncOperations.toCollection().first())!.id,
-          idempotency_key: 'test-key',
-          status: 'SUCCESS',
-          message: 'Confirmed',
+          status: 'accepted',
           server_entity_id: 'sub-server-999',
         },
       ],
@@ -114,5 +111,41 @@ describe('Offline-First Architecture & IndexedDB Sync', () => {
     const draft = await db.assignmentDrafts.get('asg-sync-success')
     expect(draft?.syncStatus).toBe('synced')
     expect(draft?.lastServerSubmissionId).toBe('sub-server-999')
+  })
+})
+
+describe('Server refusals stay visible instead of being treated as synced', () => {
+  beforeEach(async () => {
+    await db.syncOperations.clear()
+    await db.assignmentDrafts.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('keeps a rejected/conflicting operation as failed and leaves the draft unsynced', async () => {
+    await syncManager.enqueueSubmission('asg-closed', 'student-1', 'course-1', 'Closed Assignment', 'Late work.')
+    const op = (await db.syncOperations.toCollection().first())!
+    vi.spyOn(apiClient.api, 'syncOperations').mockResolvedValueOnce({
+      results: [{ operation_id: op.id, status: 'conflict', error_code: 'ASSIGNMENT_CLOSED', message: 'This assignment is closed.' }],
+    })
+
+    const result = await syncManager.processQueue()
+    expect(result.successful).toBe(0)
+    expect(result.failed).toBe(1)
+
+    const stored = await db.syncOperations.get(op.id)
+    expect(stored?.status).toBe('failed')
+    expect(stored?.lastError).toBe('This assignment is closed.')
+    expect((await db.assignmentDrafts.get('asg-closed'))?.syncStatus).not.toBe('synced')
+  })
+
+  it('sends the backend contract: assignment_submission with an answer object and the stable operation id', async () => {
+    await syncManager.enqueueSubmission('asg-contract', 'student-1', 'course-1', 'Contract', 'My answer')
+    const op = (await db.syncOperations.toCollection().first())!
+    expect(apiClient.api.toServerOperation(op)).toMatchObject({
+      operation_id: op.id,
+      operation_type: 'assignment_submission',
+      entity_id: 'asg-contract',
+      payload: { answer: { text: 'My answer' } },
+    })
   })
 })

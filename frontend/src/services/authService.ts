@@ -1,6 +1,11 @@
-import { apiRequest } from './apiClient'
-import type { TokenResponse, User } from '../types'
+import { api, apiRequest } from './apiClient'
+import type { AuthResponse, User } from '../types'
 
+/**
+ * Authentication is a server-managed httpOnly session cookie. JavaScript never sees a token;
+ * the user object kept here is only a display cache so the UI can render while offline.
+ * On a shared device the cache lives in sessionStorage and disappears with the tab.
+ */
 export const authService = {
   isSharedDevice(): boolean {
     return localStorage.getItem('eduvillage_shared_device') === 'true'
@@ -14,14 +19,16 @@ export const authService = {
     return this.isSharedDevice() ? sessionStorage : localStorage
   },
 
-  async login(email: string, password: string): Promise<TokenResponse> {
-    const data = await apiRequest<TokenResponse>('/api/auth/login', {
+  cacheUser(user: User): void {
+    this.getStorage().setItem('eduvillage_user', JSON.stringify(user))
+  },
+
+  async login(email: string, password: string): Promise<AuthResponse> {
+    const data = await apiRequest<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     })
-    const storage = this.getStorage()
-    storage.setItem('eduvillage_token', data.access_token)
-    storage.setItem('eduvillage_user', JSON.stringify(data.user))
+    this.cacheUser(data.user)
     return data
   },
 
@@ -29,41 +36,39 @@ export const authService = {
     email: string,
     fullName: string,
     password: string,
-    role: 'student' | 'teacher'
-  ): Promise<TokenResponse> {
-    const data = await apiRequest<TokenResponse>('/api/auth/register', {
+    role: 'student' | 'teacher',
+    inviteCode?: string
+  ): Promise<AuthResponse> {
+    const data = await apiRequest<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         email,
         full_name: fullName,
         password,
         role,
+        invite_code: role === 'teacher' ? inviteCode || undefined : undefined,
       }),
     })
-    const storage = this.getStorage()
-    storage.setItem('eduvillage_token', data.access_token)
-    storage.setItem('eduvillage_user', JSON.stringify(data.user))
+    this.cacheUser(data.user)
     return data
   },
 
   async getMe(): Promise<User> {
-    return apiRequest<User>('/api/auth/me')
+    return api.getCurrentUser()
   },
 
-  async refresh(): Promise<TokenResponse> {
-    const data = await apiRequest<TokenResponse>('/api/auth/refresh', {
-      method: 'POST',
-    })
-    const storage = this.getStorage()
-    storage.setItem('eduvillage_token', data.access_token)
-    storage.setItem('eduvillage_user', JSON.stringify(data.user))
-    return data
+  /** Revokes the session on the server (so a stale cookie on a shared machine is useless), then forgets the local cache. */
+  async logout(): Promise<void> {
+    try {
+      await apiRequest<void>('/auth/logout', { method: 'POST' })
+    } catch {
+      // Offline or already expired: still wipe the local cache below.
+    }
+    this.clearLocalSession()
   },
 
-  logout(): void {
-    sessionStorage.removeItem('eduvillage_token')
+  clearLocalSession(): void {
     sessionStorage.removeItem('eduvillage_user')
-    localStorage.removeItem('eduvillage_token')
     localStorage.removeItem('eduvillage_user')
   },
 
@@ -76,9 +81,4 @@ export const authService = {
       return null
     }
   },
-
-  getToken(): string | null {
-    return sessionStorage.getItem('eduvillage_token') || localStorage.getItem('eduvillage_token')
-  },
 }
-

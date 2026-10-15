@@ -17,6 +17,7 @@ export const RegisterPage: React.FC = () => {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [role, setRole] = useState<Role>('student')
+  const [inviteCode, setInviteCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,7 +43,7 @@ export const RegisterPage: React.FC = () => {
     setError(null)
 
     try {
-      const user = await register(email, fullName, password, role)
+      const user = await register(email, fullName, password, role, inviteCode)
       navigate(user.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', {
         replace: true,
       })
@@ -117,6 +118,23 @@ export const RegisterPage: React.FC = () => {
                 ]}
               />
             </FormField>
+
+            {role === 'teacher' && (
+              <FormField
+                label="Teacher Invite Code"
+                htmlFor="inviteCode"
+                required
+                hint="Teacher accounts are issued by your institution. Ask your administrator for the code."
+              >
+                <Input
+                  id="inviteCode"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+              </FormField>
+            )}
 
             <FormField label="Password" htmlFor="password" required hint="Min. 6 characters">
               <Input

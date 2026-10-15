@@ -65,11 +65,24 @@ class EduVillageDatabase extends Dexie {
   /**
    * Clear user-private data upon logout to protect privacy on shared rural devices
    */
-  async clearPrivateUserData(): Promise<void> {
+  async clearPrivateUserData(options: { includeDownloads?: boolean } = {}): Promise<void> {
     await this.transaction('rw', [this.assignmentDrafts, this.syncOperations], async () => {
       await this.assignmentDrafts.clear()
       await this.syncOperations.clear()
     })
+    if (options.includeDownloads) {
+      // Shared device: the next person must not be able to open this user's downloaded lectures, files or summaries.
+      await this.transaction(
+        'rw',
+        [this.downloadedResources, this.downloadedRecordings, this.cachedSummaries, this.cachedLessonMetadata],
+        async () => {
+          await this.downloadedResources.clear()
+          await this.downloadedRecordings.clear()
+          await this.cachedSummaries.clear()
+          await this.cachedLessonMetadata.clear()
+        }
+      )
+    }
   }
 }
 

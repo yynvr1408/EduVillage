@@ -5,20 +5,28 @@ import type { Course } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { CourseCard } from '../../components/course/CourseCard'
 import { Input } from '../../components/ui/Input'
+import { Button } from '../../components/ui/Button'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 
 export const StudentCoursesPage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([])
+  const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set())
+  const [enrollingId, setEnrollingId] = useState<string | null>(null)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     let isMounted = true
-    courseService
-      .getCourses()
-      .then((data) => {
-        if (isMounted) setCourses(data)
+    // The catalog is every published course; "mine" decides which ones show View vs Enroll.
+    Promise.all([courseService.getCatalog(), courseService.getCourses()])
+      .then(([catalog, mine]) => {
+        if (!isMounted) return
+        const merged = new Map(catalog.map((c) => [c.id, c]))
+        mine.forEach((c) => merged.set(c.id, c))
+        setCourses([...merged.values()])
+        setEnrolledIds(new Set(mine.map((c) => c.id)))
       })
       .catch((err) => console.error(err))
       .finally(() => {
@@ -28,6 +36,19 @@ export const StudentCoursesPage: React.FC = () => {
       isMounted = false
     }
   }, [])
+
+  const handleEnroll = async (courseId: string) => {
+    setEnrollingId(courseId)
+    setEnrollError(null)
+    try {
+      await courseService.enroll(courseId)
+      setEnrolledIds((prev) => new Set(prev).add(courseId))
+    } catch (err: any) {
+      setEnrollError(err.message || 'Could not enroll in this course.')
+    } finally {
+      setEnrollingId(null)
+    }
+  }
 
   const filteredCourses = courses.filter(
     (c) =>
@@ -41,6 +62,10 @@ export const StudentCoursesPage: React.FC = () => {
       title="Course Catalog"
       subtitle="Explore rural-adapted curriculum modules, download study guides, and review lesson notes."
     >
+      {enrollError && (
+        <div className="mb-4 p-3 bg-[#B42318]/10 text-[#B42318] rounded-md text-xs font-medium">{enrollError}</div>
+      )}
+
       {/* Search Input */}
       <div className="mb-6 max-w-md">
         <Input
@@ -70,7 +95,20 @@ export const StudentCoursesPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCourses.map((course) => (
-            <CourseCard key={course.id} course={course} />
+            <div key={course.id} className="flex flex-col gap-2">
+              <CourseCard course={course} />
+              {!enrolledIds.has(course.id) && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  fullWidth
+                  isLoading={enrollingId === course.id}
+                  onClick={() => handleEnroll(course.id)}
+                >
+                  Enroll to access lessons, classes and assignments
+                </Button>
+              )}
+            </div>
           ))}
         </div>
       )}

@@ -1,42 +1,33 @@
-import { apiRequest } from './apiClient'
+import { api } from './apiClient'
 import type { ClassRoom, JoinTokenResponse } from '../types'
 
 export const classService = {
-  async getClasses(): Promise<ClassRoom[]> {
-    return apiRequest<ClassRoom[]>('/api/classes')
+  getClasses(): Promise<ClassRoom[]> {
+    return api.getClasses()
   },
 
-  async getClassById(classId: string): Promise<ClassRoom> {
-    return apiRequest<ClassRoom>(`/api/classes/${classId}`)
+  getClassById(classId: string): Promise<ClassRoom> {
+    return api.getClass(classId)
   },
 
-  async scheduleClass(data: {
+  scheduleClass(data: {
     course_id: string
     title: string
     scheduled_at: string
     section_id?: string
   }): Promise<ClassRoom> {
-    return apiRequest<ClassRoom>('/api/classes', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return api.scheduleClass(data)
   },
 
-  async startClass(classId: string): Promise<ClassRoom> {
-    return apiRequest<ClassRoom>(`/api/classes/${classId}/start`, {
-      method: 'POST',
-    })
+  startClass(classId: string): Promise<ClassRoom> {
+    return api.startClass(classId)
   },
 
-  async endClass(classId: string): Promise<ClassRoom> {
-    return apiRequest<ClassRoom>(`/api/classes/${classId}/end`, {
-      method: 'POST',
-    })
+  endClass(classId: string): Promise<ClassRoom> {
+    return api.endClass(classId)
   },
 
-  async getJoinToken(classId: string): Promise<JoinTokenResponse> {
-    return apiRequest<JoinTokenResponse>(`/api/classes/${classId}/join-token`, {
-      method: 'POST',
-    })
+  getJoinToken(classId: string): Promise<JoinTokenResponse> {
+    return api.getJoinToken(classId)
   },
 }

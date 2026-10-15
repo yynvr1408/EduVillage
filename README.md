@@ -2,11 +2,19 @@
 
 Offline-first, low-bandwidth educational learning platform that helps students continue learning despite unreliable, expensive, or high-latency cellular connectivity.
 
-EduVillage features live real-time audio/video classrooms with adaptive audio-only fallback, AI-assisted missed-class recovery and lecture summaries, teacher review workflows, downloadable learning resources, IndexedDB-backed offline assignment drafts, and retryable idempotent synchronization.
+EduVillage features live real-time audio/video classrooms with adaptive audio-only fallback, recorded lectures, AI-assisted missed-class recovery and lecture summaries with teacher review, downloadable learning resources, IndexedDB-backed offline assignment drafts, and retryable idempotent synchronization.
+
+Backend documentation lives in [`docs/`](docs/): [audit](docs/BACKEND_AUDIT.md), [deduplication report](docs/DEDUPLICATION_REPORT.md), [requirements matrix](docs/BACKEND_REQUIREMENTS_MATRIX.md), [API contracts](docs/API_CONTRACTS.md), [setup](docs/BACKEND_SETUP.md).
 
 ---
 
 ## Architecture & Technology Stack
+
+- **Frontend:** React 19 + TypeScript (strict mode) with Vite 8, PWA (Service Worker + IndexedDB via Dexie.js)
+- **Backend:** FastAPI + Pydantic v2 + SQLAlchemy 2 + Alembic (SQLite for local development; PostgreSQL for production). One modular monolith, plus an independently runnable worker (`python -m app.worker`).
+- **Real-time:** WebRTC via LiveKit; adaptive audio-only mode is implemented in the frontend (media subscription control)
+- **AI:** Speech-to-text + LLM for lecture summaries (a clearly labeled stub generator is used when no provider key is set)
+- **Storage:** Local disk for uploads in development; S3-compatible object storage (required for recordings) behind one interface
 
 ### Frontend
 - **Framework & Language:** React 19 + TypeScript (strict mode) with Vite 8
@@ -19,10 +27,28 @@ EduVillage features live real-time audio/video classrooms with adaptive audio-on
 - **Testing:** Vitest + React Testing Library + Playwright
 
 ### Backend
-- **Framework:** FastAPI with Pydantic v2
-- **ORM & Database:** SQLAlchemy with SQLite fallback and PostgreSQL support
-- **Auth:** JWT tokens (`HS256`) with Bcrypt password hashing and role enforcement
-- **Real-Time Tokenization:** LiveKit API room token generator
+- **Framework:** FastAPI, all routes under `/api/v1`
+- **Auth:** server-side sessions in an httpOnly cookie (argon2 password hashing, revocable sessions); teacher registration needs an invite code
+- **Authorization:** enforced in services (course teacher / enrolled student / section membership), never from client-supplied roles
+- **Real-Time Tokenization:** short-lived, room-scoped LiveKit tokens; recording through LiveKit Egress to object storage, completion via a signed webhook
+
+```
+backend/
+  app/
+    main.py            # app entrypoint, middleware, exception handlers, /health, /ready
+    config.py          # Settings (reads .env)
+    dependencies.py    # get_db, get_current_user (session-cookie auth)
+    worker.py          # background worker (summary / transcription jobs)
+    seed.py            # optional demo accounts (python -m app.seed)
+    core/              # security, exceptions, permissions, logging
+    db/models/         # SQLAlchemy models (users, courses, sections, classes, recordings, summaries, sync...)
+    schemas/           # Pydantic request/response models
+    services/          # business logic — routers stay thin
+    integrations/      # LiveKit, object storage (local/S3), speech-to-text, LLM provider
+    api/v1/            # route handlers, one file per domain
+  alembic/             # migrations (`alembic upgrade head`)
+  tests/               # api/ and unit/
+```
 
 ---
 
@@ -45,9 +71,9 @@ The visual design system strictly follows educational usability standards optimi
 
 ---
 
-## Default Demo Accounts
+## Demo Accounts
 
-The database comes pre-seeded with two role-based demo accounts:
+`python -m app.seed` (after `alembic upgrade head`) creates two demo accounts, a published course, a section and an assignment. It refuses to run when `APP_ENV=production` because these passwords are public.
 
 | Role | Name | Email | Password |
 |---|---|---|---|
@@ -58,84 +84,41 @@ The database comes pre-seeded with two role-based demo accounts:
 
 ---
 
-## Quickstart Guide
+## Quickstart
 
-### 1. Backend Setup & Startup
+### 1. Backend
 
 ```bash
 cd backend
-# Create and activate virtualenv if needed
 python -m venv venv
-venv\Scripts\activate       # Windows (or source venv/bin/activate on Linux/Mac)
-
-# Install dependencies
+venv\Scripts\activate        # Windows (source venv/bin/activate on macOS/Linux)
 pip install -r requirements.txt
-
-# Run the backend API server
-python -m uvicorn app.main:app --reload --port 8000
+copy .env.example .env       # Windows (cp on macOS/Linux)
+alembic upgrade head
+python -m app.seed           # optional demo data
+uvicorn app.main:app --reload
+python -m app.worker         # optional second terminal: background job worker
 ```
 
-- Backend runs at: `http://localhost:8000`
-- Health check: `http://localhost:8000/health`
-- Interactive OpenAPI docs: `http://localhost:8000/docs`
+Backend: `http://localhost:8000` — `/health`, `/ready`, interactive docs at `/docs`. The default `.env` uses `sqlite:///./dev.db`; set `DATABASE_URL` to PostgreSQL (or run `docker compose up` in `backend/`) for production parity. LiveKit, S3 and the AI providers are optional: the features that need them return typed `503` errors or use the labeled stub until configured. Full variable list: [docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md).
 
-### 2. Frontend Setup & Startup
+### 2. Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start Vite development server
 npm run dev
 ```
 
-- Frontend runs at: `http://localhost:5173`
+Frontend: `http://localhost:5173`. Set `VITE_API_BASE_URL` (default `http://localhost:8000`) if the API is elsewhere. The API must list the frontend's origin in `FRONTEND_ORIGIN` because authentication uses a cookie.
 
 ---
 
-## Required Backend API Endpoints
+## API
 
-The frontend integrates with the following FastAPI endpoints:
+All endpoints are under `/api/v1`; the complete, generated list with authorization rules and error codes is in [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md). Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
 
-| Method | Endpoint | Description | Auth Required |
-|---|---|---|---|
-| `GET` | `/health` | API health check ping | No |
-| `POST` | `/api/auth/login` | Email/password sign-in | No |
-| `POST` | `/api/auth/register` | Student or teacher registration | No |
-| `GET` | `/api/auth/me` | Fetch authenticated user profile | Yes |
-| `POST` | `/api/auth/refresh` | Refresh JWT access token | Yes |
-| `GET` | `/api/courses` | List all available courses | No |
-| `POST` | `/api/courses` | Author a new course | Teacher |
-| `GET` | `/api/courses/{id}` | Course details with lesson modules | No |
-| `POST` | `/api/courses/{id}/lessons` | Append sequential lesson to course | Teacher |
-| `GET` | `/api/lessons/{id}` | Lesson detail & offline markdown body | No |
-| `GET` | `/api/lessons/{id}/assets` | List downloadable lesson assets | No |
-| `GET` | `/api/classes` | Scheduled, live, and completed classes | No |
-| `POST` | `/api/classes` | Schedule live classroom session | Teacher |
-| `POST` | `/api/classes/{id}/start` | Mutate class state to `LIVE` | Teacher |
-| `POST` | `/api/classes/{id}/end` | Mutate state to `ENDED` & trigger summary | Teacher |
-| `POST` | `/api/classes/{id}/join-token` | Issue LiveKit room access token | Yes |
-| `GET` | `/api/classes/{id}/summary` | Retrieve synthesized lecture summary | No |
-| `POST` | `/api/classes/{id}/summary-jobs` | Queue background summary generation | Teacher |
-| `GET` | `/api/summaries` | List summaries requiring teacher review | Teacher |
-| `POST` | `/api/summaries/{id}/review` | Approve summary or request revisions | Teacher |
-| `GET` | `/api/assignments` | List assignments (with student submission state) | Yes |
-| `POST` | `/api/assignments` | Create assignment with due date & score | Teacher |
-| `POST` | `/api/assignments/{id}/submissions` | Submit assignment (idempotent) | Student |
-| `GET` | `/api/assignments/{id}/submissions` | Review student submissions | Teacher |
-| `POST` | `/api/sync/operations` | Batch idempotent sync endpoint | Yes |
-| `GET` | `/api/materials` | List course learning materials | No |
-| `POST` | `/api/materials` | Upload/publish study material | Teacher |
-| `GET` | `/api/sections` | List cohort sections (e.g., Section A, Section B) | No |
-| `POST` | `/api/sections` | Create course cohort section | Teacher |
-| `GET` | `/api/recordings` | List lecture recordings with filter support | No |
-| `GET` | `/api/recordings/{id}` | Lecture recording details with transcript & summary | No |
-| `POST` | `/api/recordings` | Create/upload lecture recording | Teacher |
-| `POST` | `/api/recordings/{id}/reuse` | Associate existing recording with another section | Teacher |
-| `POST` | `/api/recordings/{id}/progress` | Save student playback resume position (debounced) | Yes |
-| `POST` | `/api/recordings/{id}/publish` | Toggle recording publication status | Teacher |
+The frontend talks to the API only through `frontend/src/services/apiClient.ts`, which adapts the backend contract to the page view-models.
 
 ---
 
@@ -143,94 +126,61 @@ The frontend integrates with the following FastAPI endpoints:
 
 ### 1. IndexedDB Stores (Dexie.js `EduVillageDB`)
 - `assignmentDrafts`: Preserves answers locally as student types ("Saved on this device"). Survives app reloads and power cycles.
-- `syncOperations`: Persistent queue storing pending actions (`submit_assignment`, `save_draft`) tagged with UUID idempotency keys.
-- `downloadedResources`: Stores explicit resource downloads (PDFs, calculation worksheets, audio) as binary Blobs for offline study.
-- `cachedLessonMetadata`: Caches viewed lesson markdown content.
-- `cachedSummaries`: Caches lecture summaries for offline self-assessment.
+- `syncOperations`: Persistent queue of pending submissions, each with a unique `operation_id`.
+- `downloadedResources` / `downloadedRecordings`: Explicit downloads stored as real binary Blobs for offline study (a failed download is an error, never placeholder content).
+- `cachedLessonMetadata`, `cachedSummaries`: cached content for offline reading.
 
 ### 2. Synchronization Lifecycle
-1. **Offline State:** Mutations are written to IndexedDB; badge displays *Saved on this device* or *Waiting to sync*.
-2. **Reconnection:** Periodic `/health` heartbeats detect live backend connectivity.
-3. **Queue Processing:** `syncManager.processQueue()` posts batches with idempotency keys.
-4. **Server Confirmation:** Status transitions to *Submitted* only when server confirms the entity ID.
-5. **Shared Device Security:** `clearPrivateUserData()` purges sensitive drafts and queue items upon logout.
+1. **Offline:** mutations are written to IndexedDB; the badge shows *Saved on this device* or *Waiting to sync*.
+2. **Reconnection:** periodic `/health` heartbeats detect connectivity.
+3. **Queue processing:** `syncManager.processQueue()` posts batches to `POST /api/v1/sync/operations`.
+4. **Server confirmation:** a submission is *Submitted* only when the server answers `accepted`. `rejected` / `conflict` stay visible as needing attention. Retrying the same `operation_id` can never create a second submission (enforced by the database, tested including simultaneous duplicates).
+5. **Shared device:** logout revokes the server session; on a shared device it also clears drafts, the queue, downloads and caches.
 
 ---
 
 ## Real-Time Classroom & Adaptive Audio-Only Mode
 
-1. **Authorization Flow:**
-   - Client requests join token via `POST /api/classes/{id}/join-token`.
-   - FastAPI verifies user enrollment and class state.
-   - FastAPI issues scoped LiveKit JWT token (Teachers = Publishers; Students = Listeners).
-2. **Adaptive Media Subscription Control:**
-   - The classroom monitors WebRTC connection quality events (`ConnectionQuality.Poor`, `ConnectionQuality.Lost`).
-   - If sustained degradation is detected (or manual toggle enabled), `useAdaptiveAudio` unsubscribes from remote video tracks (`trackPublication.setSubscribed(false)`) at the WebRTC transport layer.
-   - Incoming audio remains subscribed (`setSubscribed(true)`), reducing bandwidth consumption by ~85% while preserving voice intelligibility.
-3. **In-Classroom Lecture Summary Panel:**
-   - Desktop: Side panel integrated next to the video stage.
-   - Mobile: Bottom sheet drawer.
-   - Opening or closing the summary panel never interrupts or disconnects the WebRTC peer connection.
+1. **Authorization flow:** the client requests `POST /api/v1/classes/{id}/join-token`; FastAPI verifies enrollment, section membership and class state and issues a scoped LiveKit JWT (teachers publish; students listen). The backend never proxies media.
+2. **Adaptive media subscription control (frontend):** the classroom monitors WebRTC connection quality; on sustained degradation (or manual toggle) `useAdaptiveAudio` unsubscribes from remote video tracks while keeping audio.
+3. **Recording:** a teacher explicitly starts/stops recording; everyone in the room sees a recording notice. A recording stays private until the teacher publishes it from *Recorded Lessons*; students then stream it via short-lived signed URLs.
+4. **Summary panel:** side panel on desktop, bottom sheet on mobile; opening it never interrupts the WebRTC connection.
 
 ---
 
-## Testing & Quality Assurance
+## Testing
 
-### Vitest Unit & Logic Tests
 ```bash
-cd frontend
-npm test
+cd backend && pytest                 # SQLite; add TEST_DATABASE_URL=... to run against PostgreSQL
+cd frontend && npm test              # Vitest
+cd frontend && npx tsc -b && npm run build
+cd frontend && npx playwright test --project="Desktop Chrome"   # e2e (not re-run during the backend audit)
 ```
-Runs 20 automated tests across 6 suites covering:
-- Student and teacher authentication workflows.
-- Shared-device session storage isolation and switch user workflow.
-- Unsynchronized assignment draft warning before sign-out.
-- Recorded lecture player: play/pause, seek, low-bandwidth audio-only mode, and honest processing/unavailable states.
-- Multi-section cohort badges on scheduled class cards.
-- Role-based route protection and redirection.
-- IndexedDB draft saving and reload survival.
-- Idempotency key uniqueness and duplicate prevention.
-- WebRTC track subscription control for adaptive audio mode.
-- Download manager storage allocation and summary rendering.
 
-### End-to-End Tests (Playwright)
-```bash
-cd frontend
-npx playwright test --project="Desktop Chrome"
-```
-Validates critical user workflows on desktop and mobile viewports:
-- Student authentication, dashboard rendering, and mobile 5-destination bottom navigation.
-- Offline assignment draft saving to IndexedDB.
-- Recorded lessons library, playback player, transcript, and AI summary tabs.
-- Teacher authentication and recorded lessons management console.
+Results recorded on 2026-10-15: backend 159 passed on SQLite, 157 on PostgreSQL 18; frontend 25 passed; type-check and production build clean. See [docs/BACKEND_REQUIREMENTS_MATRIX.md](docs/BACKEND_REQUIREMENTS_MATRIX.md) for what each test does and does not prove.
 
 ---
 
-## Production Build
+## Known Constraints (honest status)
 
-```bash
-cd frontend
-npm run build
-```
-Generates production-optimized assets and PWA service worker into `frontend/dist/`.
+1. **LiveKit, recording and S3 are not verified against real services.** The backend implements token issuance, the recording lifecycle, the signed webhook and signed playback URLs, and the tests exercise them against mocked boundaries. A real LiveKit server with Egress and an S3-compatible bucket are required in production; until configured, endpoints return `503 LIVEKIT_NOT_CONFIGURED` / `RECORDING_NOT_CONFIGURED`.
+2. **AI summaries need provider keys for real output.** Without `LLM_API_KEY` the pipeline produces a stub result labeled `generator: "stub"`; without `SPEECH_TO_TEXT_API_KEY` transcription from a recording fails with `STT_NOT_CONFIGURED` (no summary is invented). Teachers must review before students see a summary.
+3. **Background Sync API:** the W3C `SyncManager` is Chromium-only, so EduVillage pairs IndexedDB queuing with a foreground `NetworkContext` that triggers an idempotent batch sync on reconnection or launch.
+4. **Storage quota:** downloads are subject to the browser quota; the Downloads page shows real usage via `navigator.storage.estimate()`, or says it is unavailable.
+5. **Not built:** grading, due-date enforcement, cross-institution sharing, multi-process rate limiting, external job queue.
 
 ---
 
-## External Dependencies & Known Constraints
+## Against the problem statement
 
-1. **LiveKit WebRTC SFU Server:**
-   - **Production Requirement:** For real-time multi-peer video/audio classroom distribution over the internet, a running LiveKit SFU server instance or LiveKit Cloud project is required.
-   - **Configuration:** Set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in `backend/.env`.
-   - **Current State:** The backend generates valid JWT room join tokens (`/api/classes/{id}/join-token`) with scoped publish/subscribe permissions for students and teachers. When an external LiveKit SFU is not reachable, the classroom interface provides clear connection error and retry feedback without crashing.
+> *"Rural colleges face weak internet, few devices, and limited teachers... Build a simple tool for live and recorded classes that works on low bandwidth. Success means students can attend, catch up, and submit work even on poor connections."*
 
-2. **AI Speech-to-Text and Summarization Pipeline:**
-   - **Production Requirement:** Generating automated summaries from audio recordings requires an asynchronous task queue (e.g. Celery / Redis) connected to a speech-to-text model (e.g. Whisper) and an LLM API (e.g. Gemini 1.5 Pro).
-   - **Configuration:** Set `LLM_API_KEY` in `backend/.env`.
-   - **Current State:** The backend implements the complete database schema, job dispatch endpoint (`POST /api/classes/{id}/summary-jobs`), polling endpoint (`GET /api/classes/{id}/summary`), and teacher review approval/revision workflow (`POST /api/summaries/{id}/review`). Realistic lecture summaries are pre-seeded in the database for demonstration and verification.
-
-3. **Background Sync & Browser Variations:**
-   - **Implementation:** The service worker implements Workbox caching for the application shell and static assets. Because the W3C `SyncManager` API is only supported in Chromium-based browsers, EduVillage does not rely exclusively on Background Sync. Instead, it pairs IndexedDB queuing with a reactive foreground `NetworkContext` that triggers automatic idempotent batch synchronization immediately upon reconnection or app launch.
-
-4. **Storage Quota Management:**
-   - Offline resource downloads (worksheets, reading guides, audio files) are stored as binary Blobs in IndexedDB. Storage is subject to the client device's browser quota. EduVillage monitors available storage using `navigator.storage.estimate()` and displays a real-time storage bar on the Downloads page so students on low-capacity mobile devices never experience unexpected write failures.
-
+| Ask | Status | Implementation |
+|---|---|---|
+| Weak internet / low bandwidth | Implemented (frontend logic tested; not field-tested) | Audio-only fallback, offline-first assignment sync |
+| Live classes | Implemented; **needs a LiveKit server to run live** | Role-based, room-scoped join tokens |
+| Recorded classes | Implemented; **needs LiveKit Egress + S3 to record** | Recording lifecycle, publish, signed playback, library |
+| Students catch up | Implemented | Recording playback, transcript, teacher-approved AI summary |
+| Submit work on poor connections | Implemented and tested | Offline drafts + idempotent sync with retry queue |
+| Few devices | Implemented | Shared-device mode, session revocation, local data wipe |
+| Limited teachers | Implemented (same-teacher scope) | Sections, co-teachers, recordings and resources reused across sections without copying |

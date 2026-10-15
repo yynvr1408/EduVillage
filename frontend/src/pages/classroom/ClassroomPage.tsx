@@ -26,6 +26,7 @@ import {
   X,
   Radio,
 } from 'lucide-react'
+import { api } from '../../services/apiClient'
 import { classService } from '../../services/classService'
 import { summaryService } from '../../services/summaryService'
 import { useAuth } from '../../context/AuthContext'
@@ -276,6 +277,71 @@ const ClassroomStage: React.FC<{
 }
 
 /**
+ * Recording notice for everyone, plus start/stop for teachers. Recording is always an explicit
+ * teacher action; a recording stays private until the teacher publishes it from Recorded Lessons.
+ */
+const RecordingBar: React.FC<{ classId: string; isTeacher: boolean; initiallyRecording: boolean }> = ({
+  classId,
+  isTeacher,
+  initiallyRecording,
+}) => {
+  const [recordingId, setRecordingId] = useState<string | null>(null)
+  const [isRecording, setIsRecording] = useState(initiallyRecording)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    // A teacher who reloads mid-recording needs the active recording's id to be able to stop it.
+    if (!isTeacher || !initiallyRecording) return
+    api
+      .getClassRecordings(classId)
+      .then((list) => setRecordingId(list.find((r) => r.status === 'recording')?.id ?? null))
+      .catch(() => {})
+  }, [classId, isTeacher, initiallyRecording])
+
+  const toggle = async () => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      if (isRecording && recordingId) {
+        await api.stopRecording(classId, recordingId)
+        setIsRecording(false)
+        setMessage('Recording stopped. It is being processed and will stay private until you publish it.')
+      } else {
+        const rec = await api.startRecording(classId)
+        setRecordingId(rec.id)
+        setIsRecording(true)
+      }
+    } catch (err: any) {
+      setMessage(err.message || 'Could not change the recording state.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!isTeacher && !isRecording) return null
+  return (
+    <div className="bg-[#111111] text-[#FFFFFF] text-xs px-4 py-2 flex items-center justify-between gap-3 border-b border-[#262626]" role="status">
+      <span>
+        {isRecording
+          ? 'This session is being recorded, and the audio may be transcribed for lecture summaries.'
+          : (message ?? 'This session is not being recorded.')}
+      </span>
+      {isTeacher && (
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={busy || (isRecording && !recordingId)}
+          className="px-3 py-1.5 rounded-md bg-[#262626] hover:bg-[#333333] disabled:opacity-50 cursor-pointer"
+        >
+          {isRecording ? 'Stop recording' : 'Start recording'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
  * Main Classroom Page with token authorization flow
  */
 export const ClassroomPage: React.FC = () => {
@@ -359,6 +425,7 @@ export const ClassroomPage: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#000000] overflow-hidden select-none">
+      <RecordingBar classId={classroom.id} isTeacher={Boolean(isTeacher)} initiallyRecording={joinData.recording_active} />
       <LiveKitRoom
         serverUrl={joinData.url}
         token={joinData.token}

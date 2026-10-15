@@ -1,44 +1,51 @@
-import { apiRequest } from './apiClient'
+import { api, ApiError } from './apiClient'
 import type { Assignment, Submission } from '../types'
 
 export const assignmentService = {
-  async getAssignments(courseId?: string): Promise<Assignment[]> {
-    const query = courseId ? `?course_id=${encodeURIComponent(courseId)}` : ''
-    return apiRequest<Assignment[]>(`/api/assignments${query}`)
+  getAssignments(courseId?: string): Promise<Assignment[]> {
+    return api.getAssignments(courseId)
   },
 
-  async getAssignmentById(assignmentId: string): Promise<Assignment> {
-    return apiRequest<Assignment>(`/api/assignments/${assignmentId}`)
+  getAssignmentById(assignmentId: string): Promise<Assignment> {
+    return api.getAssignment(assignmentId)
   },
 
-  async createAssignment(data: {
+  createAssignment(data: {
     course_id: string
     title: string
     instructions: string
     due_date: string
     max_score?: number
   }): Promise<Assignment> {
-    return apiRequest<Assignment>('/api/assignments', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return api.createAssignment(data)
   },
 
-  async submitAssignment(
-    assignmentId: string,
-    content: string,
-    idempotencyKey?: string
-  ): Promise<Submission> {
-    return apiRequest<Submission>(`/api/assignments/${assignmentId}/submissions`, {
-      method: 'POST',
-      body: JSON.stringify({
-        content,
-        idempotency_key: idempotencyKey,
-      }),
-    })
+  /**
+   * Online submission goes through the same idempotent sync endpoint the offline queue uses, so a
+   * retry of the same idempotencyKey can never create a second submission. Resolves only when the
+   * server has accepted it; a server-side refusal throws (it is NOT a connectivity problem).
+   */
+  async submitAssignment(assignmentId: string, content: string, idempotencyKey: string): Promise<{ submissionId: string }> {
+    const { results } = await api.syncOperations([
+      {
+        id: idempotencyKey,
+        operationType: 'submit_assignment',
+        entityId: assignmentId,
+        payload: { content },
+        status: 'syncing',
+        idempotencyKey,
+        createdAt: new Date().toISOString(),
+        retryCount: 0,
+      },
+    ])
+    const result = results[0]
+    if (!result || result.status !== 'accepted') {
+      throw new ApiError(result?.message || 'The server did not accept this submission.', 409, false, result?.error_code)
+    }
+    return { submissionId: result.server_entity_id ?? '' }
   },
 
-  async getSubmissions(assignmentId: string): Promise<Submission[]> {
-    return apiRequest<Submission[]>(`/api/assignments/${assignmentId}/submissions`)
+  getSubmissions(assignmentId: string): Promise<Submission[]> {
+    return api.getSubmissions(assignmentId)
   },
 }

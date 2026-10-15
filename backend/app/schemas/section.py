@@ -1,0 +1,30 @@
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class SectionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    code: str = Field(min_length=1, max_length=40)
+
+
+class SectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    course_id: str
+    name: str
+    code: str
+
+
+class SectionMemberAdd(BaseModel):
+    student_id: str
+
+
+class SectionMemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    section_id: str
+    student_id: str
+    added_at: datetime

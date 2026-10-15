@@ -18,6 +18,13 @@ export const StorageMeter: React.FC = () => {
   }, [])
 
   if (!storage) return null
+  if (!storage.supported) {
+    return (
+      <div className="p-4 bg-[#F5F5F5] border border-[#E5E5E5] rounded-lg text-xs text-[#666666]">
+        This browser can't report device storage, so free space is unknown.
+      </div>
+    )
+  }
 
   const usedMB = Math.round(storage.usageBytes / (1024 * 1024))
 

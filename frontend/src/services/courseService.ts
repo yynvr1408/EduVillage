@@ -1,14 +1,22 @@
-import { apiRequest } from './apiClient'
+import { api } from './apiClient'
 import { db } from '../db/db'
 import type { Course, Lesson, Material } from '../types'
 
 export const courseService = {
   async getCourses(): Promise<Course[]> {
-    return apiRequest<Course[]>('/api/courses')
+    return api.getCourses()
+  },
+
+  getCatalog(): Promise<Course[]> {
+    return api.getCourseCatalog()
+  },
+
+  async enroll(courseId: string): Promise<void> {
+    await api.enroll(courseId)
   },
 
   async getCourseById(courseId: string): Promise<Course> {
-    const course = await apiRequest<Course>(`/api/courses/${courseId}`)
+    const course = await api.getCourse(courseId)
     // Cache lessons for offline viewing
     if (course.lessons) {
       for (const lesson of course.lessons) {
@@ -25,10 +33,7 @@ export const courseService = {
   },
 
   async createCourse(data: { title: string; code: string; description?: string }): Promise<Course> {
-    return apiRequest<Course>('/api/courses', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return api.createCourse(data)
   },
 
   async createLesson(courseId: string, data: {
@@ -38,15 +43,12 @@ export const courseService = {
     content?: string
     offline_ready?: boolean
   }): Promise<Lesson> {
-    return apiRequest<Lesson>(`/api/courses/${courseId}/lessons`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return api.createLesson(courseId, data)
   },
 
   async getLessonById(lessonId: string): Promise<Lesson> {
     try {
-      const lesson = await apiRequest<Lesson>(`/api/lessons/${lessonId}`)
+      const lesson = await api.getLesson(lessonId)
       // Update local cache
       await db.cachedLessonMetadata.put({
         id: lesson.id,
@@ -67,6 +69,6 @@ export const courseService = {
   },
 
   async getLessonAssets(lessonId: string): Promise<Material[]> {
-    return apiRequest<Material[]>(`/api/lessons/${lessonId}/assets`)
+    return api.getLessonAssets(lessonId)
   },
 }

@@ -11,6 +11,7 @@ import {
 import type { Assignment, AssignmentDraft } from '../../types'
 import { syncManager } from '../../services/syncManager'
 import { assignmentService } from '../../services/assignmentService'
+import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../../context/AuthContext'
 import { useNetworkStatus } from '../../context/NetworkContext'
 import { useSync } from '../../context/SyncContext'
@@ -135,9 +136,16 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
         setSaveStatus('server_confirmed')
         if (onSubmitted) onSubmitted()
       } catch (err: any) {
-        // If server call fails, fallback gracefully to offline queue!
-        console.warn('Online submit failed, enqueuing for offline retry:', err)
-        await handleEnqueueOffline()
+        if (err instanceof ApiError && !err.isNetworkError) {
+          // The server answered and refused (closed assignment, not enrolled...). Queuing it would
+          // just be refused again, so tell the student instead of pretending it will be retried.
+          setErrorMessage(err.message)
+          setSaveStatus('error')
+        } else {
+          // Connectivity problem: keep the work safe in the offline queue.
+          console.warn('Online submit failed, enqueuing for offline retry:', err)
+          await handleEnqueueOffline()
+        }
       }
     } else {
       // Offline mode: enqueue to sync operations

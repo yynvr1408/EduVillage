@@ -12,6 +12,7 @@ import {
   ChevronRight,
   FolderOpen,
 } from 'lucide-react'
+import { api } from '../../services/apiClient'
 import { courseService } from '../../services/courseService'
 import { classService } from '../../services/classService'
 import { assignmentService } from '../../services/assignmentService'
@@ -50,40 +51,9 @@ export const StudentCourseDetailPage: React.FC = () => {
         setClasses(allCls.filter((cl) => cl.course_id === courseId))
         setAssignments(allAsg)
 
-        // Generate or load materials for the course
-        const sampleMaterials: Material[] = [
-          {
-            id: `mat-${courseId}-1`,
-            course_id: courseId,
-            title: `${c.code} Field Diagnostics Handbook (PDF)`,
-            file_url: `/downloads/${c.code.toLowerCase()}-handbook.pdf`,
-            file_type: 'pdf',
-            file_size: 2450000,
-            is_published: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: `mat-${courseId}-2`,
-            course_id: courseId,
-            title: `${c.code} Sizing & Engineering Calculation Sheet`,
-            file_url: `/downloads/${c.code.toLowerCase()}-worksheet.pdf`,
-            file_type: 'pdf',
-            file_size: 980000,
-            is_published: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: `mat-${courseId}-3`,
-            course_id: courseId,
-            title: `Audio Lecture: Emergency Maintenance & Troubleshooting`,
-            file_url: `/downloads/${c.code.toLowerCase()}-audio.mp3`,
-            file_type: 'audio',
-            file_size: 5600000,
-            is_published: true,
-            created_at: new Date().toISOString(),
-          },
-        ]
-        setMaterials(sampleMaterials)
+        // Real materials uploaded by the course's teachers (empty until they publish some).
+        const realMaterials = await api.getMaterials(courseId).catch(() => [] as Material[])
+        if (isMounted) setMaterials(realMaterials)
       } catch (err: any) {
         if (isMounted) setError(err.message || 'Failed to load course details')
       } finally {

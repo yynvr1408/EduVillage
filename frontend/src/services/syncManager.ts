@@ -1,5 +1,5 @@
 import { db } from '../db/db'
-import { apiRequest } from './apiClient'
+import { api } from './apiClient'
 import type { AssignmentDraft, SyncOperation } from '../types'
 
 function generateUUID(): string {
@@ -143,39 +143,17 @@ export const syncManager = {
     let failed = 0
 
     try {
-      // Build batch request
-      const batchPayload = {
-        operations: pendingOps.map((op) => ({
-          operation_id: op.id,
-          idempotency_key: op.idempotencyKey,
-          operation_type: op.operationType,
-          entity_id: op.entityId,
-          payload: op.payload,
-          timestamp: op.createdAt,
-        })),
-      }
-
-      const response = await apiRequest<{
-        processed_count: number
-        results: Array<{
-          operation_id: string
-          idempotency_key: string
-          status: string
-          message: string
-          server_entity_id?: string
-        }>
-      }>('/api/sync/operations', {
-        method: 'POST',
-        body: JSON.stringify(batchPayload),
-      })
+      // The backend is idempotent on (user, operation_id): a retry after a dropped response replays the
+      // original result instead of creating a second submission.
+      const response = await api.syncOperations(pendingOps)
 
       for (const res of response.results) {
         const op = pendingOps.find((o) => o.id === res.operation_id)
         if (!op) continue
 
-        if (res.status === 'SUCCESS') {
+        if (res.status === 'accepted') {
           successful++
-          // Update corresponding draft
+          // Only now — after server confirmation — is the draft considered submitted.
           if (op.operationType === 'submit_assignment') {
             const draft = await db.assignmentDrafts.get(op.entityId)
             if (draft) {
@@ -187,10 +165,11 @@ export const syncManager = {
           // Remove completed operation from queue
           await db.syncOperations.delete(op.id)
         } else {
+          // rejected / conflict: the server answered and refused — keep it visible as "needs attention".
           failed++
           op.status = 'failed'
           op.retryCount = (op.retryCount || 0) + 1
-          op.lastError = res.message
+          op.lastError = res.message || res.error_code
           await db.syncOperations.put(op)
         }
       }

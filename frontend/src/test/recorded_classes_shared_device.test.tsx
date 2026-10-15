@@ -30,7 +30,7 @@ describe('Recorded Classes, Shared Devices & Multi-Section Workflows', () => {
   it('renders RecordedLecturePlayer for a READY recording with controls and audio-only toggle', () => {
     const readyRecording: Recording = {
       id: 'rec-1',
-      classroom_id: 'cls-1',
+      class_id: 'cls-1',
       course_id: 'course-1',
       course_code: 'STEM-201',
       course_title: 'Solar Micro-Grids',
@@ -105,7 +105,7 @@ describe('Recorded Classes, Shared Devices & Multi-Section Workflows', () => {
       teacher_name: 'Prof. Miller',
       title: 'Hydraulic Conductivity Laboratory',
       status: 'SCHEDULED',
-      scheduled_start: new Date(Date.now() + 3600000).toISOString(),
+      scheduled_at: new Date(Date.now() + 3600000).toISOString(),
       section_id: 'sec-a',
       section_name: 'Section A (Cohort 2026)',
     }
@@ -128,14 +128,34 @@ describe('Recorded Classes, Shared Devices & Multi-Section Workflows', () => {
     authService.setSharedDevice(true)
     expect(authService.isSharedDevice()).toBe(true)
 
-    // Storing token in shared device mode routes to sessionStorage
-    authService.getStorage().setItem('eduvillage_token', 'shared-session-token')
-    expect(sessionStorage.getItem('eduvillage_token')).toBe('shared-session-token')
-    expect(localStorage.getItem('eduvillage_token')).toBeNull()
+    // The cached profile (display only; auth is an httpOnly cookie) lives in sessionStorage on a shared device
+    const user = { id: 'u1', email: 'a@b.c', full_name: 'A', role: 'student' as const }
+    authService.cacheUser(user)
+    expect(sessionStorage.getItem('eduvillage_user')).not.toBeNull()
+    expect(localStorage.getItem('eduvillage_user')).toBeNull()
 
-    // Logging out clears session tokens
-    authService.logout()
-    expect(sessionStorage.getItem('eduvillage_token')).toBeNull()
+    // Logging out revokes the server session (so a leftover cookie is dead) and wipes the local cache
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await authService.logout()
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/auth/logout'), expect.objectContaining({ method: 'POST', credentials: 'include' }))
+    expect(sessionStorage.getItem('eduvillage_user')).toBeNull()
+  })
+
+  it('still wipes the local cache when logout cannot reach the server', async () => {
+    authService.setSharedDevice(true)
+    authService.cacheUser({ id: 'u1', email: 'a@b.c', full_name: 'A', role: 'student' })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    await authService.logout()
+    expect(authService.getStoredUser()).toBeNull()
+  })
+
+  it('wipes downloads and caches on shared-device logout, but keeps them on a personal device', async () => {
+    await db.downloadedResources.put({ id: 'r1', resourceId: 'r1', courseId: 'c', title: 't', fileType: 'pdf', sizeBytes: 1, downloadedAt: new Date().toISOString() })
+    await db.clearPrivateUserData({ includeDownloads: false })
+    expect(await db.downloadedResources.count()).toBe(1)
+    await db.clearPrivateUserData({ includeDownloads: true })
+    expect(await db.downloadedResources.count()).toBe(0)
   })
 
   it('prompts warning when unsaved assignment draft exists before logging out on shared device', async () => {
@@ -169,7 +189,7 @@ describe('Recorded Classes, Shared Devices & Multi-Section Workflows', () => {
         <AuthProvider>
           <NetworkProvider>
             <SyncProvider>
-              <AppHeader onToggleSidebar={() => {}} />
+              <AppHeader />
             </SyncProvider>
           </NetworkProvider>
         </AuthProvider>

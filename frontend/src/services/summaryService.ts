@@ -1,11 +1,11 @@
-import { apiRequest } from './apiClient'
+import { api } from './apiClient'
 import { db } from '../db/db'
 import type { Summary } from '../types'
 
 export const summaryService = {
   async getClassSummary(classId: string): Promise<Summary> {
     try {
-      const summary = await apiRequest<Summary>(`/api/classes/${classId}/summary`)
+      const summary = await api.getClassSummary(classId)
       // Cache summary in Dexie
       await db.cachedSummaries.put({
         classId: summary.class_id,
@@ -27,7 +27,7 @@ export const summaryService = {
   },
 
   async listSummaries(): Promise<Summary[]> {
-    return apiRequest<Summary[]>('/api/summaries')
+    return api.getSummaries()
   },
 
   async reviewSummary(
@@ -40,15 +40,10 @@ export const summaryService = {
       revision_questions?: string[]
     }
   ): Promise<Summary> {
-    return apiRequest<Summary>(`/api/summaries/${summaryId}/review`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+    return api.reviewSummary(summaryId, data)
   },
 
-  async createSummaryJob(classId: string): Promise<{ job_id: string; status: string }> {
-    return apiRequest<{ job_id: string; status: string }>(`/api/classes/${classId}/summary-jobs`, {
-      method: 'POST',
-    })
+  async createSummaryJob(classId: string, transcriptText?: string): Promise<{ job_id: string; status: string }> {
+    return api.createSummaryJob(classId, transcriptText)
   },
 }

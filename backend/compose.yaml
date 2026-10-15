@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: eduvillage
+      POSTGRES_PASSWORD: eduvillage
+      POSTGRES_DB: eduvillage
+    ports:
+      - "5432:5432"
+    volumes:
+      - eduvillage_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eduvillage"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://eduvillage:eduvillage@db:5432/eduvillage
+      APP_ENV: development
+      FRONTEND_ORIGIN: http://localhost:5173
+      SESSION_SECRET: dev-secret-change-me
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./media:/app/media
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    build: .
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+psycopg2://eduvillage:eduvillage@db:5432/eduvillage
+      APP_ENV: development
+    volumes:
+      - ./media:/app/media
+    command: python -m app.worker
+
+volumes:
+  eduvillage_pgdata:
