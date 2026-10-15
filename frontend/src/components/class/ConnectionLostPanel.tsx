@@ -6,6 +6,9 @@ import { Button } from '../ui/Button'
 export interface ConnectionLostPanelProps {
   /** Students get the Downloads shortcut; teachers can only wait or leave. */
   showDownloads: boolean
+  /** Accurate copy for the actual cause (see services/connectivity). Falls back to generic text. */
+  headline?: string
+  guidance?: string
   onKeepWaiting: () => void
   onLeave: () => void
 }
@@ -15,7 +18,7 @@ export interface ConnectionLostPanelProps {
  * that the student is still in the class, and its Downloads link is a plain client-side route, so
  * it works with the network and the backend completely unavailable.
  */
-export const ConnectionLostPanel: React.FC<ConnectionLostPanelProps> = ({ showDownloads, onKeepWaiting, onLeave }) => (
+export const ConnectionLostPanel: React.FC<ConnectionLostPanelProps> = ({ showDownloads, headline, guidance, onKeepWaiting, onLeave }) => (
   <div
     role="alertdialog"
     aria-labelledby="connection-lost-title"
@@ -24,10 +27,10 @@ export const ConnectionLostPanel: React.FC<ConnectionLostPanelProps> = ({ showDo
     <div className="max-w-sm w-full text-center flex flex-col items-center gap-3">
       <WifiOff className="w-10 h-10 text-[#84908D]" />
       <h2 id="connection-lost-title" className="text-lg font-bold">
-        You are not connected to the live class
+        {headline || 'You are not connected to the live class'}
       </h2>
       <p className="text-xs text-[#C9D3D0] leading-relaxed">
-        {showDownloads
+        {guidance ? guidance : showDownloads
           ? 'We could not restore the connection. While you wait, your downloaded lectures, audio, notes and summaries are still available on this device.'
           : 'We could not restore the connection. You will rejoin automatically if it comes back.'}
       </p>

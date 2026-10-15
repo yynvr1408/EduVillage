@@ -119,6 +119,7 @@ class LocalObjectStorage(ObjectStorage):
 class S3ObjectStorage(ObjectStorage):
     def __init__(self):
         import boto3
+        from botocore.config import Config
 
         self.bucket = settings.object_storage_bucket
         self.client = boto3.client(
@@ -127,17 +128,21 @@ class S3ObjectStorage(ObjectStorage):
             aws_access_key_id=settings.object_storage_access_key,
             aws_secret_access_key=settings.object_storage_secret_key,
             region_name=settings.object_storage_region,
+            # Signature v4 is required by R2 and recommended everywhere; path-style addressing for
+            # emulators/self-hosted stores (OBJECT_STORAGE_FORCE_PATH_STYLE=true).
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path" if settings.object_storage_force_path_style else "auto"},
+            ),
         )
 
     def upload_target(self, storage_key: str, content_type: str) -> dict:
-        presigned = self.client.generate_presigned_post(
-            Bucket=self.bucket,
-            Key=storage_key,
-            Fields={"Content-Type": content_type},
-            Conditions=[{"Content-Type": content_type}],
-            ExpiresIn=900,
+        # A presigned PUT, not a presigned POST policy: Cloudflare R2 does not implement POST policies.
+        # The browser must send the same Content-Type that was signed.
+        url = self.client.generate_presigned_url(
+            "put_object", Params={"Bucket": self.bucket, "Key": storage_key, "ContentType": content_type}, ExpiresIn=900
         )
-        return {"method": "POST", "url": presigned["url"], "fields": presigned["fields"]}
+        return {"method": "PUT", "url": url, "fields": {}, "headers": {"Content-Type": content_type}}
 
     def verify_uploaded(self, storage_key: str) -> int | None:
         try:

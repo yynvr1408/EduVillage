@@ -28,6 +28,8 @@ import {
 } from 'lucide-react'
 import { api } from '../../services/apiClient'
 import { useConnectionRecovery } from '../../hooks/useConnectionRecovery'
+import { useNetworkStatus } from '../../context/NetworkContext'
+import { diagnoseConnectivity } from '../../services/connectivity'
 import { ConnectionLostPanel } from '../../components/class/ConnectionLostPanel'
 import { classService } from '../../services/classService'
 import { summaryService } from '../../services/summaryService'
@@ -80,6 +82,9 @@ const ClassroomStage: React.FC<{
 
   // A sustained outage offers the offline recovery screen (Downloads stay usable without any server)
   const { recoveryRequired, dismiss } = useConnectionRecovery(connectionStateStr)
+  // Three separate signals: the device, the EduVillage API, and the live media connection.
+  const { isBrowserOnline, isServerReachable } = useNetworkStatus()
+  const diagnosis = diagnoseConnectivity({ browserOnline: isBrowserOnline, apiReachable: isServerReachable, liveKitState: connectionStateStr })
 
   // Get video tracks from publishers
   const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare], {
@@ -279,7 +284,13 @@ const ClassroomStage: React.FC<{
       <RoomAudioRenderer />
 
       {recoveryRequired && (
-        <ConnectionLostPanel showDownloads={!isTeacher} onKeepWaiting={dismiss} onLeave={onLeave} />
+        <ConnectionLostPanel
+          showDownloads={!isTeacher}
+          headline={diagnosis.headline}
+          guidance={diagnosis.guidance}
+          onKeepWaiting={dismiss}
+          onLeave={onLeave}
+        />
       )}
     </div>
   )

@@ -71,6 +71,7 @@ def _s3_upload_target(storage_key: str):
         bucket=settings.object_storage_bucket,
         region=settings.object_storage_region,
         endpoint=settings.object_storage_endpoint or "",
+        force_path_style=settings.object_storage_force_path_style,
     ), storage_key
 
 

@@ -49,7 +49,46 @@ def _openai_summary(transcript_text: str) -> dict:
     return data
 
 
+LONG_TRANSCRIPT_CHARS = 60_000  # roughly 15k tokens; beyond this, summarise in parts so nothing is truncated
+PART_CHARS = 40_000
+
+
+def _split_parts(text: str, size: int = PART_CHARS) -> list[str]:
+    """Splits on paragraph boundaries so a part never cuts a sentence in half where avoidable."""
+    parts, current = [], ""
+    for para in text.split("\n\n"):
+        if current and len(current) + len(para) > size:
+            parts.append(current)
+            current = ""
+        while len(para) > size:  # a single enormous paragraph
+            parts.append(para[:size])
+            para = para[size:]
+        current += ("\n\n" if current else "") + para
+    if current:
+        parts.append(current)
+    return parts
+
+
+def _merge(partials: list[dict]) -> dict:
+    merged = {"overview": " ".join(p.get("overview", "") for p in partials).strip()}
+    for key in ("key_concepts", "definitions", "examples", "revision_questions"):
+        seen, items = set(), []
+        for p in partials:
+            for item in p.get(key, []):
+                if item not in seen:
+                    seen.add(item)
+                    items.append(item)
+        merged[key] = items
+    merged["source"] = partials[0].get("source", "stub")
+    return merged
+
+
 def generate_summary(transcript_text: str) -> dict:
-    if not settings.llm_configured:
-        return _stub_summary(transcript_text)
-    return _openai_summary(transcript_text)
+    """Summarises the COMPLETE transcript. A long one is summarised part by part and merged, never cut off."""
+    summarize = _stub_summary if not settings.llm_configured else _openai_summary
+    if len(transcript_text) <= LONG_TRANSCRIPT_CHARS:
+        return summarize(transcript_text)
+    partials = [summarize(part) for part in _split_parts(transcript_text)]
+    result = _merge(partials)
+    result["parts_summarized"] = len(partials)
+    return result

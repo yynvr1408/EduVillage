@@ -10,6 +10,16 @@ _TEST_DB_PATH = tempfile.mktemp(suffix=".db")
 # Set TEST_DATABASE_URL (e.g. a throwaway PostgreSQL database) to run the suite against another engine.
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_TEST_DB_PATH}"
 os.environ["APP_ENV"] = "test"
+# Tests that process real media need an ffmpeg binary: use the system one, else the one bundled with imageio-ffmpeg.
+import shutil as _shutil  # noqa: E402
+
+if not _shutil.which("ffmpeg") and not os.environ.get("FFMPEG_PATH"):
+    try:
+        import imageio_ffmpeg  # noqa: E402
+
+        os.environ["FFMPEG_PATH"] = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:  # noqa: BLE001 - ffmpeg-dependent tests are skipped when unavailable
+        pass
 os.environ["SESSION_COOKIE_NAME"] = "eduvillage_session"
 # The suite is written against the local-disk storage backend and the labeled stub AI
 # providers; a developer's real .env (real S3/LiveKit/LLM credentials) must not leak into
@@ -146,14 +156,53 @@ class FakeStorage:
         self.objects.pop(key, None)
         self.deleted.append(key)
 
+    media_file = None  # a real media file served as the recording; set by the fixture
+
     def fetch_to_path(self, key, dest):
-        dest.write_bytes(b"audio")
+        import shutil
+
+        if self.media_file is None:
+            dest.write_bytes(b"audio")  # only for tests that never reach ffmpeg
+        else:
+            shutil.copyfile(self.media_file, dest)
         return dest
 
 
+def ffmpeg_binary() -> str | None:
+    import shutil
+
+    return shutil.which(os.environ.get("FFMPEG_PATH") or "ffmpeg")
+
+
+requires_ffmpeg = pytest.mark.skipif(ffmpeg_binary() is None, reason="ffmpeg is not available")
+
+
+def make_audio(path, *, seconds: float, noise: bool = False, bitrate: str = "32k", rate: int = 16000):
+    """Generates REAL audio with ffmpeg. noise=True gives incompressible CBR audio, so file size is
+    exactly bitrate*seconds (used to build recordings that really exceed Whisper's 25 MB limit)."""
+    import subprocess
+
+    source = "anoisesrc=color=white:amplitude=0.3" if noise else "sine=frequency=440"
+    subprocess.run(
+        [ffmpeg_binary(), "-nostdin", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"{source}:duration={seconds}",
+         "-ac", "1", "-ar", str(rate), "-b:a", bitrate, str(path)],
+        check=True, capture_output=True,
+    )
+    return path
+
+
+@pytest.fixture(scope="session")
+def short_audio(tmp_path_factory):
+    """A real 4-second MP3 for tests that run the transcription pipeline on a small recording."""
+    if ffmpeg_binary() is None:
+        return None
+    return make_audio(tmp_path_factory.mktemp("media") / "short.mp3", seconds=4)
+
+
 @pytest.fixture
-def fake_storage(monkeypatch):
+def fake_storage(monkeypatch, short_audio):
     storage = FakeStorage()
+    storage.media_file = short_audio
     for target in ("app.services.recording_service.get_storage", "app.services.summary_service.get_storage"):
         monkeypatch.setattr(target, lambda: storage)
     return storage

@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.enums import ClassStatus, ParticipationStatus, RecordingStatus
@@ -7,15 +8,15 @@ from app.db.models.enums import ClassStatus, ParticipationStatus, RecordingStatu
 
 class ClassCreate(BaseModel):
     title: str
-    scheduled_start: datetime
-    scheduled_end: datetime | None = None
+    scheduled_start: UtcDatetime
+    scheduled_end: UtcDatetime | None = None
     section_ids: list[str] = []  # empty => the whole course
 
 
 class ClassUpdate(BaseModel):
     title: str | None = None
-    scheduled_start: datetime | None = None
-    scheduled_end: datetime | None = None
+    scheduled_start: UtcDatetime | None = None
+    scheduled_end: UtcDatetime | None = None
 
 
 class ClassOut(BaseModel):
@@ -25,8 +26,8 @@ class ClassOut(BaseModel):
     course_id: str
     teacher_id: str
     title: str
-    scheduled_start: datetime
-    scheduled_end: datetime | None
+    scheduled_start: UtcDatetime
+    scheduled_end: UtcDatetime | None
     status: ClassStatus
     section_ids: list[str] = []
 
@@ -44,8 +45,8 @@ class ParticipantOut(BaseModel):
 
     id: str
     user_id: str
-    joined_at: datetime | None
-    left_at: datetime | None
+    joined_at: UtcDatetime | None
+    left_at: UtcDatetime | None
     participation_status: ParticipationStatus
 
 
@@ -55,8 +56,8 @@ class RecordingOut(BaseModel):
     id: str
     class_id: str
     status: RecordingStatus
-    started_at: datetime
-    completed_at: datetime | None
+    started_at: UtcDatetime
+    completed_at: UtcDatetime | None
     title: str | None = None
     is_published: bool = False
     duration_seconds: int = 0

@@ -86,7 +86,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                   }
                   size="sm"
                 >
-                  {op.status}
+                  {op.status === 'failed' && op.outcome ? op.outcome : op.status}
                 </Badge>
               </div>
             ))}

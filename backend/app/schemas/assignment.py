@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.enums import AssignmentStatus, SubmissionStatus
@@ -8,14 +9,14 @@ from app.db.models.enums import AssignmentStatus, SubmissionStatus
 class AssignmentCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     instructions: str | None = None
-    due_at: datetime | None = None
+    due_at: UtcDatetime | None = None
     status: AssignmentStatus = AssignmentStatus.draft
 
 
 class AssignmentUpdate(BaseModel):
     title: str | None = None
     instructions: str | None = None
-    due_at: datetime | None = None
+    due_at: UtcDatetime | None = None
     status: AssignmentStatus | None = None
 
 
@@ -27,7 +28,7 @@ class AssignmentOut(BaseModel):
     created_by: str
     title: str
     instructions: str | None
-    due_at: datetime | None
+    due_at: UtcDatetime | None
     status: AssignmentStatus
 
 
@@ -45,5 +46,5 @@ class SubmissionOut(BaseModel):
     answer: dict
     status: SubmissionStatus
     version: int
-    submitted_at: datetime | None
-    updated_at: datetime
+    submitted_at: UtcDatetime | None
+    updated_at: UtcDatetime

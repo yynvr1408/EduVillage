@@ -181,6 +181,7 @@ export interface Summary {
 
 export type SyncOperationType = 'submit_assignment' | 'save_draft'
 export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'completed'
+export type SyncOutcomeKind = 'expired' | 'closed' | 'conflict' | 'rejected' | 'network'
 
 export interface SyncOperation {
   id: string
@@ -192,6 +193,9 @@ export interface SyncOperation {
   createdAt: string
   retryCount: number
   lastError?: string
+  /** Why a failed operation failed. Only 'network' failures are retried automatically. */
+  outcome?: SyncOutcomeKind
+  errorCode?: string
 }
 
 export interface AssignmentDraft {
@@ -203,7 +207,14 @@ export interface AssignmentDraft {
   content: string
   wordCount: number
   savedAt: string
-  syncStatus: 'local_only' | 'pending_sync' | 'synced'
+  /**
+   * local_only: saved on this device. pending_sync: queued. synced: the SERVER confirmed it stored it.
+   * expired / conflict / rejected: the server answered and refused (final). sync_failed: repeated network
+   * failures; still retried, but NOT received.
+   */
+  syncStatus: 'local_only' | 'pending_sync' | 'synced' | 'expired' | 'conflict' | 'rejected' | 'sync_failed'
+  /** Server message for the last refusal. */
+  syncMessage?: string
   lastServerSubmissionId?: string
 }
 

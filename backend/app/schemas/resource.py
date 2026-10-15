@@ -1,3 +1,4 @@
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, ConfigDict
 
 from datetime import datetime
@@ -45,8 +46,8 @@ class ResourceOut(BaseModel):
     processing_error: str | None = None
     version: int = 1
     checksum_sha256: str | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: UtcDatetime | None = None
+    updated_at: UtcDatetime | None = None
 
 
 class DownloadResponse(BaseModel):

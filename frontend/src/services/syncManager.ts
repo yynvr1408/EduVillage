@@ -1,6 +1,7 @@
 import { db } from '../db/db'
 import { api } from './apiClient'
 import type { AssignmentDraft, SyncOperation } from '../types'
+import { MAX_NETWORK_RETRIES, classifySyncResult, draftStatusFor } from './syncOutcome'
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -55,6 +56,26 @@ export const syncManager = {
   },
 
   /**
+   * The server refused an online submission (deadline passed, conflict...). Persist the student's text together
+   * with that refusal so it survives a reload and is never mistaken for a pending or confirmed submission.
+   */
+  async recordRefusal(
+    assignmentId: string,
+    studentId: string,
+    courseId: string,
+    assignmentTitle: string,
+    content: string,
+    status: 'expired' | 'conflict' | 'rejected',
+    message?: string
+  ): Promise<AssignmentDraft> {
+    const draft = await this.saveDraftLocally(assignmentId, studentId, courseId, assignmentTitle, content)
+    draft.syncStatus = status
+    draft.syncMessage = message
+    await db.assignmentDrafts.put(draft)
+    return draft
+  },
+
+  /**
    * Enqueue an assignment submission for synchronization
    */
   async enqueueSubmission(
@@ -79,14 +100,17 @@ export const syncManager = {
     await db.assignmentDrafts.put(draft)
 
     // 2. Check if there's already a pending operation for this assignment
+    // (an operation that only failed on the network is reused; one the server refused gets a fresh id)
     const existingOp = await db.syncOperations
-      .filter((op) => op.entityId === assignmentId && op.status === 'pending')
+      .filter((op) => op.entityId === assignmentId && (op.status === 'pending' || (op.status === 'failed' && op.outcome === 'network')))
       .first()
 
     let operation: SyncOperation
 
     if (existingOp) {
       existingOp.payload = { content }
+      existingOp.status = 'pending'
+      existingOp.outcome = undefined
       existingOp.retryCount = 0
       await db.syncOperations.put(existingOp)
       operation = existingOp
@@ -125,8 +149,10 @@ export const syncManager = {
    * Process all pending synchronization operations against the backend
    */
   async processQueue(): Promise<SyncResult> {
+    // Retry what can still succeed: queued operations and network failures. A submission the server has
+    // already refused (deadline passed, conflict...) would only be refused again, so it is not resent.
     const pendingOps = await db.syncOperations
-      .filter((op) => op.status === 'pending' || op.status === 'failed')
+      .filter((op) => op.status === 'pending' || (op.status === 'failed' && op.outcome === 'network'))
       .toArray()
 
     if (pendingOps.length === 0) {
@@ -147,17 +173,21 @@ export const syncManager = {
       // original result instead of creating a second submission.
       const response = await api.syncOperations(pendingOps)
 
+      const answered = new Set<string>()
       for (const res of response.results) {
         const op = pendingOps.find((o) => o.id === res.operation_id)
         if (!op) continue
+        answered.add(op.id)
+        const outcome = classifySyncResult(res)
 
-        if (res.status === 'accepted') {
+        if (outcome === 'confirmed') {
           successful++
-          // Only now — after server confirmation — is the draft considered submitted.
+          // Only now - after server confirmation - is the draft considered submitted.
           if (op.operationType === 'submit_assignment') {
             const draft = await db.assignmentDrafts.get(op.entityId)
             if (draft) {
               draft.syncStatus = 'synced'
+              draft.syncMessage = undefined
               draft.lastServerSubmissionId = res.server_entity_id
               await db.assignmentDrafts.put(draft)
             }
@@ -165,19 +195,49 @@ export const syncManager = {
           // Remove completed operation from queue
           await db.syncOperations.delete(op.id)
         } else {
-          // rejected / conflict: the server answered and refused — keep it visible as "needs attention".
+          // The server answered and refused: a final, distinct state (never "synced", never retried).
           failed++
           op.status = 'failed'
+          op.outcome = outcome
+          op.errorCode = res.error_code
           op.retryCount = (op.retryCount || 0) + 1
           op.lastError = res.message || res.error_code
+          await db.syncOperations.put(op)
+          if (op.operationType === 'submit_assignment') {
+            const draft = await db.assignmentDrafts.get(op.entityId)
+            if (draft) {
+              draft.syncStatus = draftStatusFor(outcome)
+              draft.syncMessage = op.lastError
+              await db.assignmentDrafts.put(draft)
+            }
+          }
+        }
+      }
+      // Anything the server did not answer for is still unsent: back to the queue, not stuck in "syncing".
+      for (const op of pendingOps) {
+        if (!answered.has(op.id)) {
+          op.status = 'pending'
           await db.syncOperations.put(op)
         }
       }
     } catch (err: any) {
-      // Entire batch failed due to network / connectivity drop
+      // Entire batch failed (connectivity drop): nothing is confirmed. It stays queued; after repeated
+      // failures the draft shows "sync failed" (still retried) so the student knows it has NOT been received.
       for (const op of pendingOps) {
-        op.status = 'pending'
+        op.retryCount = (op.retryCount || 0) + 1
         op.lastError = err.message || 'Network disconnected during synchronization'
+        if (op.retryCount >= MAX_NETWORK_RETRIES) {
+          op.status = 'failed'
+          op.outcome = 'network'
+          const draft = op.operationType === 'submit_assignment' ? await db.assignmentDrafts.get(op.entityId) : undefined
+          if (draft && draft.syncStatus === 'pending_sync') {
+            draft.syncStatus = 'sync_failed'
+            draft.syncMessage = op.lastError
+            await db.assignmentDrafts.put(draft)
+          }
+        } else {
+          op.status = 'pending'
+        }
         await db.syncOperations.put(op)
       }
       failed = pendingOps.length

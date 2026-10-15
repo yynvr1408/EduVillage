@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models.enums import CourseStatus, CourseTeacherRole, EnrollmentStatus
@@ -28,7 +29,7 @@ class CourseOut(BaseModel):
     subject: str | None
     teacher_id: str
     status: CourseStatus
-    created_at: datetime
+    created_at: UtcDatetime
     teacher_name: str | None = None
 
 
@@ -43,7 +44,7 @@ class EnrollmentOut(BaseModel):
     course_id: str
     student_id: str
     status: EnrollmentStatus
-    enrolled_at: datetime
+    enrolled_at: UtcDatetime
 
 
 class CoTeacherCreate(BaseModel):
@@ -57,4 +58,4 @@ class CoTeacherOut(BaseModel):
     course_id: str
     teacher_id: str
     role: CourseTeacherRole
-    added_at: datetime
+    added_at: UtcDatetime

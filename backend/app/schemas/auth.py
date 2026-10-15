@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.db.models.enums import UserRole
@@ -36,8 +37,8 @@ class SessionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    created_at: datetime
-    expires_at: datetime
+    created_at: UtcDatetime
+    expires_at: UtcDatetime
 
 
 class RevokeAllResponse(BaseModel):

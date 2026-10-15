@@ -43,6 +43,18 @@ class Settings(BaseSettings):
 
     max_upload_mb: int = 500  # per file; large media is streamed to storage, never held in memory
 
+    # FFmpeg / transcription of long recordings
+    ffmpeg_path: str = "ffmpeg"
+    ffmpeg_timeout_seconds: int = 1800
+    stt_max_upload_bytes: int = 24 * 1024 * 1024  # Whisper's hard limit is 25 MB; keep a margin
+    stt_chunk_seconds: int = 600
+
+    # R2 / S3-compatible storage details
+    object_storage_force_path_style: bool = False
+
+    # Assignments submitted offline before the deadline may sync up to this long after it
+    offline_submission_grace_hours: int = 24
+
     llm_api_key: str | None = None
     llm_model: str = "gpt-4o-mini"
     # Leave unset for real OpenAI. Set this when LLM_API_KEY belongs to an OpenAI-compatible

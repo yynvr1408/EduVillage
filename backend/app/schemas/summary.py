@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, ConfigDict
 
 from app.db.models.enums import JobStatus, SummaryStatus
@@ -33,7 +34,7 @@ class JobStatusOut(BaseModel):
     status: JobStatus
     attempts: int
     error_code: str | None
-    completed_at: datetime | None
+    completed_at: UtcDatetime | None
 
 
 class SummaryOut(BaseModel):
@@ -48,4 +49,4 @@ class SummaryOut(BaseModel):
     content_json: dict
     status: SummaryStatus
     reviewed_by: str | None
-    reviewed_at: datetime | None
+    reviewed_at: UtcDatetime | None

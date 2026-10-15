@@ -6,13 +6,17 @@ from app.core.exceptions import ServiceUnavailableError
 settings = get_settings()
 
 
-def transcribe(audio_path: Path) -> str:
+def ensure_configured() -> None:
     if not settings.speech_to_text_api_key:
         raise ServiceUnavailableError(
             "No speech-to-text provider is configured (SPEECH_TO_TEXT_API_KEY is unset). "
             "Supply a transcript directly instead, or configure a provider.",
             code="STT_NOT_CONFIGURED",
         )
+
+
+def transcribe(audio_path: Path) -> str:
+    ensure_configured()
 
     from openai import OpenAI
 

@@ -13,6 +13,8 @@ class LectureTranscript(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     class_id: Mapped[str] = mapped_column(String(36), ForeignKey("classes.id", ondelete="CASCADE"), nullable=False, index=True)
     resource_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("learning_resources.id"), nullable=True)
     recording_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("class_recordings.id"), nullable=True, index=True)
+    # Per-chunk progress for long recordings: {total, segment_seconds, done: {index: text}}
+    chunk_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     language: Mapped[str] = mapped_column(String(10), nullable=False, default="en")
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # dedupes identical sources
     content: Mapped[str | None] = mapped_column(Text, nullable=True)

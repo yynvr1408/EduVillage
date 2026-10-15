@@ -35,6 +35,18 @@ export const AssignmentCard: React.FC<AssignmentCardProps> = ({
           <Badge variant="success" size="sm">
             Submitted
           </Badge>
+        ) : draft?.syncStatus === 'expired' ? (
+          <Badge variant="error" size="sm">
+            Deadline passed
+          </Badge>
+        ) : draft?.syncStatus === 'conflict' || draft?.syncStatus === 'rejected' ? (
+          <Badge variant="warning" size="sm">
+            Not accepted
+          </Badge>
+        ) : draft?.syncStatus === 'sync_failed' ? (
+          <Badge variant="error" size="sm">
+            Sync failed
+          </Badge>
         ) : isPendingSync ? (
           <Badge variant="warning" size="sm">
             Waiting to sync

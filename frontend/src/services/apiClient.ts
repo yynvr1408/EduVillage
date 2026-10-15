@@ -510,7 +510,7 @@ export const api = {
     file: File,
     options: { lessonId?: string; title?: string; description?: string; resourceType?: MaterialType } = {}
   ): Promise<Material> => {
-    const init = await apiRequest<{ resource_id: string; upload: { method: string; url: string; fields: Record<string, string> } }>(
+    const init = await apiRequest<{ resource_id: string; upload: { method: string; url: string; fields: Record<string, string>; headers?: Record<string, string> } }>(
       '/resources/upload-init',
       {
         method: 'POST',
@@ -532,6 +532,15 @@ export const api = {
       Object.entries(init.upload.fields).forEach(([k, v]) => form.append(k, v))
       form.append('file', file)
       const res = await fetch(init.upload.url, { method: 'POST', body: form })
+      if (!res.ok) throw new ApiError('Upload to storage failed.', res.status)
+    } else if (/^https?:\/\//i.test(init.upload.url)) {
+      // Presigned URL straight to object storage: no API prefix, no cookies, and exactly the headers that were signed.
+      const res = await fetch(init.upload.url, {
+        method: 'PUT',
+        body: file,
+        headers: init.upload.headers ?? { 'Content-Type': file.type || 'application/octet-stream' },
+        credentials: 'omit',
+      })
       if (!res.ok) throw new ApiError('Upload to storage failed.', res.status)
     } else {
       await apiRequest<void>(init.upload.url, {

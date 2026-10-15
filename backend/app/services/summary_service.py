@@ -23,15 +23,15 @@ from app.db.models.lesson import LearningResource
 from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
 from app.db.models.user import User
 from app.db.session import SessionLocal
-from app.integrations import llm_provider, speech_to_text
+from app.integrations import llm_provider
 from app.integrations.object_storage import get_storage
-from app.services import audit_service, classroom_service, course_service
+from app.services import audit_service, classroom_service, course_service, transcription_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Failures worth retrying automatically; configuration errors (e.g. no STT key) are not.
-RETRYABLE_ERROR_CODES = {"UNEXPECTED_ERROR", "LLM_ERROR"}
+RETRYABLE_ERROR_CODES = {"UNEXPECTED_ERROR", "LLM_ERROR", "STT_CHUNK_FAILED", "MEDIA_TIMEOUT"}
 
 
 def _source_hash(transcript_text: str | None, resource_id: str | None, recording_id: str | None) -> str:
@@ -130,8 +130,9 @@ def _transcribe(db: Session, transcript: LectureTranscript) -> str:
         raise AppError("No stored media to transcribe.", code="NO_TRANSCRIPT_SOURCE")
 
     with tempfile.TemporaryDirectory() as tmp:
-        path = get_storage().fetch_to_path(storage_key, Path(tmp) / "media")
-        return speech_to_text.transcribe(path)  # raises STT_NOT_CONFIGURED when no provider key
+        work = Path(tmp)
+        media = get_storage().fetch_to_path(storage_key, work / "source")
+        return transcription_service.transcribe_recording(db, transcript, media, work)
 
 
 def process_summary_job(job_id: str) -> None:
@@ -158,7 +159,9 @@ def process_summary_job(job_id: str) -> None:
                 transcript.status = TranscriptStatus.ready
                 db.commit()
             except AppError as exc:
-                transcript.status = TranscriptStatus.failed
+                # Retryable failures keep their finished chunks and stay pending, so the next attempt resumes.
+                if exc.code not in RETRYABLE_ERROR_CODES or job.attempts >= job.max_attempts:
+                    transcript.status = TranscriptStatus.failed
                 _fail(db, job, summary, exc.code)
                 return
 
@@ -170,6 +173,10 @@ def process_summary_job(job_id: str) -> None:
             _fail(db, db.get(BackgroundJob, job_id), db.get(LectureSummary, summary.id), "LLM_ERROR")
             return
 
+        done, total = transcription_service.chunk_summary(transcript)
+        # Provenance: a summary is only ever generated from a transcript that is complete.
+        content["transcript_complete"] = True
+        content["transcript_chunks"] = total or 1
         summary.content_json = content
         summary.generator = content.get("source")
         summary.generator_model = settings.llm_model if content.get("source") == "llm" else None
@@ -268,6 +275,8 @@ def approve_summary(db: Session, teacher: User, summary: LectureSummary) -> Lect
     classroom_service.assert_teaches_class(db, teacher, cls)
     if summary.status != SummaryStatus.needs_review:
         raise ConflictError(f"Cannot approve a summary in status '{summary.status.value}'.")
+    if (summary.content_json or {}).get("transcript_complete") is False:
+        raise ConflictError("This summary was built from an incomplete transcript and cannot be published.", code="SUMMARY_SOURCE_INCOMPLETE")
     summary.status = SummaryStatus.completed
     summary.reviewed_by = teacher.id
     summary.reviewed_at = utcnow()

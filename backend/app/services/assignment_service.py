@@ -80,8 +80,20 @@ def get_my_submission(db: Session, student: User, assignment: Assignment) -> Ass
     return _get_submission(db, assignment.id, student.id)
 
 
+def assert_before_deadline(assignment: Assignment, *, as_of=None) -> None:
+    """The deadline is judged by SERVER time (`as_of` lets an offline submission be judged by when the
+    student made it — see synchronization_service for the bounded grace policy)."""
+    if assignment.due_at is None:
+        return
+    moment = as_of or utcnow()
+    if moment > assignment.due_at:
+        raise ConflictError(
+            "The deadline for this assignment has passed, so it no longer accepts submissions.", code="ASSIGNMENT_EXPIRED"
+        )
+
+
 def save_submission(
-    db: Session, student: User, assignment: Assignment, *, answer: dict, submit: bool, commit: bool = True
+    db: Session, student: User, assignment: Assignment, *, answer: dict, submit: bool, commit: bool = True, as_of=None
 ) -> AssignmentSubmission:
     """commit=False leaves the transaction open (flushed) so the sync service can persist the
     submission and its idempotency record atomically."""
@@ -95,6 +107,7 @@ def save_submission(
         raise ConflictError("This assignment is closed and no longer accepts submissions.", code="ASSIGNMENT_CLOSED")
     if assignment.status != AssignmentStatus.published and not course_service.is_teaching(db, student, course):
         raise ConflictError("This assignment is not open for submissions.", code="ASSIGNMENT_NOT_PUBLISHED")
+    assert_before_deadline(assignment, as_of=as_of)
 
     submission = _get_submission(db, assignment.id, student.id)
     if submission is None:

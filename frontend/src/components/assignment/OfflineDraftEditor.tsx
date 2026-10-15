@@ -35,7 +35,7 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
   const [content, setContent] = useState<string>('')
   const [draft, setDraft] = useState<AssignmentDraft | null>(null)
   const [saveStatus, setSaveStatus] = useState<
-    'clean' | 'saved_locally' | 'waiting_sync' | 'submitting' | 'server_confirmed' | 'error'
+    'clean' | 'saved_locally' | 'waiting_sync' | 'submitting' | 'server_confirmed' | 'error' | 'expired' | 'conflict' | 'sync_failed'
   >('clean')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
@@ -65,6 +65,9 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
         setLastSavedAt(localDraft.savedAt)
         if (localDraft.syncStatus === 'pending_sync') {
           setSaveStatus('waiting_sync')
+        } else if (localDraft.syncStatus === 'expired' || localDraft.syncStatus === 'conflict' || localDraft.syncStatus === 'sync_failed') {
+          setSaveStatus(localDraft.syncStatus)
+          if (localDraft.syncMessage) setErrorMessage(localDraft.syncMessage)
         } else if (localDraft.content.trim()) {
           setSaveStatus('saved_locally')
         }
@@ -137,10 +140,16 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
         if (onSubmitted) onSubmitted()
       } catch (err: any) {
         if (err instanceof ApiError && !err.isNetworkError) {
-          // The server answered and refused (closed assignment, not enrolled...). Queuing it would
+          // The server answered and refused (deadline, closed assignment, not enrolled...). Queuing it would
           // just be refused again, so tell the student instead of pretending it will be retried.
           setErrorMessage(err.message)
-          setSaveStatus('error')
+          const refusal = err.code === 'ASSIGNMENT_EXPIRED' || err.code === 'ASSIGNMENT_CLOSED' ? 'expired' : err.status === 409 ? 'conflict' : null
+          setSaveStatus(refusal ?? 'error')
+          if (refusal) {
+            // Keep the text AND the refusal on this device (a reload must not lose either).
+            const kept = await syncManager.recordRefusal(assignment.id, user.id, assignment.course_id, assignment.title, content, refusal, err.message)
+            setDraft(kept)
+          }
         } else {
           // Connectivity problem: keep the work safe in the offline queue.
           console.warn('Online submit failed, enqueuing for offline retry:', err)
@@ -184,6 +193,21 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
             <Badge variant="success" size="sm">
               <CheckCircle className="w-3.5 h-3.5 mr-1" />
               Server Confirmed
+            </Badge>
+          ) : saveStatus === 'expired' ? (
+            <Badge variant="error" size="sm">
+              <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+              Deadline passed
+            </Badge>
+          ) : saveStatus === 'conflict' ? (
+            <Badge variant="warning" size="sm">
+              <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+              Conflict
+            </Badge>
+          ) : saveStatus === 'sync_failed' ? (
+            <Badge variant="error" size="sm">
+              <CloudUpload className="w-3.5 h-3.5 mr-1" />
+              Sync failed
             </Badge>
           ) : saveStatus === 'waiting_sync' ? (
             <Badge variant="warning" size="sm">
@@ -249,6 +273,7 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
           <Button
             onClick={handleSubmit}
             isLoading={saveStatus === 'submitting'}
+            disabled={saveStatus === 'expired'}
             variant={saveStatus === 'waiting_sync' ? 'secondary' : 'primary'}
             icon={isOnline ? <Send className="w-3.5 h-3.5" /> : <CloudUpload className="w-3.5 h-3.5" />}
           >

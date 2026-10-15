@@ -7,7 +7,12 @@ from app.config import get_settings
 
 settings = get_settings()
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+if settings.database_url.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+elif settings.database_url.startswith("postgresql"):
+    connect_args = {"options": "-c timezone=utc"}  # naive datetimes are UTC; never let the server's local zone reinterpret them
+else:
+    connect_args = {}
 
 engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
 

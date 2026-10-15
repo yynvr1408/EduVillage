@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -27,4 +28,4 @@ class SectionMemberOut(BaseModel):
     id: str
     section_id: str
     student_id: str
-    added_at: datetime
+    added_at: UtcDatetime

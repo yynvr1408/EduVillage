@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.schemas.common import UtcDatetime
 from pydantic import BaseModel, Field
 
 
@@ -8,7 +9,7 @@ class SyncOperationIn(BaseModel):
     operation_type: str
     entity_id: str
     payload: dict
-    client_updated_at: datetime | None = None
+    client_updated_at: UtcDatetime | None = None
 
 
 class SyncBatchRequest(BaseModel):
@@ -20,7 +21,7 @@ class SyncOperationResult(BaseModel):
     status: str  # accepted | rejected | conflict
     server_entity_id: str | None = None
     server_version: int | None = None
-    server_updated_at: datetime | None = None
+    server_updated_at: UtcDatetime | None = None
     error_code: str | None = None
     message: str | None = None
 

@@ -105,6 +105,7 @@ def test_recording_transcription_with_mocked_provider_links_source_and_recording
     from app.db.models.summary import LectureSummary, LectureTranscript
     from app.integrations import speech_to_text
 
+    monkeypatch.setattr(speech_to_text.settings, "speech_to_text_api_key", "test-key")  # a provider key must exist
     monkeypatch.setattr(speech_to_text, "transcribe", lambda path: TRANSCRIPT)
     tclient, _ = teacher
     cls = tclient.post(
@@ -236,3 +237,137 @@ def test_teacher_can_edit_then_approve_and_edits_are_flagged(teacher, enrolled_s
     tclient.post(f"/api/v1/summaries/{summary['id']}/approve")
     again = tclient.patch(f"/api/v1/summaries/{summary['id']}", json={"overview": "late edit"})
     assert again.status_code == 409 and again.json()["error"]["code"] == "SUMMARY_NOT_IN_REVIEW"
+
+
+# ----------------------------------------------------------------------------- long recordings (real ffmpeg)
+
+from tests.conftest import requires_ffmpeg  # noqa: E402
+
+
+def _ready_recording(tclient, published_course, mock_recording_pipeline, fake_storage):
+    cls = tclient.post(
+        f"/api/v1/classes?course_id={published_course['id']}", json={"title": "Long", "scheduled_start": "2026-11-02T10:00:00Z"}
+    ).json()
+    tclient.post(f"/api/v1/classes/{cls['id']}/start")
+    rec = tclient.post(f"/api/v1/classes/{cls['id']}/recordings/start").json()
+    tclient.post(f"/api/v1/classes/{cls['id']}/recordings/{rec['id']}/stop")
+    mock_recording_pipeline["status"] = "complete"
+    fake_storage.put(rec["id"], cls["id"])
+    tclient.get(f"/api/v1/classes/{cls['id']}/recordings")
+    return cls, rec
+
+
+@requires_ffmpeg
+def test_summary_waits_for_every_chunk_retries_and_is_only_published_when_complete(
+    mock_recording_pipeline, fake_storage, teacher, published_course, monkeypatch, db_session
+):
+    from app import worker
+    from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
+    from app.integrations import speech_to_text
+    from app.services import transcription_service
+
+    monkeypatch.setattr(speech_to_text.settings, "speech_to_text_api_key", "test-key")
+    monkeypatch.setattr(transcription_service.settings, "stt_max_upload_bytes", 6000)
+    monkeypatch.setattr(transcription_service.settings, "stt_chunk_seconds", 1)
+    monkeypatch.setattr(transcription_service, "_transcribe_chunk", transcription_service._transcribe_chunk)  # keep real retry loop
+    monkeypatch.setattr("time.sleep", lambda s: None)
+
+    state = {"outage": True, "calls": []}
+
+    def provider(path):
+        i = int(path.stem.split("_")[1])
+        if i == 2 and state["outage"]:
+            raise RuntimeError("rate limited")
+        state["calls"].append(i)
+        return f"Segment {i} of the lecture."
+
+    monkeypatch.setattr(speech_to_text, "transcribe", provider)
+
+    tclient, _ = teacher
+    cls, rec = _ready_recording(tclient, published_course, mock_recording_pipeline, fake_storage)
+    job = tclient.post(f"/api/v1/recordings/{rec['id']}/summary-jobs", json={}).json()
+
+    db_session.expire_all()
+    j = db_session.get(BackgroundJob, job["job_id"])
+    s = db_session.get(LectureSummary, j.reference_id)
+    t = db_session.get(LectureTranscript, s.transcript_id)
+    # First attempt: failed midway. It is retryable, so nothing is published or marked failed-for-good,
+    # and the chunks that finished are kept.
+    assert (j.status.value, j.error_code) == ("failed", "STT_CHUNK_FAILED")
+    assert s.status.value == "processing" and not s.content_json  # no summary of a half-transcribed recording
+    assert t.status.value == "pending" and sorted(t.chunk_state["done"]) == ["0", "1"]
+    assert tclient.post(f"/api/v1/summaries/{s.id}/approve").status_code == 409  # cannot be approved/published
+
+    # The provider recovers; the worker retries and RESUMES (chunks 0 and 1 are not redone).
+    state["outage"], state["calls"] = False, []
+    assert worker.run_once() >= 1
+    db_session.expire_all()
+    j, s, t = db_session.get(BackgroundJob, j.id), db_session.get(LectureSummary, s.id), db_session.get(LectureTranscript, t.id)
+    assert j.status.value == "completed" and s.status.value == "needs_review" and t.status.value == "ready"
+    assert 0 not in state["calls"] and 1 not in state["calls"] and state["calls"][0] == 2
+    assert s.content_json["transcript_complete"] is True and s.content_json["transcript_chunks"] >= 4
+    assert t.content.startswith("Segment 0 of the lecture.\n\nSegment 1 of the lecture.\n\nSegment 2")  # all parts, in order
+    assert tclient.post(f"/api/v1/summaries/{s.id}/approve").status_code == 200
+
+
+@requires_ffmpeg
+def test_a_recording_that_keeps_failing_ends_as_failed_never_as_a_finished_summary(
+    mock_recording_pipeline, fake_storage, teacher, enrolled_student, published_course, monkeypatch, db_session
+):
+    from app import worker
+    from app.db.models.summary import BackgroundJob, LectureSummary
+    from app.integrations import speech_to_text
+    from app.services import transcription_service
+
+    monkeypatch.setattr(speech_to_text.settings, "speech_to_text_api_key", "test-key")
+    monkeypatch.setattr(transcription_service.settings, "stt_max_upload_bytes", 6000)
+    monkeypatch.setattr(transcription_service.settings, "stt_chunk_seconds", 1)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    monkeypatch.setattr(speech_to_text, "transcribe", lambda p: (_ for _ in ()).throw(RuntimeError("provider down")))
+
+    tclient, _ = teacher
+    cls, rec = _ready_recording(tclient, published_course, mock_recording_pipeline, fake_storage)
+    job = tclient.post(f"/api/v1/recordings/{rec['id']}/summary-jobs", json={}).json()
+    for _ in range(5):
+        worker.run_once()
+    db_session.expire_all()
+    j = db_session.get(BackgroundJob, job["job_id"])
+    s = db_session.get(LectureSummary, j.reference_id)
+    assert j.status.value == "failed" and j.attempts == j.max_attempts == 3
+    assert s.status.value == "failed" and not s.content_json
+    # students never see it; the teacher cannot approve it
+    assert enrolled_student[0].get(f"/api/v1/classes/{cls['id']}/summary").status_code == 404
+    assert tclient.post(f"/api/v1/summaries/{s.id}/approve").status_code == 409
+    # the recording itself is unaffected
+    assert tclient.get(f"/api/v1/recordings/{rec['id']}/playback").status_code == 200
+
+
+@requires_ffmpeg
+def test_corrupt_recording_media_is_a_permanent_failure_with_a_clear_code(
+    mock_recording_pipeline, fake_storage, teacher, published_course, monkeypatch, db_session
+):
+    from app.db.models.summary import BackgroundJob
+    from app.integrations import speech_to_text
+
+    monkeypatch.setattr(speech_to_text.settings, "speech_to_text_api_key", "test-key")
+    fake_storage.media_file = None  # fetch_to_path now writes bytes that are not media
+    tclient, _ = teacher
+    cls, rec = _ready_recording(tclient, published_course, mock_recording_pipeline, fake_storage)
+    job = tclient.post(f"/api/v1/recordings/{rec['id']}/summary-jobs", json={}).json()
+    db_session.expire_all()
+    j = db_session.get(BackgroundJob, job["job_id"])
+    assert (j.status.value, j.error_code, j.attempts) == ("failed", "MEDIA_INVALID", 1)  # not retried: retrying can't fix it
+
+
+def test_a_summary_flagged_incomplete_cannot_be_published(teacher, live_class, db_session):
+    from app.db.models.summary import LectureSummary
+    from app.db.models.enums import SummaryStatus
+
+    client, _ = teacher
+    client.post(f"/api/v1/classes/{live_class['id']}/summary-jobs", json={"transcript_text": TRANSCRIPT})
+    summary = db_session.query(LectureSummary).filter(LectureSummary.class_id == live_class["id"]).one()
+    summary.content_json = {**summary.content_json, "transcript_complete": False}
+    summary.status = SummaryStatus.needs_review
+    db_session.commit()
+    resp = client.post(f"/api/v1/summaries/{summary.id}/approve")
+    assert resp.status_code == 409 and resp.json()["error"]["code"] == "SUMMARY_SOURCE_INCOMPLETE"

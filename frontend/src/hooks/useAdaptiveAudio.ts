@@ -5,37 +5,57 @@ export interface UseAdaptiveAudioOptions {
   room: Room | null
   initialAudioOnly?: boolean
   autoAdaptiveEnabled?: boolean
-  sustainedThresholdMs?: number // how long poor quality must persist to activate
+  /** How long poor quality must persist before video is dropped. */
+  sustainedThresholdMs?: number
+  /** How long GOOD quality must persist before video is restored (longer than the drop, to avoid flapping). */
+  recoveryThresholdMs?: number
 }
 
+const isPoor = (q: ConnectionQuality) => q === ConnectionQuality.Poor || q === ConnectionQuality.Lost
+const isGood = (q: ConnectionQuality) => q === ConnectionQuality.Good || q === ConnectionQuality.Excellent
+
+/**
+ * Automatic audio-only adaptation with hysteresis:
+ *   healthy --(poor for sustainedThresholdMs)--> audio-only --(good for recoveryThresholdMs)--> healthy
+ * Quality events only fire when the quality CHANGES, so the thresholds are enforced with timers, not by
+ * waiting for a second event. A manual choice by the student always wins. After a LiveKit reconnect
+ * the subscription policy is re-applied, because a re-established session may reset track subscriptions.
+ */
 export function useAdaptiveAudio({
   room,
   initialAudioOnly = false,
   autoAdaptiveEnabled = true,
   sustainedThresholdMs = 5000,
+  recoveryThresholdMs = 15000,
 }: UseAdaptiveAudioOptions) {
   const [isAudioOnly, setIsAudioOnly] = useState<boolean>(initialAudioOnly)
   const [isManualOverride, setIsManualOverride] = useState<boolean>(false)
   const [isAdaptiveActive, setIsAdaptiveActive] = useState<boolean>(false)
   const [poorQualityDuration, setPoorQualityDuration] = useState<number>(0)
-  
-  const poorStartTimeRef = useRef<number | null>(null)
+
+  // Latest values for use inside timers/event handlers without re-subscribing on every change.
+  const audioOnlyRef = useRef(isAudioOnly)
+  const manualRef = useRef(isManualOverride)
+  const adaptiveRef = useRef(isAdaptiveActive)
+  const qualityRef = useRef<ConnectionQuality | null>(null)
+  const poorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const recoveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const poorSince = useRef<number | null>(null)
+  audioOnlyRef.current = isAudioOnly
+  manualRef.current = isManualOverride
+  adaptiveRef.current = isAdaptiveActive
 
   // Actual media subscription control function
   const applySubscriptionPolicy = useCallback(
     (audioOnly: boolean) => {
       if (!room) return
-
-      // Iterate through remote participants and update their video track subscriptions
       room.remoteParticipants.forEach((participant) => {
         participant.trackPublications.forEach((publication) => {
           if (publication.kind === Track.Kind.Video) {
-            // Unsubscribe from video tracks at the WebRTC transport layer
-            // When audioOnly is true -> setSubscribed(false) cuts off video packets!
+            // Unsubscribing at the WebRTC transport layer is what actually stops the video packets.
             publication.setSubscribed(!audioOnly)
           } else if (publication.kind === Track.Kind.Audio) {
-            // Keep audio subscribed always
-            publication.setSubscribed(true)
+            publication.setSubscribed(true) // audio stays on in every mode
           }
         })
       })
@@ -43,69 +63,123 @@ export function useAdaptiveAudio({
     [room]
   )
 
+  const clearTimers = () => {
+    if (poorTimer.current) clearTimeout(poorTimer.current)
+    if (recoveryTimer.current) clearTimeout(recoveryTimer.current)
+    poorTimer.current = null
+    recoveryTimer.current = null
+    poorSince.current = null
+  }
+
   // Toggle manual audio-only mode
   const toggleAudioOnly = useCallback(
     (forced?: boolean) => {
-      const next = typeof forced === 'boolean' ? forced : !isAudioOnly
+      const next = typeof forced === 'boolean' ? forced : !audioOnlyRef.current
+      clearTimers()
       setIsManualOverride(true)
       setIsAudioOnly(next)
       setIsAdaptiveActive(false)
       applySubscriptionPolicy(next)
     },
-    [isAudioOnly, applySubscriptionPolicy]
+    [applySubscriptionPolicy]
   )
 
-  // Listen to connection quality changes from WebRTC
   useEffect(() => {
     if (!room || !autoAdaptiveEnabled) return
 
-    const handleConnectionQuality = (
-      quality: ConnectionQuality,
-      participant: any
-    ) => {
-      // Monitor local participant connection quality
-      if (participant === room.localParticipant) {
-        if (quality === ConnectionQuality.Poor || quality === ConnectionQuality.Lost) {
-          const now = Date.now()
-          if (!poorStartTimeRef.current) {
-            poorStartTimeRef.current = now
-          } else {
-            const elapsed = now - poorStartTimeRef.current
-            setPoorQualityDuration(elapsed)
+    const engageAudioOnly = () => {
+      poorTimer.current = null
+      if (manualRef.current || audioOnlyRef.current) return
+      if (qualityRef.current === null || !isPoor(qualityRef.current)) return // it improved while we waited
+      console.debug('[adaptive] poor quality sustained: switching to audio-only')
+      setIsAudioOnly(true)
+      setIsAdaptiveActive(true)
+      applySubscriptionPolicy(true)
+    }
 
-            // If sustained poor quality exceeds threshold and not manually overridden
-            if (elapsed >= sustainedThresholdMs && !isManualOverride && !isAudioOnly) {
-              setIsAudioOnly(true)
-              setIsAdaptiveActive(true)
-              applySubscriptionPolicy(true)
-            }
-          }
-        } else if (quality === ConnectionQuality.Excellent || quality === ConnectionQuality.Good) {
-          // Stable recovery detected
-          poorStartTimeRef.current = null
-          setPoorQualityDuration(0)
+    const restoreVideo = () => {
+      recoveryTimer.current = null
+      if (manualRef.current || !adaptiveRef.current) return
+      if (qualityRef.current === null || !isGood(qualityRef.current)) return // not stable after all
+      console.debug('[adaptive] quality recovered and stable: restoring video')
+      setIsAudioOnly(false)
+      setIsAdaptiveActive(false)
+      applySubscriptionPolicy(false)
+    }
+
+    const handleConnectionQuality = (quality: ConnectionQuality, participant: any) => {
+      if (participant !== room.localParticipant) return
+      qualityRef.current = quality
+
+      if (isPoor(quality)) {
+        if (recoveryTimer.current) {
+          clearTimeout(recoveryTimer.current) // recovery was premature: restart the clock
+          recoveryTimer.current = null
+        }
+        if (poorSince.current === null) poorSince.current = Date.now()
+        if (!poorTimer.current && !manualRef.current && !audioOnlyRef.current) {
+          poorTimer.current = setTimeout(engageAudioOnly, sustainedThresholdMs)
+        }
+        setPoorQualityDuration(Date.now() - poorSince.current)
+      } else if (isGood(quality)) {
+        if (poorTimer.current) {
+          clearTimeout(poorTimer.current) // it was only a blip
+          poorTimer.current = null
+        }
+        poorSince.current = null
+        setPoorQualityDuration(0)
+        if (adaptiveRef.current && !manualRef.current && !recoveryTimer.current) {
+          recoveryTimer.current = setTimeout(restoreVideo, recoveryThresholdMs)
         }
       }
     }
 
-    const handleTrackSubscribed = (track: any, publication: any) => {
-      // When a new track is added, ensure subscription matches current policy
-      if (publication.kind === Track.Kind.Video && isAudioOnly) {
-        publication.setSubscribed(false)
+    // Policy must follow new tracks and survive a reconnect.
+    const reapply = () => applySubscriptionPolicy(audioOnlyRef.current)
+    const handleTrackPublished = (publication: any) => {
+      if (publication?.kind === Track.Kind.Video) publication.setSubscribed(!audioOnlyRef.current)
+    }
+    const handleTrackSubscribed = (_track: any, publication: any) => {
+      if (publication.kind === Track.Kind.Video && audioOnlyRef.current) publication.setSubscribed(false)
+    }
+    const handleReconnected = () => {
+      // The old quality reading is stale; wait for a fresh one before judging, and re-assert subscriptions.
+      qualityRef.current = null
+      if (recoveryTimer.current) clearTimeout(recoveryTimer.current)
+      recoveryTimer.current = null
+      reapply()
+    }
+    const handleStateChanged = (state: string) => {
+      // While the link is down no quality verdict is meaningful: do not restore video during a drop.
+      if (state !== 'connected' && recoveryTimer.current) {
+        clearTimeout(recoveryTimer.current)
+        recoveryTimer.current = null
       }
     }
 
     room.on(RoomEvent.ConnectionQualityChanged, handleConnectionQuality)
     room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed)
+    room.on(RoomEvent.TrackPublished, handleTrackPublished)
+    room.on(RoomEvent.Reconnected, handleReconnected)
+    room.on(RoomEvent.ConnectionStateChanged, handleStateChanged)
 
-    // Apply policy on initial mount / room ready
-    applySubscriptionPolicy(isAudioOnly)
+    reapply() // initial mount / room ready
 
     return () => {
       room.off(RoomEvent.ConnectionQualityChanged, handleConnectionQuality)
       room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed)
+      room.off(RoomEvent.TrackPublished, handleTrackPublished)
+      room.off(RoomEvent.Reconnected, handleReconnected)
+      room.off(RoomEvent.ConnectionStateChanged, handleStateChanged)
+      clearTimers()
     }
-  }, [room, autoAdaptiveEnabled, isManualOverride, isAudioOnly, sustainedThresholdMs, applySubscriptionPolicy])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room, autoAdaptiveEnabled, sustainedThresholdMs, recoveryThresholdMs, applySubscriptionPolicy])
+
+  // Re-apply whenever the mode flips (covers the automatic transitions as well as manual ones).
+  useEffect(() => {
+    applySubscriptionPolicy(isAudioOnly)
+  }, [isAudioOnly, applySubscriptionPolicy])
 
   return {
     isAudioOnly,

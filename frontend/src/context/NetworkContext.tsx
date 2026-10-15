@@ -4,6 +4,8 @@ import { syncManager } from '../services/syncManager'
 
 interface NetworkContextType {
   isOnline: boolean
+  /** The browser's own online/offline flag only; says nothing about the API or live media. */
+  isBrowserOnline: boolean
   isServerReachable: boolean
   quality: NetworkQuality
   latencyMs: number
@@ -105,6 +107,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <NetworkContext.Provider
       value={{
         isOnline: effectiveOnline,
+        isBrowserOnline,
         isServerReachable,
         quality,
         latencyMs,

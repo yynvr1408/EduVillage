@@ -1,0 +1,3 @@
+-r requirements.txt
+imageio-ffmpeg  # a bundled ffmpeg for tests on machines without one
+moto[server,s3]  # in-process S3-API emulator for storage tests (NOT real S3/R2)

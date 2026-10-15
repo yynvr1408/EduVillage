@@ -12,11 +12,13 @@ Guarantees:
 import hashlib
 import json
 import logging
+from datetime import timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.core.exceptions import AppError
 from app.db.base import utcnow
 from app.db.models.enums import SyncOperationStatus, SyncOperationType
@@ -47,12 +49,34 @@ def _apply_assignment_submission(db: Session, user: User, op: SyncOperationIn) -
         raise AppError("payload.answer must be an object for assignment_submission.", code="INVALID_PAYLOAD", status_code=422)
 
     assignment = assignment_service.get_assignment_or_404(db, op.entity_id)
-    submission = assignment_service.save_submission(db, user, assignment, answer=answer, submit=True, commit=False)
+    as_of = _effective_submission_time(op)
+    if assignment.due_at is not None and as_of != utcnow() and not _within_grace(assignment.due_at, utcnow()):
+        as_of = utcnow()  # too late to honour the device's claim: the server's clock decides
+    submission = assignment_service.save_submission(
+        db, user, assignment, answer=answer, submit=True, commit=False, as_of=as_of
+    )
     return {
         "server_entity_id": submission.id,
         "server_version": submission.version,
         "server_updated_at": submission.updated_at,
     }
+
+
+def _effective_submission_time(op: SyncOperationIn):
+    """Offline-first policy: a submission made before the deadline may sync late, but only within
+    OFFLINE_SUBMISSION_GRACE_HOURS of the deadline's passing, and a device clock in the future never
+    helps. Outside that window (or with no client time) the server's own clock decides."""
+    now = utcnow()
+    client = op.client_updated_at
+    if client is None:
+        return now
+    if client.tzinfo is not None:
+        client = client.astimezone(timezone.utc).replace(tzinfo=None)
+    return min(client, now)  # never later than now: a forward-dated clock gains nothing
+
+
+def _within_grace(due_at, now) -> bool:
+    return now <= due_at + timedelta(hours=get_settings().offline_submission_grace_hours)
 
 
 _HANDLERS = {
