@@ -36,10 +36,6 @@ export const courseService = {
     title: string
     code: string
     description?: string
-    grade_level?: string
-    language?: string
-    institution?: string
-    region?: string
   }): Promise<Course> {
     return api.createCourse(data)
   },

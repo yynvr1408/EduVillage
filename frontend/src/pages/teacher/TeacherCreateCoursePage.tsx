@@ -15,10 +15,6 @@ export const TeacherCreateCoursePage: React.FC = () => {
   const [title, setTitle] = useState('')
   const [code, setCode] = useState('')
   const [description, setDescription] = useState('')
-  const [gradeLevel, setGradeLevel] = useState('')
-  const [language, setLanguage] = useState('')
-  const [institution, setInstitution] = useState('')
-  const [region, setRegion] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,10 +32,6 @@ export const TeacherCreateCoursePage: React.FC = () => {
         title,
         code: code.toUpperCase().trim(),
         description,
-        grade_level: gradeLevel.trim() || undefined,
-        language: language.trim() || undefined,
-        institution: institution.trim() || undefined,
-        region: region.trim() || undefined,
       })
       navigate(`/teacher/courses/${created.id}/manage`)
     } catch (err: any) {
@@ -109,21 +101,6 @@ export const TeacherCreateCoursePage: React.FC = () => {
                 placeholder="Explain the learning objectives, practical applications, and target learners..."
               />
             </FormField>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Grade / Academic Level" htmlFor="gradeLevel" hint="Optional — helps students find the right course">
-                <Input id="gradeLevel" value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)} placeholder="e.g. Grade 9" />
-              </FormField>
-              <FormField label="Language of Instruction" htmlFor="language" hint="Optional">
-                <Input id="language" value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="e.g. Telugu" />
-              </FormField>
-              <FormField label="Institution" htmlFor="institution" hint="Optional">
-                <Input id="institution" value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="e.g. Rural College A" />
-              </FormField>
-              <FormField label="Region" htmlFor="region" hint="Optional">
-                <Input id="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. District 4" />
-              </FormField>
-            </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E1E8E4]">
               <Link to="/teacher/courses">

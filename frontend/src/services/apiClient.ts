@@ -166,10 +166,6 @@ function mapCourse(c: Raw, lessons?: Lesson[]): Course {
     lessons_count: lessons?.length,
     lessons,
     status: c.status ?? 'draft',
-    grade_level: c.grade_level ?? undefined,
-    language: c.language ?? undefined,
-    institution: c.institution ?? undefined,
-    region: c.region ?? undefined,
   }
 }
 
@@ -358,10 +354,6 @@ export const api = {
     title: string
     code: string
     description?: string
-    grade_level?: string
-    language?: string
-    institution?: string
-    region?: string
   }) =>
     mapCourse(
       await apiRequest<Raw>('/courses', {
@@ -370,10 +362,6 @@ export const api = {
           title: data.title,
           description: data.description,
           subject: data.code,
-          grade_level: data.grade_level || undefined,
-          language: data.language || undefined,
-          institution: data.institution || undefined,
-          region: data.region || undefined,
           status: 'published',
         }),
       })

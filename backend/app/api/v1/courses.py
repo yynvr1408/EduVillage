@@ -30,16 +30,12 @@ def course_catalog(
     limit: int = 50,
     offset: int = 0,
     subject: str | None = None,
-    grade_level: str | None = None,
-    language: str | None = None,
-    institution: str | None = None,
-    region: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Published courses a student can browse and then self-enroll in."""
     courses = course_service.list_catalog(
-        db, limit=limit, offset=offset, subject=subject, grade_level=grade_level, language=language, institution=institution, region=region
+        db, limit=limit, offset=offset, subject=subject
     )
     return [_course_out(db, c) for c in courses]
 
@@ -53,10 +49,6 @@ def create_course(payload: CourseCreate, user: User = Depends(get_current_user),
         title=payload.title,
         description=payload.description,
         subject=payload.subject,
-        grade_level=payload.grade_level,
-        language=payload.language,
-        institution=payload.institution,
-        region=payload.region,
         status=payload.status,
     )
     return CourseOut.model_validate(course)

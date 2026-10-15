@@ -169,28 +169,11 @@ def test_student_cannot_delete_a_course(student, published_course):
     assert client.get(f"/api/v1/courses/{published_course['id']}").status_code == 200
 
 
-def test_course_discovery_fields_persist_and_filter_the_catalog(teacher, student):
-    tclient, _ = teacher
-    math = tclient.post(
-        "/api/v1/courses",
-        json={"title": "Grade 9 Mathematics", "status": "published", "grade_level": "9", "language": "Telugu", "region": "District A"},
-    ).json()
-    assert math["grade_level"] == "9"
-    assert math["language"] == "Telugu"
-    assert math["region"] == "District A"
-
-    tclient.post(
-        "/api/v1/courses",
-        json={"title": "Grade 10 Mathematics", "status": "published", "grade_level": "10", "language": "Telugu", "region": "District A"},
-    )
-
-    sclient, _ = student
-    grade_9_only = sclient.get("/api/v1/courses/catalog", params={"grade_level": "9"}).json()
-    assert any(c["id"] == math["id"] for c in grade_9_only)
-    assert all(c["grade_level"] == "9" for c in grade_9_only)
-
-    no_match = sclient.get("/api/v1/courses/catalog", params={"region": "District B"}).json()
-    assert no_match == []
+def test_course_has_no_discovery_fields_any_more(teacher):
+    client, _ = teacher
+    course = client.post("/api/v1/courses", json={"title": "Plain Course", "status": "published"}).json()
+    for gone in ("grade_level", "language", "institution", "region"):
+        assert gone not in course
 
 
 def test_archived_course_drops_out_of_the_catalog_but_stays_visible_to_its_teacher(teacher, student):
