@@ -181,6 +181,48 @@ describe('offline summaries and recordings', () => {
     await expect(downloadManager.downloadRecording({ ...recording, id: 'rec-2', status: 'PROCESSING' } as Recording)).rejects.toMatchObject({ code: 'UNAVAILABLE' })
   })
 
+  it('saves a downloaded resource and a downloaded recording to the real device, not just IndexedDB', async () => {
+    const createdUrls: string[] = []
+    const revokedUrls: string[] = []
+    const clicks: HTMLAnchorElement[] = []
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn((b: Blob) => {
+        const u = `blob:fake-${createdUrls.length}`
+        createdUrls.push(u)
+        return u
+      }),
+      revokeObjectURL: vi.fn((u: string) => revokedUrls.push(u)),
+    })
+    const realClick = HTMLAnchorElement.prototype.click
+    HTMLAnchorElement.prototype.click = vi.fn(function (this: HTMLAnchorElement) {
+      clicks.push(this)
+    })
+
+    try {
+      await downloadManager.downloadResource(material, undefined, undefined, { chunkSize: 2000 })
+      await downloadManager.saveResourceToDevice('mat-1')
+      expect(clicks).toHaveLength(1)
+      expect(clicks[0].download).toBe('Week 1 Notes.pdf')
+      expect(clicks[0].href).toBe(createdUrls[0])
+
+      const recording = {
+        id: 'rec-save-1', course_id: 'c-1', title: 'Lecture: Mitochondria', duration_seconds: 60, file_size_bytes: FILE.length,
+        status: 'READY', video_url: 'https://files.example/rec-save-1.mp4?sig=x', download_url: 'https://files.example/rec-save-1.mp4?sig=x',
+      } as unknown as Recording
+      await downloadManager.downloadRecording(recording, undefined, { chunkSize: 2000 })
+      await downloadManager.saveRecordingToDevice('rec-save-1')
+      expect(clicks).toHaveLength(2)
+      // Filesystem-unsafe characters (the colon) are sanitized out of the suggested filename.
+      expect(clicks[1].download).toBe('Lecture_ Mitochondria.mp4')
+
+      // Never downloaded -> a clear error, not a silent no-op.
+      await expect(downloadManager.saveRecordingToDevice('never-downloaded')).rejects.toMatchObject({ code: 'UNAVAILABLE' })
+    } finally {
+      HTMLAnchorElement.prototype.click = realClick
+    }
+  })
+
   it('shared-device sign-out removes downloads, partial downloads and saved summaries', async () => {
     await downloadManager.downloadResource(material, undefined, undefined, { chunkSize: 2000 })
     await downloadManager.downloadSummary(summary)
