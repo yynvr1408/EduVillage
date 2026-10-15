@@ -29,7 +29,7 @@ afterEach(() => vi.restoreAllMocks())
 describe('classifying what the server answered', () => {
   it('maps every answer to exactly one distinct state', () => {
     expect(classifySyncResult({ status: 'accepted' })).toBe('confirmed')
-    expect(classifySyncResult({ status: 'conflict', error_code: 'ASSIGNMENT_EXPIRED' })).toBe('expired')
+    expect(classifySyncResult({ status: 'conflict', error_code: 'SUBMISSION_EXPIRED' })).toBe('expired')
     expect(classifySyncResult({ status: 'conflict', error_code: 'ASSIGNMENT_CLOSED' })).toBe('closed')
     expect(classifySyncResult({ status: 'conflict', error_code: 'OPERATION_ID_REUSED' })).toBe('conflict')
     expect(classifySyncResult({ status: 'rejected', error_code: 'FORBIDDEN' })).toBe('rejected')
@@ -41,7 +41,7 @@ describe('sync outcomes are surfaced, never reported as confirmed', () => {
   it('marks a submission whose deadline passed as expired, keeps the work, and never retries it', async () => {
     const op = await enqueue()
     const sync = vi.spyOn(apiClient.api, 'syncOperations').mockResolvedValueOnce({
-      results: [result({ operation_id: op.id, status: 'conflict', error_code: 'ASSIGNMENT_EXPIRED', message: 'The deadline has passed.' })],
+      results: [result({ operation_id: op.id, status: 'conflict', error_code: 'SUBMISSION_EXPIRED', message: 'The deadline has passed.' })],
     })
     const r = await syncManager.processQueue()
     expect(r.successful).toBe(0)
@@ -51,7 +51,7 @@ describe('sync outcomes are surfaced, never reported as confirmed', () => {
     expect(draft?.content).toBe('My answer') // the student's work is preserved
     expect(draft?.syncMessage).toBe('The deadline has passed.')
     const stored = await db.syncOperations.get(op.id)
-    expect(stored).toMatchObject({ status: 'failed', outcome: 'expired', errorCode: 'ASSIGNMENT_EXPIRED' })
+    expect(stored).toMatchObject({ status: 'failed', outcome: 'expired', errorCode: 'SUBMISSION_EXPIRED' })
 
     sync.mockClear()
     await syncManager.processQueue()
@@ -105,7 +105,7 @@ describe('sync outcomes are surfaced, never reported as confirmed', () => {
   it('a fresh submission after a refusal gets a NEW operation id (the old one would just replay the refusal)', async () => {
     const first = await enqueue()
     vi.spyOn(apiClient.api, 'syncOperations').mockResolvedValueOnce({
-      results: [result({ operation_id: first.id, status: 'conflict', error_code: 'ASSIGNMENT_EXPIRED' })],
+      results: [result({ operation_id: first.id, status: 'conflict', error_code: 'SUBMISSION_EXPIRED' })],
     })
     await syncManager.processQueue()
     const second = await enqueue()
@@ -121,7 +121,7 @@ describe('the assignment editor never shows server confirmation before the backe
 
   it('shows "Deadline passed" (not "Server Confirmed") when the server refuses an online submission as expired', async () => {
     vi.spyOn(assignmentService, 'submitAssignment').mockRejectedValue(
-      new apiClient.ApiError('The deadline for this assignment has passed.', 409, false, 'ASSIGNMENT_EXPIRED')
+      new apiClient.ApiError('The deadline for this assignment has passed.', 409, false, 'SUBMISSION_EXPIRED')
     )
     render(<OfflineDraftEditor assignment={assignment} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'my late answer' } })

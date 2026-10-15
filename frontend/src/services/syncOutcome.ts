@@ -9,7 +9,7 @@ export type TerminalDraftStatus = 'expired' | 'conflict' | 'rejected'
 
 export function classifySyncResult(result: { status: string; error_code?: string }): SyncOutcome {
   if (result.status === 'accepted') return 'confirmed'
-  if (result.error_code === 'ASSIGNMENT_EXPIRED') return 'expired'
+  if (result.error_code === 'SUBMISSION_EXPIRED') return 'expired'
   if (result.error_code === 'ASSIGNMENT_CLOSED') return 'closed'
   if (result.status === 'conflict') return 'conflict'
   return 'rejected'

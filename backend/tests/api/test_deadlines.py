@@ -36,12 +36,14 @@ def test_no_deadline_means_always_open(teacher, enrolled_student, published_cour
     assert enrolled_student[0].put(f"/api/v1/assignments/{a['id']}/submissions/me", json={"answer": {"text": "x"}, "submit": True}).status_code == 200
 
 
-def test_submitting_or_saving_after_the_deadline_is_refused_as_expired(teacher, enrolled_student, published_course):
+def test_final_submission_after_the_deadline_is_refused_but_a_draft_can_still_be_saved(teacher, enrolled_student, published_course):
     a = _assignment(teacher[0], published_course["id"], due_in_hours=-1)
-    for submit in (True, False):  # neither a final submission nor a draft save may change work after the deadline
-        resp = enrolled_student[0].put(f"/api/v1/assignments/{a['id']}/submissions/me", json={"answer": {"text": "late"}, "submit": submit})
-        assert resp.status_code == 409 and resp.json()["error"]["code"] == "ASSIGNMENT_EXPIRED"
-    assert teacher[0].get(f"/api/v1/assignments/{a['id']}/submissions").json() == []  # nothing was persisted
+    resp = enrolled_student[0].put(f"/api/v1/assignments/{a['id']}/submissions/me", json={"answer": {"text": "late"}, "submit": True})
+    assert resp.status_code == 409 and resp.json()["error"]["code"] == "SUBMISSION_EXPIRED"
+    assert teacher[0].get(f"/api/v1/assignments/{a['id']}/submissions").json() == []  # nothing was recorded as submitted
+    # Saving a draft is allowed (nothing typed is lost) - and a late draft is never counted as submitted.
+    draft = enrolled_student[0].put(f"/api/v1/assignments/{a['id']}/submissions/me", json={"answer": {"text": "late draft"}, "submit": False})
+    assert draft.status_code == 200 and draft.json()["status"] == "draft" and draft.json()["submitted_at"] is None
 
 
 def test_work_submitted_before_the_deadline_cannot_be_edited_afterwards(teacher, enrolled_student, published_course, db_session):
@@ -55,14 +57,14 @@ def test_work_submitted_before_the_deadline_cannot_be_edited_afterwards(teacher,
     row.due_at = utcnow() - timedelta(minutes=5)  # time passes
     db_session.commit()
     resp = sclient.put(f"/api/v1/assignments/{a['id']}/submissions/me", json={"answer": {"text": "v2 changed after deadline"}, "submit": True})
-    assert resp.status_code == 409 and resp.json()["error"]["code"] == "ASSIGNMENT_EXPIRED"
+    assert resp.status_code == 409 and resp.json()["error"]["code"] == "SUBMISSION_EXPIRED"
     assert sclient.get(f"/api/v1/assignments/{a['id']}/submissions/me").json()["answer"] == {"text": "v1"}
 
 
 def test_sync_after_the_deadline_without_a_client_time_is_expired_and_replays_stably(teacher, enrolled_student, published_course):
     a = _assignment(teacher[0], published_course["id"], due_in_hours=-1)
     first = _sync(enrolled_student[0], "op-late", a["id"])
-    assert first["status"] == "conflict" and first["error_code"] == "ASSIGNMENT_EXPIRED"
+    assert first["status"] == "conflict" and first["error_code"] == "SUBMISSION_EXPIRED"
     assert _sync(enrolled_student[0], "op-late", a["id"]) == first
     assert teacher[0].get(f"/api/v1/assignments/{a['id']}/submissions").json() == []
 
@@ -83,26 +85,26 @@ def test_an_offline_submission_is_not_honoured_after_the_grace_window(teacher, e
     a = _assignment(teacher[0], published_course["id"], due_in_hours=-48)  # deadline was two days ago
     made_at = datetime.now(timezone.utc) - timedelta(hours=60)  # made before it, but synced far too late
     result = _sync(enrolled_student[0], "op-too-late", a["id"], client_time=made_at)
-    assert result["status"] == "conflict" and result["error_code"] == "ASSIGNMENT_EXPIRED"
+    assert result["status"] == "conflict" and result["error_code"] == "SUBMISSION_EXPIRED"
 
 
 def test_a_client_clock_claiming_a_time_before_the_deadline_that_was_made_after_it_gains_nothing(teacher, enrolled_student, published_course):
     """The device claims it wrote the answer before the deadline; that is honoured only inside the bounded window."""
     a = _assignment(teacher[0], published_course["id"], due_in_hours=-30)
     forged = datetime.now(timezone.utc) - timedelta(hours=31)  # backdated beyond the 24 h window
-    assert _sync(enrolled_student[0], "op-backdated", a["id"], client_time=forged)["error_code"] == "ASSIGNMENT_EXPIRED"
+    assert _sync(enrolled_student[0], "op-backdated", a["id"], client_time=forged)["error_code"] == "SUBMISSION_EXPIRED"
 
 
 def test_a_forward_dated_client_clock_never_helps_or_hurts(teacher, enrolled_student, published_course):
     a = _assignment(teacher[0], published_course["id"], due_in_hours=-1)
     future = datetime.now(timezone.utc) + timedelta(days=30)
-    assert _sync(enrolled_student[0], "op-future", a["id"], client_time=future)["error_code"] == "ASSIGNMENT_EXPIRED"
+    assert _sync(enrolled_student[0], "op-future", a["id"], client_time=future)["error_code"] == "SUBMISSION_EXPIRED"
 
 
 def test_a_client_time_after_the_deadline_is_judged_late(teacher, enrolled_student, published_course):
     a = _assignment(teacher[0], published_course["id"], due_in_hours=-2)
     written_late = datetime.now(timezone.utc) - timedelta(hours=1)  # after the deadline, even if synced "in grace"
-    assert _sync(enrolled_student[0], "op-written-late", a["id"], client_time=written_late)["error_code"] == "ASSIGNMENT_EXPIRED"
+    assert _sync(enrolled_student[0], "op-written-late", a["id"], client_time=written_late)["error_code"] == "SUBMISSION_EXPIRED"
 
 
 @pytest.mark.parametrize("hours", [0.5, 5])
@@ -123,7 +125,7 @@ def test_times_are_returned_as_explicit_utc_and_offsets_are_converted_not_droppe
     assert abs((due - (datetime.now(timezone.utc) - td(hours=1))).total_seconds()) < 5  # the same INSTANT, not 5.5 h off
     # ...so the deadline is genuinely in the past on every database, whatever its session time zone
     resp = enrolled_student[0].put(f"/api/v1/assignments/{a['id']}/submissions/me", json={"answer": {"text": "x"}, "submit": True})
-    assert resp.status_code == 409 and resp.json()["error"]["code"] == "ASSIGNMENT_EXPIRED"
+    assert resp.status_code == 409 and resp.json()["error"]["code"] == "SUBMISSION_EXPIRED"
 
 
 def test_class_times_round_trip_as_utc(teacher, published_course):

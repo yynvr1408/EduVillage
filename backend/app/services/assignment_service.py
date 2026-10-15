@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -88,7 +90,7 @@ def assert_before_deadline(assignment: Assignment, *, as_of=None) -> None:
     moment = as_of or utcnow()
     if moment > assignment.due_at:
         raise ConflictError(
-            "The deadline for this assignment has passed, so it no longer accepts submissions.", code="ASSIGNMENT_EXPIRED"
+            "The deadline for this assignment has passed; the submission was not accepted.", code="SUBMISSION_EXPIRED"
         )
 
 
@@ -107,7 +109,10 @@ def save_submission(
         raise ConflictError("This assignment is closed and no longer accepts submissions.", code="ASSIGNMENT_CLOSED")
     if assignment.status != AssignmentStatus.published and not course_service.is_teaching(db, student, course):
         raise ConflictError("This assignment is not open for submissions.", code="ASSIGNMENT_NOT_PUBLISHED")
-    assert_before_deadline(assignment, as_of=as_of)
+    # The deadline applies to a final submission. Saving a draft after it is still allowed, so nothing the
+    # student already typed is lost (a late draft is never counted as submitted).
+    if submit:
+        assert_before_deadline(assignment, as_of=as_of)
 
     submission = _get_submission(db, assignment.id, student.id)
     if submission is None:

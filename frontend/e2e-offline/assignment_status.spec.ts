@@ -38,7 +38,7 @@ async function mockBackend(page: Page) {
       const ops = JSON.parse(req.postData() || '{}').operations as Array<{ operation_id: string }>
       if (server.syncMode === 'down') return route.abort('connectionrefused')
       if (server.syncMode === 'expired') {
-        return json({ results: ops.map((o) => ({ operation_id: o.operation_id, status: 'conflict', error_code: 'ASSIGNMENT_EXPIRED', message: 'The deadline for this assignment has passed, so it no longer accepts submissions.' })) })
+        return json({ results: ops.map((o) => ({ operation_id: o.operation_id, status: 'conflict', error_code: 'SUBMISSION_EXPIRED', message: 'The deadline for this assignment has passed, so it no longer accepts submissions.' })) })
       }
       server.confirmed = true
       return json({ results: ops.map((o) => ({ operation_id: o.operation_id, status: 'accepted', server_entity_id: 's1', server_version: 1 })) })

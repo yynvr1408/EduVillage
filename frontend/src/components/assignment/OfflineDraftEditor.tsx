@@ -143,7 +143,7 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
           // The server answered and refused (deadline, closed assignment, not enrolled...). Queuing it would
           // just be refused again, so tell the student instead of pretending it will be retried.
           setErrorMessage(err.message)
-          const refusal = err.code === 'ASSIGNMENT_EXPIRED' || err.code === 'ASSIGNMENT_CLOSED' ? 'expired' : err.status === 409 ? 'conflict' : null
+          const refusal = err.code === 'SUBMISSION_EXPIRED' || err.code === 'ASSIGNMENT_CLOSED' ? 'expired' : err.status === 409 ? 'conflict' : null
           setSaveStatus(refusal ?? 'error')
           if (refusal) {
             // Keep the text AND the refusal on this device (a reload must not lose either).
