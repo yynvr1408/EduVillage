@@ -325,17 +325,17 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
         {/* Source Badge (Offline vs Network) */}
         <div className="absolute top-3 left-3 flex items-center space-x-2">
           {isOfflineBlob ? (
-            <Badge variant="success" className="bg-[#E5F5EB] text-[#247A4D] border border-[#247A4D]/30 text-[10px]">
+            <Badge variant="success" className="bg-[#E5F5EB] text-[#247A4D] border border-[#247A4D]/30 text-xs">
               <HardDrive className="w-3 h-3 mr-1 inline" /> Offline Storage
             </Badge>
           ) : (
-            <Badge variant="secondary" className="bg-[#202B2A] text-[#CBD7D1] border-[#374947] text-[10px]">
+            <Badge variant="secondary" className="bg-[#202B2A] text-[#CBD7D1] border-[#374947] text-xs">
               <Video className="w-3 h-3 mr-1 inline text-[#0F5B57]" /> Stream
             </Badge>
           )}
 
           {startPosition > 0 && currentTime === startPosition && (
-            <Badge variant="secondary" className="bg-[#202B2A] text-[#CBD7D1] border-[#374947] text-[10px]">
+            <Badge variant="secondary" className="bg-[#202B2A] text-[#CBD7D1] border-[#374947] text-xs">
               Resumed at {formatDuration(startPosition)}
             </Badge>
           )}
@@ -386,7 +386,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
       <div className="bg-[#202B2A] text-[#FFFFFF] p-3 sm:p-4 space-y-2 border-t border-[#374947]">
         {/* Scrub Bar */}
         <div className="flex items-center space-x-3">
-          <span className="text-[11px] font-mono text-[#CBD7D1] min-w-9 text-right">
+          <span className="text-xs font-mono text-[#CBD7D1] min-w-9 text-right">
             {formatDuration(currentTime)}
           </span>
           <input
@@ -401,7 +401,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
             aria-label="Seek time"
             className="w-full h-1.5 bg-[#374947] rounded-lg appearance-none cursor-pointer accent-[#0F5B57]"
           />
-          <span className="text-[11px] font-mono text-[#CBD7D1] min-w-9">
+          <span className="text-xs font-mono text-[#CBD7D1] min-w-9">
             {formatDuration(duration)}
           </span>
         </div>
@@ -495,7 +495,7 @@ export const RecordedLecturePlayer: React.FC<RecordedLecturePlayerProps> = ({
                 <span className="hidden sm:inline">{isDownloading ? 'Downloading...' : 'Offline'}</span>
               </button>
             ) : (
-              <span className="text-[11px] text-[#247A4D] flex items-center space-x-1 px-1.5 py-1">
+              <span className="text-xs text-[#247A4D] flex items-center space-x-1 px-1.5 py-1">
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Saved</span>
               </span>

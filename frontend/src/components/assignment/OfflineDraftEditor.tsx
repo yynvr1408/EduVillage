@@ -202,14 +202,14 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
           )}
 
           {lastSavedAt && (
-            <span className="text-[#687775] text-[11px] flex items-center gap-1">
+            <span className="text-[#687775] text-xs flex items-center gap-1">
               <Clock className="w-3 h-3 text-[#687775]" />
               Saved: {new Date(lastSavedAt).toLocaleTimeString()}
             </span>
           )}
         </div>
 
-        <div className="text-[11px] text-[#687775] font-medium">
+        <div className="text-xs text-[#687775] font-medium">
           {wordCount} Words • IndexedDB Persistence Active
         </div>
       </div>

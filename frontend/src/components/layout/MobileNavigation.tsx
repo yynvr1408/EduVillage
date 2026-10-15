@@ -62,7 +62,7 @@ export const MobileNavigation: React.FC<{
                 }
               >
                 <Icon className="w-5 h-5 mb-0.5" />
-                <span className="text-[10px] leading-tight">{item.label}</span>
+                <span className="text-xs leading-tight">{item.label}</span>
               </NavLink>
             )
           })}

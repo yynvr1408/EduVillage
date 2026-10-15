@@ -29,7 +29,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, isTeacher = fals
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col">
-        <h3 className="font-semibold text-[17px] text-[#202B2A] line-clamp-1 mb-1 leading-snug">
+        <h3 className="font-semibold text-base text-[#202B2A] line-clamp-1 mb-1 leading-snug">
           {course.title}
         </h3>
         {course.teacher_name && (
@@ -44,7 +44,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, isTeacher = fals
       </CardContent>
 
       <CardFooter>
-        <span className="text-[11px] text-[#687775] font-medium">
+        <span className="text-xs text-[#687775] font-medium">
           {isTeacher ? 'Manage Curriculum' : 'Offline Ready'}
         </span>
         <Link to={detailLink}>

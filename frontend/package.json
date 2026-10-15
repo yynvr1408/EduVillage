@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e:offline": "playwright test -c playwright.offline.config.ts"
+    "test:e2e:offline": "playwright test -c playwright.offline.config.ts",
+    "test:e2e:layout": "playwright test -c playwright.layout.config.ts"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.24",

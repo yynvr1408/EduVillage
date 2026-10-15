@@ -106,6 +106,7 @@ describe('Recorded Classes, Shared Devices & Multi-Section Workflows', () => {
       title: 'Hydraulic Conductivity Laboratory',
       status: 'SCHEDULED',
       scheduled_at: new Date(Date.now() + 3600000).toISOString(),
+      livekit_room_name: 'eduvillage-class-cls-101',
       section_id: 'sec-a',
       section_name: 'Section A (Cohort 2026)',
     }

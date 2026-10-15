@@ -51,7 +51,7 @@ export const OfflineIndicator: React.FC = () => {
           <button
             type="button"
             onClick={() => checkReachability()}
-            className="underline hover:text-[#123B39] text-[11px] flex items-center gap-1 cursor-pointer font-semibold"
+            className="underline hover:text-[#123B39] text-xs flex items-center gap-1 cursor-pointer font-semibold"
           >
             <RefreshCw className="w-3 h-3" />
             Check Connection
@@ -61,7 +61,7 @@ export const OfflineIndicator: React.FC = () => {
             type="button"
             disabled={isSyncing}
             onClick={() => syncNow()}
-            className="underline hover:text-[#123B39] text-[11px] flex items-center gap-1 cursor-pointer font-semibold disabled:opacity-50"
+            className="underline hover:text-[#123B39] text-xs flex items-center gap-1 cursor-pointer font-semibold disabled:opacity-50"
           >
             <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Syncing...' : 'Sync Now'}

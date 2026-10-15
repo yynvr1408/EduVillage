@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Calendar, FileText, CheckCircle2, Clock } from 'lucide-react'
 import { assignmentService } from '../../services/assignmentService'
+import { formatDueDate } from '../../utils/dates'
 import type { Assignment } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { OfflineDraftEditor } from '../../components/assignment/OfflineDraftEditor'
@@ -82,7 +83,7 @@ export const StudentAssignmentDetailPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#687775] flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-[#687775]" />
-              Due: {new Date(assignment.due_date).toLocaleDateString()}
+              {assignment.due_date ? `Due: ${formatDueDate(assignment.due_date)}` : 'No due date'}
             </span>
             <Badge variant={isServerSubmitted ? 'success' : 'outline'}>
               {isServerSubmitted ? 'Submitted' : 'Open for Submission'}
@@ -107,7 +108,7 @@ export const StudentAssignmentDetailPage: React.FC = () => {
             <CheckCircle2 className="w-5 h-5 shrink-0 text-[#247A4D]" />
             <div>
               <p className="font-bold text-[#247A4D]">Submission Confirmed by Server</p>
-              <p className="text-[11px] text-[#247A4D]">
+              <p className="text-xs text-[#247A4D]">
                 Submitted on {new Date(assignment.my_submission!.submitted_at).toLocaleString()}
                 {assignment.my_submission!.score !== null &&
                   ` • Score: ${assignment.my_submission!.score} / ${assignment.max_score}`}

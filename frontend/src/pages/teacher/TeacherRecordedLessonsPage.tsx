@@ -148,19 +148,19 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
                   {/* Left Info */}
                   <div className="space-y-2 max-w-2xl">
                     <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                      <span className="text-[11px] font-mono text-[#687775] uppercase bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
+                      <span className="text-xs font-mono text-[#687775] uppercase bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         {recording.course_code || 'Course'}
                       </span>
                       {isProcessing ? (
-                        <Badge variant="warning" className="text-[10px]">
+                        <Badge variant="warning" className="text-xs">
                           <Clock className="w-2.5 h-2.5 mr-1" /> Processing
                         </Badge>
                       ) : recording.is_published ? (
-                        <Badge variant="success" className="text-[10px]">
+                        <Badge variant="success" className="text-xs">
                           Published
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-xs">
                           Draft / Private
                         </Badge>
                       )}
@@ -189,13 +189,13 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
                           recording.section_ids.map((secId) => (
                             <span
                               key={secId}
-                              className="text-[10px] font-mono bg-[#F1F5F2] px-1.5 py-0.5 rounded border border-[#CBD7D1] text-[#202B2A]"
+                              className="text-xs font-mono bg-[#F1F5F2] px-1.5 py-0.5 rounded border border-[#CBD7D1] text-[#202B2A]"
                             >
                               {secId}
                             </span>
                           ))
                         ) : (
-                          <span className="text-[11px] text-[#8A5700] italic">
+                          <span className="text-xs text-[#8A5700] italic">
                             All enrolled students in course
                           </span>
                         )}
@@ -287,7 +287,7 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
                         />
                         <span className="font-medium text-[#202B2A]">{sec.name}</span>
                       </div>
-                      <span className="text-[11px] font-mono text-[#687775]">
+                      <span className="text-xs font-mono text-[#687775]">
                         {sec.student_count} students
                       </span>
                     </label>
@@ -296,7 +296,7 @@ export const TeacherRecordedLessonsPage: React.FC = () => {
               )}
             </div>
 
-            <div className="p-2.5 bg-[#E5F5EB] rounded-lg border border-[#CBD7D1] text-[11px] text-[#247A4D] leading-relaxed">
+            <div className="p-2.5 bg-[#E5F5EB] rounded-lg border border-[#CBD7D1] text-xs text-[#247A4D] leading-relaxed">
               <strong>Bandwidth & Storage Efficient:</strong> Reusing an authorized recording creates lightweight permission references without duplicating large media files or consuming storage quotas.
             </div>
 

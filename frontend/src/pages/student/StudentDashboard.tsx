@@ -103,7 +103,7 @@ export const StudentDashboard: React.FC = () => {
       <div className="mb-6 p-5 sm:p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[11px] font-bold text-[#0F5B57] bg-[#DDF3EA] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-[#CBD7D1]">
+            <span className="text-xs font-bold text-[#0F5B57] bg-[#DDF3EA] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-[#CBD7D1]">
               Student Workspace
             </span>
             <Badge variant={isOnline ? 'success' : 'warning'} size="sm">
@@ -127,7 +127,7 @@ export const StudentDashboard: React.FC = () => {
               <Clock className="w-4 h-4 text-[#8A5700]" />
               <div>
                 <p className="font-semibold text-[#202B2A]">{pendingCount} Waiting to Sync</p>
-                <p className="text-[10px] text-[#687775]">Local drafts queued</p>
+                <p className="text-xs text-[#687775]">Local drafts queued</p>
               </div>
               <Button
                 size="sm"
@@ -144,7 +144,7 @@ export const StudentDashboard: React.FC = () => {
               <CheckCircle2 className="w-4 h-4 text-[#247A4D]" />
               <div>
                 <p className="font-semibold text-[#202B2A]">Up to Date</p>
-                <p className="text-[10px] text-[#687775]">{downloads.length} items offline</p>
+                <p className="text-xs text-[#687775]">{downloads.length} items offline</p>
               </div>
             </div>
           )}
@@ -181,30 +181,33 @@ export const StudentDashboard: React.FC = () => {
       {/* Main Grid: Courses, Classes & Tasks */}
       <div className="flex flex-col gap-8">
         {/* Enrolled Courses */}
-        <section>
+        <section className="@container min-w-0 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-[#202B2A]">My Enrolled Courses</h2>
               <p className="text-xs text-[#687775]">Access curriculum modules, lessons, and offline assets</p>
             </div>
-            <Link to="/student/courses" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
-              Browse All <ArrowRight className="w-3.5 h-3.5" />
+            <Link to="/student/courses">
+              <Button size="sm" variant="outline" className="whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5">Browse All <ArrowRight className="w-3.5 h-3.5" /></span>
+              </Button>
             </Link>
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               <SkeletonCard />
               <SkeletonCard />
             </div>
           ) : courses.length === 0 ? (
             <EmptyState
+              className="flex-1"
               icon={<BookOpen className="w-6 h-6" />}
               title="No courses found"
               description="Courses will appear here once loaded or when online connectivity returns."
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               {courses.slice(0, 2).map((course) => (
                 <CourseCard key={course.id} course={course} />
               ))}
@@ -213,30 +216,33 @@ export const StudentDashboard: React.FC = () => {
         </section>
 
         {/* Upcoming Classes */}
-        <section>
+        <section className="@container min-w-0 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-[#202B2A]">Live Classes Timetable</h2>
               <p className="text-xs text-[#687775]">Join sessions or review synthesized lecture summaries</p>
             </div>
-            <Link to="/student/classes" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
-              Full Schedule <ArrowRight className="w-3.5 h-3.5" />
+            <Link to="/student/classes">
+              <Button size="sm" variant="outline" className="whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5">Full Schedule <ArrowRight className="w-3.5 h-3.5" /></span>
+              </Button>
             </Link>
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               <SkeletonCard />
               <SkeletonCard />
             </div>
           ) : classes.length === 0 ? (
             <EmptyState
+              className="flex-1"
               icon={<Video className="w-6 h-6" />}
               title="No classes scheduled"
               description="Upcoming interactive lectures will be posted by your teachers."
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               {classes.slice(0, 2).map((cls) => (
                 <ClassCard key={cls.id} classroom={cls} />
               ))}
@@ -245,30 +251,33 @@ export const StudentDashboard: React.FC = () => {
         </section>
 
         {/* Recent Recorded Lessons */}
-        <section>
+        <section className="@container min-w-0 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-[#202B2A]">Recent Recorded Lessons</h2>
               <p className="text-xs text-[#687775]">Watch lecture replays, read AI summaries, or download for offline revision</p>
             </div>
-            <Link to="/student/recorded-lessons" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
-              All Recordings <ArrowRight className="w-3.5 h-3.5" />
+            <Link to="/student/recorded-lessons">
+              <Button size="sm" variant="outline" className="whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5">All Recordings <ArrowRight className="w-3.5 h-3.5" /></span>
+              </Button>
             </Link>
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               <SkeletonCard />
               <SkeletonCard />
             </div>
           ) : recordings.length === 0 ? (
             <EmptyState
+              className="flex-1"
               icon={<PlayCircle className="w-6 h-6" />}
               title="No recorded lessons available"
               description="Recordings will appear here after live lectures or when published by your teachers."
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               {recordings.slice(0, 2).map((rec) => (
                 <div
                   key={rec.id}
@@ -276,7 +285,7 @@ export const StudentDashboard: React.FC = () => {
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono font-semibold px-2 py-0.5 bg-[#DDF3EA] border border-[#CBD7D1] rounded text-[#0F5B57]">
+                      <span className="text-xs font-mono font-semibold px-2 py-0.5 bg-[#DDF3EA] border border-[#CBD7D1] rounded text-[#0F5B57]">
                         {rec.course_code || 'Recorded'}
                       </span>
                       <Badge variant={rec.status === 'READY' ? 'success' : 'default'} size="sm">
@@ -325,29 +334,31 @@ export const StudentDashboard: React.FC = () => {
         </section>
 
         {/* Pending Assignments & Local Drafts */}
-        <section>
+        <section className="@container min-w-0 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-[#202B2A]">Pending Assignments</h2>
               <p className="text-xs text-[#687775]">Complete and save drafts offline; syncs automatically when online</p>
             </div>
-            <Link to="/student/assignments" className="text-xs font-semibold text-[#0F5B57] hover:underline flex items-center gap-1">
-              All Assignments <ArrowRight className="w-3.5 h-3.5" />
+            <Link to="/student/assignments">
+              <Button size="sm" variant="outline" className="whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5">All Assignments <ArrowRight className="w-3.5 h-3.5" /></span>
+              </Button>
             </Link>
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               <SkeletonCard />
               <SkeletonCard />
             </div>
           ) : pendingAssignments.length === 0 ? (
-            <div className="p-6 border border-[#E1E8E4] rounded-2xl bg-[#FFFFFF] text-center text-xs text-[#687775]">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 border border-[#E1E8E4] rounded-2xl bg-[#FFFFFF] text-center text-xs text-[#687775]">
               <CheckCircle2 className="w-8 h-8 mx-auto text-[#247A4D] mb-2" />
               All assignments have been submitted. Great job!
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               {pendingAssignments.map((a) => (
                 <AssignmentCard key={a.id} assignment={a} draft={drafts[a.id]} />
               ))}
@@ -370,7 +381,7 @@ export const StudentDashboard: React.FC = () => {
           </div>
 
           <Link to="/student/downloads">
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" className="whitespace-nowrap">
               Manage Downloads
             </Button>
           </Link>

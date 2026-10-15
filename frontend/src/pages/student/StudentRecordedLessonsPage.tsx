@@ -173,7 +173,7 @@ export const StudentRecordedLessonsPage: React.FC = () => {
           onAction={searchTerm ? () => setSearchTerm('') : undefined}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,24rem),1fr))] gap-4">
           {filteredRecordings.map((recording) => {
             const isDown = downloadedIds.has(recording.id)
             const isProcessing = recording.status === 'PROCESSING'
@@ -188,19 +188,19 @@ export const StudentRecordedLessonsPage: React.FC = () => {
                   {/* Top metadata tags */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                      <span className="text-[11px] font-mono text-[#687775] uppercase bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
+                      <span className="text-xs font-mono text-[#687775] uppercase bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         {recording.course_code || 'Course'}
                       </span>
                       {isProcessing ? (
-                        <Badge variant="warning" className="text-[10px]">
+                        <Badge variant="warning" className="text-xs">
                           <Clock className="w-2.5 h-2.5 mr-1" /> Processing
                         </Badge>
                       ) : isDown ? (
-                        <Badge variant="success" className="text-[10px]">
+                        <Badge variant="success" className="text-xs">
                           <HardDrive className="w-2.5 h-2.5 mr-1" /> Saved Offline
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-xs">
                           Ready
                         </Badge>
                       )}
@@ -227,17 +227,17 @@ export const StudentRecordedLessonsPage: React.FC = () => {
                   {/* Feature badges (Transcript, Summary, Resumed) */}
                   <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
                     {recording.has_transcript && (
-                      <span className="inline-flex items-center text-[11px] text-[#687775] bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
+                      <span className="inline-flex items-center text-xs text-[#687775] bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         <FileText className="w-3 h-3 mr-1 text-[#2364AA]" /> Transcript
                       </span>
                     )}
                     {recording.has_summary && (
-                      <span className="inline-flex items-center text-[11px] text-[#687775] bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
+                      <span className="inline-flex items-center text-xs text-[#687775] bg-[#F1F5F2] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         <Sparkles className="w-3 h-3 mr-1 text-[#0F5B57]" /> AI Summary
                       </span>
                     )}
                     {hasProgress && !recording.user_completed && (
-                      <span className="inline-flex items-center text-[11px] text-[#8A5700] bg-[#FFF0CB] px-2 py-0.5 rounded border border-[#CBD7D1]">
+                      <span className="inline-flex items-center text-xs text-[#8A5700] bg-[#FFF0CB] px-2 py-0.5 rounded border border-[#CBD7D1]">
                         Resume at {formatDuration(recording.user_progress_seconds!)}
                       </span>
                     )}
@@ -246,7 +246,7 @@ export const StudentRecordedLessonsPage: React.FC = () => {
 
                 {/* Actions bottom row */}
                 <div className="pt-4 mt-4 border-t border-[#E1E8E4] flex items-center justify-between gap-2">
-                  <div className="text-[11px] text-[#687775]">
+                  <div className="text-xs text-[#687775]">
                     Instructor: <span className="text-[#202B2A] font-medium">{recording.teacher_name}</span>
                   </div>
 

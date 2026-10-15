@@ -70,7 +70,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
           </Link>
 
           {user && (
-            <Badge variant="secondary" size="sm" className="hidden sm:inline-flex uppercase text-[10px] tracking-wider">
+            <Badge variant="secondary" size="sm" className="hidden sm:inline-flex uppercase text-xs tracking-wider">
               {user.role}
             </Badge>
           )}
@@ -94,7 +94,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
             ) : (
               <WifiOff className="w-3.5 h-3.5" />
             )}
-            <span className="font-semibold text-[11px]">
+            <span className="font-semibold text-xs">
               {isOnline ? (quality === 'poor' ? 'Low Bandwidth' : 'Online') : 'Offline'}
             </span>
           </div>
@@ -110,7 +110,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
             <RefreshCw className={`w-3.5 h-3.5 ${pendingCount > 0 ? 'text-[#8A5700]' : 'text-[#687775]'}`} />
             <span className="hidden sm:inline">Sync</span>
             {pendingCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-[#0F5B57] text-[#FFFFFF] text-[10px] flex items-center justify-center font-bold">
+              <span className="w-4 h-4 rounded-full bg-[#0F5B57] text-[#FFFFFF] text-xs flex items-center justify-center font-bold">
                 {pendingCount}
               </span>
             )}
@@ -120,10 +120,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
           {user && (
             <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-[#E1E8E4]">
               <div className="hidden md:flex flex-col text-right">
-                <span className="text-xs font-semibold text-[#202B2A] leading-tight truncate max-w-30">
+                <span className="text-xs font-semibold text-[#202B2A] leading-tight truncate max-w-52">
                   {user.full_name}
                 </span>
-                <span className="text-[10px] text-[#687775] leading-tight truncate max-w-30">
+                <span className="text-xs text-[#687775] leading-tight truncate max-w-52">
                   {user.email}
                 </span>
               </div>
@@ -131,7 +131,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
               {isSharedDevice && (
                 <span
                   title="Shared Device Mode Active"
-                  className="hidden lg:inline text-[10px] font-semibold bg-[#FFF0CB] text-[#8A5700] border border-[#8A5700]/30 px-2 py-0.5 rounded-md"
+                  className="hidden lg:inline text-xs font-semibold bg-[#FFF0CB] text-[#8A5700] border border-[#8A5700]/30 px-2 py-0.5 rounded-md"
                 >
                   Shared Device
                 </span>

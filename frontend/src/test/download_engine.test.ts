@@ -41,7 +41,7 @@ function fakeServer(file: Uint8Array, opts: ServerOptions = {}) {
     if (opts.status) return { ok: false, status: opts.status, headers: new Headers(), blob: async () => new Blob([]) }
     if (opts.failChunks && call <= opts.failChunks[0]) return { ok: false, status: 503, headers: new Headers(), blob: async () => new Blob([]) }
     if (opts.honorRange === false || !range) {
-      return { ok: true, status: 200, headers: new Headers(), blob: async () => new Blob([file]) }
+      return { ok: true, status: 200, headers: new Headers(), blob: async () => new Blob([file as Uint8Array<ArrayBuffer>]) }
     }
     const m = range.match(/bytes=(\d+)-(\d+)/)!
     const start = Number(m[1])

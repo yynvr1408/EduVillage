@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { assignmentService } from '../../services/assignmentService'
 import { courseService } from '../../services/courseService'
+import { formatDueDate } from '../../utils/dates'
 import type { Assignment, Course, Submission } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { Card, CardHeader, CardContent } from '../../components/ui/Card'
@@ -152,7 +153,7 @@ export const TeacherAssignmentsPage: React.FC = () => {
                 </div>
                 <p className="text-[#687775] line-clamp-2 max-w-2xl mb-1">{a.instructions}</p>
                 <div className="flex items-center gap-2 text-[#84908D]">
-                  <span>Due: {new Date(a.due_date).toLocaleDateString()}</span>
+                  <span>{a.due_date ? `Due: ${formatDueDate(a.due_date)}` : 'No due date'}</span>
                   <span>•</span>
                   <span>Max Score: {a.max_score} pts</span>
                 </div>
@@ -292,7 +293,7 @@ export const TeacherAssignmentsPage: React.FC = () => {
                       {sub.status}
                     </Badge>
                   </div>
-                  <span className="text-[11px] text-[#687775]">
+                  <span className="text-xs text-[#687775]">
                     Submitted: {new Date(sub.submitted_at).toLocaleString()}
                   </span>
                 </div>

@@ -103,7 +103,7 @@ export const DownloadItem: React.FC<DownloadItemProps> = ({
         <div className="min-w-0">
           <p className="font-semibold text-sm text-[#202B2A] truncate">{material.title}</p>
           <div className="flex items-center gap-2 text-[#687775] mt-0.5">
-            <span className="uppercase text-[10px] font-mono font-semibold">{material.file_type}</span>
+            <span className="uppercase text-xs font-mono font-semibold">{material.file_type}</span>
             <span>•</span>
             <span>{formatBytes(material.file_size)}</span>
             {courseTitle && (
@@ -113,7 +113,7 @@ export const DownloadItem: React.FC<DownloadItemProps> = ({
               </>
             )}
           </div>
-          {error && <p className="text-[11px] text-[#B42318] mt-1">{error}</p>}
+          {error && <p className="text-xs text-[#B42318] mt-1">{error}</p>}
         </div>
       </div>
 

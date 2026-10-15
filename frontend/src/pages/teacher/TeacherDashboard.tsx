@@ -82,7 +82,7 @@ export const TeacherDashboard: React.FC = () => {
       {/* Header Banner & Quick Action Bar */}
       <div className="mb-6 p-6 bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
         <div>
-          <span className="text-[11px] font-bold text-[#0F5B57] bg-[#DDF3EA] px-2.5 py-0.5 rounded-full uppercase tracking-wider inline-block mb-1.5 border border-[#CBD7D1]">
+          <span className="text-xs font-bold text-[#0F5B57] bg-[#DDF3EA] px-2.5 py-0.5 rounded-full uppercase tracking-wider inline-block mb-1.5 border border-[#CBD7D1]">
             Teacher Console
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
@@ -171,7 +171,7 @@ export const TeacherDashboard: React.FC = () => {
                       <Badge variant="warning" size="sm">
                         Needs Review
                       </Badge>
-                      <span className="text-[11px] text-[#687775]">
+                      <span className="text-xs text-[#687775]">
                         {new Date(sum.created_at).toLocaleDateString()}
                       </span>
                     </div>

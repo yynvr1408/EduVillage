@@ -65,7 +65,7 @@ export const ClassCard: React.FC<ClassCardProps> = ({
 
         {classroom.section_name && (
           <div className="flex items-center gap-1.5 mb-3">
-            <span className="text-[11px] font-semibold bg-[#DDF3EA] text-[#0F5B57] px-2 py-0.5 rounded-md border border-[#CBD7D1]">
+            <span className="text-xs font-semibold bg-[#DDF3EA] text-[#0F5B57] px-2 py-0.5 rounded-md border border-[#CBD7D1]">
               Section: {classroom.section_name}
             </span>
           </div>

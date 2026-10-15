@@ -29,7 +29,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
             <p className="text-xs font-semibold text-[#202B2A]">
               Status: {isOnline ? 'Connected to EduVillage Server' : 'Offline (Local Only)'}
             </p>
-            <p className="text-[11px] text-[#687775]">
+            <p className="text-xs text-[#687775]">
               {lastSyncTime ? `Last synced: ${lastSyncTime.toLocaleTimeString()}` : 'No sync recorded yet this session'}
             </p>
           </div>
@@ -64,12 +64,12 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                     <p className="font-medium text-[#202B2A]">
                       {op.operationType === 'submit_assignment' ? 'Assignment Submission' : 'Draft Save'}
                     </p>
-                    <p className="text-[10px] text-[#687775]">
+                    <p className="text-xs text-[#687775]">
                       Queued: {new Date(op.createdAt).toLocaleTimeString()}
                       {op.retryCount > 0 && ` • Retries: ${op.retryCount}`}
                     </p>
                     {op.lastError && (
-                      <p className="text-[10px] text-[#B42318] mt-0.5">{op.lastError}</p>
+                      <p className="text-xs text-[#B42318] mt-0.5">{op.lastError}</p>
                     )}
                   </div>
                 </div>
@@ -94,7 +94,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         )}
 
         <div className="pt-2 flex justify-between items-center border-t border-[#E1E8E4]">
-          <span className="text-[11px] text-[#687775]">
+          <span className="text-xs text-[#687775]">
             Uses idempotent keys to guarantee zero duplicates
           </span>
           <Button

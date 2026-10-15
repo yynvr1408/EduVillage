@@ -208,7 +208,7 @@ export const StudentRecordedLessonDetailPage: React.FC = () => {
                   <h3 className="text-xs font-semibold text-[#202B2A] uppercase tracking-wider">
                     Lecture Transcript
                   </h3>
-                  <span className="text-[11px] text-[#687775]">Automated verbatim log</span>
+                  <span className="text-xs text-[#687775]">Automated verbatim log</span>
                 </div>
 
                 {hasTranscript ? (

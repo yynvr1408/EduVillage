@@ -42,7 +42,7 @@ export const StudentClassesPage: React.FC = () => {
       subtitle="Join real-time WebRTC audio/video sessions or read synthesized lecture summaries."
     >
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
         {(['all', 'live', 'scheduled', 'ended'] as const).map((tab) => (
           <button
             key={tab}
@@ -60,7 +60,7 @@ export const StudentClassesPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
@@ -72,7 +72,7 @@ export const StudentClassesPage: React.FC = () => {
           description={`No classes match the filter '${filter}'.`}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
           {filtered.map((cls) => (
             <ClassCard key={cls.id} classroom={cls} />
           ))}

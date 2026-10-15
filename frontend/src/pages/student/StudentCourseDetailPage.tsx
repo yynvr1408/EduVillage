@@ -17,6 +17,7 @@ import { courseService } from '../../services/courseService'
 import { classService } from '../../services/classService'
 import { assignmentService } from '../../services/assignmentService'
 import { downloadManager } from '../../services/downloadManager'
+import { formatDueDate } from '../../utils/dates'
 import type { Course, Lesson, ClassRoom, Assignment, Material } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { Card, CardHeader, CardContent, Badge, Button, LoadingState, ErrorState } from '../../components/ui'
@@ -147,7 +148,7 @@ export const StudentCourseDetailPage: React.FC = () => {
                           {lesson.title}
                         </span>
                         {lesson.offline_ready && (
-                          <Badge variant="secondary" size="sm" className="text-[10px]">
+                          <Badge variant="secondary" size="sm" className="text-xs">
                             Offline Ready
                           </Badge>
                         )}
@@ -199,7 +200,7 @@ export const StudentCourseDetailPage: React.FC = () => {
                       <Badge variant={c.status === 'LIVE' ? 'live' : 'secondary'} size="sm">
                         {c.status}
                       </Badge>
-                      <span className="text-[11px] text-[#687775]">
+                      <span className="text-xs text-[#687775]">
                         {new Date(c.scheduled_at).toLocaleDateString()}
                       </span>
                     </div>
@@ -239,7 +240,7 @@ export const StudentCourseDetailPage: React.FC = () => {
                       {a.my_submission ? (
                         <Badge variant="success" size="sm">Submitted</Badge>
                       ) : (
-                        <Badge variant="outline" size="sm">Due {new Date(a.due_date).toLocaleDateString()}</Badge>
+                        <Badge variant="outline" size="sm">{a.due_date ? `Due ${formatDueDate(a.due_date)}` : 'No due date'}</Badge>
                       )}
                     </div>
                     <Link to={`/student/assignments/${a.id}`} className="mt-1">

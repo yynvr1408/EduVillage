@@ -26,14 +26,14 @@ export const TeacherProfilePage: React.FC = () => {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-lg font-bold text-[#202B2A]">{user?.full_name}</h2>
-                <Badge variant="default" size="sm" className="uppercase text-[10px]">
+                <Badge variant="default" size="sm" className="uppercase text-xs">
                   {user?.role}
                 </Badge>
               </div>
               <p className="text-xs text-[#687775] flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-[#0F5B57]" /> {user?.email}
               </p>
-              <p className="text-[11px] text-[#84908D] mt-1">
+              <p className="text-xs text-[#84908D] mt-1">
                 Role Authorized by EduVillage Administrative Core
               </p>
             </div>
@@ -70,7 +70,7 @@ export const TeacherProfilePage: React.FC = () => {
           <CardContent className="p-5 text-xs text-[#687775] flex items-center justify-between">
             <div>
               <p className="font-semibold text-[#202B2A]">Network Health</p>
-              <p className="text-[11px]">
+              <p className="text-xs">
                 {isOnline ? `Online (${quality}) • ${latencyMs}ms latency` : 'Offline'}
               </p>
             </div>
