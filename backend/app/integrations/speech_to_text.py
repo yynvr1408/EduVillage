@@ -20,7 +20,7 @@ def transcribe(audio_path: Path) -> str:
 
     from openai import OpenAI
 
-    client = OpenAI(api_key=settings.speech_to_text_api_key)
+    client = OpenAI(api_key=settings.speech_to_text_api_key, base_url=settings.speech_to_text_base_url or None)
     with open(audio_path, "rb") as f:
-        result = client.audio.transcriptions.create(model="whisper-1", file=f)
+        result = client.audio.transcriptions.create(model=settings.speech_to_text_model, file=f)
     return result.text

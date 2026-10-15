@@ -192,7 +192,7 @@ def test_transient_llm_failure_is_retried_up_to_the_cap_then_fails(queued_job, d
     from app.integrations import llm_provider
 
     def boom(text):
-        raise RuntimeError("provider down")
+        raise RuntimeError("provider down: quota exceeded")
 
     monkeypatch.setattr(llm_provider, "generate_summary", boom)
     job_id, summary_id = queued_job
@@ -201,6 +201,9 @@ def test_transient_llm_failure_is_retried_up_to_the_cap_then_fails(queued_job, d
     db_session.expire_all()
     job = db_session.get(BackgroundJob, job_id)
     assert job.status.value == "failed" and job.error_code == "LLM_ERROR" and job.attempts == job.max_attempts == 3
+    # The real underlying reason must be preserved, not just the generic code — this is what
+    # actually lets someone diagnose a failure (e.g. a quota error) instead of guessing.
+    assert "quota exceeded" in (job.error_message or "")
     assert db_session.get(LectureSummary, summary_id).status.value == "failed"
 
 
@@ -294,6 +297,9 @@ def test_summary_waits_for_every_chunk_retries_and_is_only_published_when_comple
     # First attempt: failed midway. It is retryable, so nothing is published or marked failed-for-good,
     # and the chunks that finished are kept.
     assert (j.status.value, j.error_code) == ("failed", "STT_CHUNK_FAILED")
+    # The real provider error must reach the stored message, not just the generic code — this
+    # is what actually lets someone tell a rate limit apart from, say, an expired key.
+    assert "rate limited" in (j.error_message or "")
     assert s.status.value == "processing" and not s.content_json  # no summary of a half-transcribed recording
     assert t.status.value == "pending" and sorted(t.chunk_state["done"]) == ["0", "1"]
     assert tclient.post(f"/api/v1/summaries/{s.id}/approve").status_code == 409  # cannot be approved/published

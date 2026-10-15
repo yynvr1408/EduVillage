@@ -101,7 +101,7 @@ export const TeacherCoursesPage: React.FC = () => {
           title="No courses created yet"
           description="Create your first offline-ready course curriculum to start teaching."
           actionLabel="Create Course"
-          onAction={() => {}}
+          onAction={() => navigate('/teacher/courses/new')}
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">

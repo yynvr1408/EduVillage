@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     # third-party/proxy provider instead (its docs will give you this URL).
     llm_base_url: str | None = None
     speech_to_text_api_key: str | None = None
+    speech_to_text_model: str = "whisper-1"
+    # Leave unset for real OpenAI. Set this (and speech_to_text_model) when the STT key belongs
+    # to an OpenAI-compatible third-party provider instead — e.g. Groq, which hosts Whisper too:
+    # https://api.groq.com/openai/v1 with model whisper-large-v3-turbo.
+    speech_to_text_base_url: str | None = None
 
     @property
     def is_production(self) -> bool:

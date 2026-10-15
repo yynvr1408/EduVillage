@@ -544,9 +544,15 @@ export const api = {
     })
   },
   getJobStatus: (jobId: string) =>
-    apiRequest<{ id: string; job_type: string; status: string; attempts: number; error_code: string | null; completed_at: string | null }>(
-      `/jobs/${jobId}`
-    ),
+    apiRequest<{
+      id: string
+      job_type: string
+      status: string
+      attempts: number
+      error_code: string | null
+      error_message: string | null
+      completed_at: string | null
+    }>(`/jobs/${jobId}`),
   reviewSummary: async (
     summaryId: string,
     data: {
