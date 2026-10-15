@@ -7,7 +7,9 @@ services:
     dockerContext: backend
     plan: free
     healthCheckPath: /health
-    preDeployCommand: alembic upgrade head
+    # No preDeployCommand: Render's free tier doesn't support it. Migrations instead run as part
+    # of the container's own startup command (see backend/Dockerfile's CMD) — idempotent, so this
+    # is safe to run on every boot, including every free-tier cold start after spin-down.
     envVars:
       - key: APP_ENV
         value: production
