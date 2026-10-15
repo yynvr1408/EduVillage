@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env / secrets
+.env
+.env.local
+
+# Local DB / media
+*.sqlite3
+*.db
+backend/media/
+backend/uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Scratch / non-repo artifacts (slide deck, template working files)
+*.pptx
+template_src/
+qa1/
+qa2/
