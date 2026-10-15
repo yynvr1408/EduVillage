@@ -52,7 +52,7 @@ describe('teacher resource upload', () => {
   })
 
   it('publishes through PATCH and reflects the server state', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
       json({ id: 'r1', course_id: 'c1', filename: 'a.pdf', mime_type: 'application/pdf', size_bytes: 1, status: 'available', is_published: true, processing_status: 'ready', version: 2 })
     )
     vi.stubGlobal('fetch', fetchMock)

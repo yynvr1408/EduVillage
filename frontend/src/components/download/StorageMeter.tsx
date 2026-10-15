@@ -53,7 +53,7 @@ export const StorageMeter: React.FC = () => {
         />
       </div>
 
-      <div className="flex items-center justify-between text-[11px] text-[#687775] font-medium">
+      <div className="flex items-center justify-between text-xs text-[#687775] font-medium">
         <span>Used by EduVillage: {usedMB} MB</span>
         <span>Available on Device: ~{storage.availableMB} MB</span>
         {storage.persisted === false && <span>Browser may clear downloads if space runs low</span>}

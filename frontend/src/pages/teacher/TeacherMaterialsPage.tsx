@@ -153,7 +153,7 @@ export const TeacherMaterialsPage: React.FC = () => {
                   <div>
                     <p className="font-semibold text-sm text-[#202B2A]">{mat.title}</p>
                     <div className="flex items-center gap-2 text-[#687775] mt-0.5">
-                      <span className="uppercase font-mono text-[10px]">{mat.file_type}</span>
+                      <span className="uppercase font-mono text-xs">{mat.file_type}</span>
                       <span>•</span>
                       <span>{course ? `${course.code}: ${course.title}` : 'General Course'}</span>
                       <span>•</span>

@@ -21,13 +21,16 @@ export const PageContainer: React.FC<PageContainerProps> = ({
     sm: 'max-w-2xl',
     md: 'max-w-4xl',
     lg: 'max-w-5xl',
-    xl: 'max-w-6xl',
-    '2xl': 'max-w-7xl',
+    // The two wide variants are fluid: they fill the space beside the sidebar and only stop growing on
+    // ultra-wide monitors, where lines of cards would become hard to scan. Narrow variants (sm-lg) stay
+    // intentionally narrow for reading and forms.
+    xl: 'max-w-[110rem]',
+    '2xl': 'max-w-[110rem]',
     full: 'max-w-full',
   }
 
   return (
-    <div className={`w-full ${maxWidthStyles[maxWidth]} mx-auto px-4 sm:px-6 py-6 pb-20 lg:pb-8 ${className}`}>
+    <div className={`w-full ${maxWidthStyles[maxWidth]} mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-8 ${className}`}>
       {(title || action) && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#E1E8E4]">
           <div>

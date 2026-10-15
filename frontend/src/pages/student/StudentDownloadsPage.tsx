@@ -81,7 +81,7 @@ export const StudentDownloadsPage: React.FC = () => {
                   <div className="min-w-0">
                     <p className="font-semibold text-sm text-[#202B2A] truncate">{item.title}</p>
                     <div className="flex items-center gap-2 text-[#687775] mt-0.5">
-                      <span className="uppercase text-[10px] font-mono">{item.fileType}</span>
+                      <span className="uppercase text-xs font-mono">{item.fileType}</span>
                       <span>•</span>
                       <span>{formatBytes(item.sizeBytes)}</span>
                       <span>•</span>
@@ -117,7 +117,7 @@ export const StudentDownloadsPage: React.FC = () => {
               <div className="min-w-0">
                 <p className="font-semibold text-sm text-[#202B2A] truncate">{sm.title}</p>
                 <div className="flex items-center gap-2 text-[#687775] mt-0.5">
-                  <span className="uppercase text-[10px] font-mono">summary</span>
+                  <span className="uppercase text-xs font-mono">summary</span>
                   <span>•</span>
                   <span>Saved: {new Date(sm.downloadedAt).toLocaleDateString()}</span>
                 </div>

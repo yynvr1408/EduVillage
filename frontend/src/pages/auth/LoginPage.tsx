@@ -123,7 +123,7 @@ export const LoginPage: React.FC = () => {
               </label>
 
               {isSharedDevice && (
-                <div className="text-[11px] text-[#8A5700] bg-[#FFF0CB] p-2.5 rounded-lg border border-[#8A5700]/30 leading-relaxed">
+                <div className="text-xs text-[#8A5700] bg-[#FFF0CB] p-2.5 rounded-lg border border-[#8A5700]/30 leading-relaxed">
                   <strong>Shared Device Protection:</strong> Credentials will not be remembered on this browser, and private assignment drafts will be cleared upon sign-out to prevent access by subsequent learners.
                 </div>
               )}
@@ -151,7 +151,7 @@ export const LoginPage: React.FC = () => {
 
           {/* Quick Demo Fill Buttons */}
           <div className="mt-6 pt-5 border-t border-[#E1E8E4]">
-            <p className="text-[11px] font-bold text-[#687775] uppercase tracking-wider mb-2.5 text-center">
+            <p className="text-xs font-bold text-[#687775] uppercase tracking-wider mb-2.5 text-center">
               Quick Demo Accounts
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -161,7 +161,7 @@ export const LoginPage: React.FC = () => {
                 className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
               >
                 <strong className="block text-[#0F5B57]">Student Demo</strong>
-                <span className="text-[10px] text-[#687775]">Amina Diallo</span>
+                <span className="text-xs text-[#687775]">Amina Diallo</span>
               </button>
               <button
                 type="button"
@@ -169,7 +169,7 @@ export const LoginPage: React.FC = () => {
                 className="px-3 py-2 text-xs border border-[#CBD7D1] hover:border-[#0F5B57] hover:bg-[#DDF3EA] bg-[#F1F5F2] rounded-lg text-[#202B2A] text-left transition-colors cursor-pointer"
               >
                 <strong className="block text-[#0F5B57]">Teacher Demo</strong>
-                <span className="text-[10px] text-[#687775]">Dr. Elena Rostova</span>
+                <span className="text-xs text-[#687775]">Dr. Elena Rostova</span>
               </button>
             </div>
           </div>

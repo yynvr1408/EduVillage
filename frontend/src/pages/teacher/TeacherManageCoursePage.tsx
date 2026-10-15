@@ -174,7 +174,7 @@ export const TeacherManageCoursePage: React.FC = () => {
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-[#687775] font-semibold">{idx + 1}.</span>
                     <span className="font-bold text-[#202B2A] text-sm">{lesson.title}</span>
-                    <Badge variant="secondary" size="sm" className="text-[10px]">
+                    <Badge variant="secondary" size="sm" className="text-xs">
                       Offline Ready
                     </Badge>
                   </div>
@@ -184,7 +184,7 @@ export const TeacherManageCoursePage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-[#687775]">
+                  <span className="text-xs text-[#687775]">
                     {lesson.content ? `${lesson.content.length} chars` : 'Empty'}
                   </span>
                 </div>

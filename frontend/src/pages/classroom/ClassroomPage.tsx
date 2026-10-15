@@ -115,7 +115,7 @@ const ClassroomStage: React.FC<{
             <h1 className="font-bold text-sm sm:text-base text-[#FFFFFF] truncate">
               {classroom.title}
             </h1>
-            <p className="text-[11px] text-[#84908D] truncate">
+            <p className="text-xs text-[#84908D] truncate">
               {classroom.course_title || 'Live Classroom Session'} • Teacher: {classroom.teacher_name}
             </p>
           </div>
@@ -145,7 +145,7 @@ const ClassroomStage: React.FC<{
           <button
             type="button"
             onClick={() => toggleAudioOnly(false)}
-            className="underline font-semibold hover:text-[#0F5B57] text-[11px] cursor-pointer ml-3 shrink-0"
+            className="underline font-semibold hover:text-[#0F5B57] text-xs cursor-pointer ml-3 shrink-0"
           >
             Switch to Video
           </button>
@@ -169,7 +169,7 @@ const ClassroomStage: React.FC<{
               <p className="text-xs text-[#84908D] max-w-xs mb-4">
                 Adaptive Low-Bandwidth Mode. Live audio playback stream is actively sustained.
               </p>
-              <Badge variant="secondary" size="sm" className="font-mono text-[10px]">
+              <Badge variant="secondary" size="sm" className="font-mono text-xs">
                 WebRTC OPUS • ~24 kbps Stream
               </Badge>
             </div>

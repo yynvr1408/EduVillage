@@ -50,8 +50,6 @@ describe('Authentication & Protected Routes', () => {
 
   it('authenticates student successfully and persists session token', async () => {
     vi.spyOn(authService, 'login').mockResolvedValueOnce({
-      access_token: 'fake-jwt-token-123',
-      token_type: 'bearer',
       user: {
         id: 'student-1',
         email: 'student@eduvillage.org',

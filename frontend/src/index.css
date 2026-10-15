@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Type scale: one notch larger than Tailwind's defaults so body, labels and captions stay easy to
+   read on rural-college hardware (small, low-contrast screens). Everything that uses text-xs /
+   text-sm / text-base scales together; headings are unchanged. */
+@theme {
+  --text-xs: 0.8125rem; /* 13px (was 12px) */
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem; /* 15px (was 14px) */
+  --text-sm--line-height: 1.4rem;
+  --text-base: 1.0625rem; /* 17px (was 16px) */
+  --text-base--line-height: 1.6rem;
+}
+
 @layer base {
   :root {
     /* Official Knowledge Teal Design System Tokens */

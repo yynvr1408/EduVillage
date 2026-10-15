@@ -76,7 +76,7 @@ export const TeacherClassesPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
           <SkeletonCard />
           <SkeletonCard />
         </div>
@@ -87,7 +87,7 @@ export const TeacherClassesPage: React.FC = () => {
           description={`No classes match '${filter}'. Click 'Schedule Class' to add a session.`}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
           {filtered.map((cls) => (
             <ClassCard
               key={cls.id}

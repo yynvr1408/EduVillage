@@ -32,14 +32,14 @@ export const StudentProfilePage: React.FC = () => {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-lg font-bold text-[#202B2A]">{user?.full_name}</h2>
-                <Badge variant="secondary" size="sm" className="uppercase text-[10px]">
+                <Badge variant="secondary" size="sm" className="uppercase text-xs">
                   {user?.role}
                 </Badge>
               </div>
               <p className="text-xs text-[#687775] flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-[#0F5B57]" /> {user?.email}
               </p>
-              <p className="text-[11px] text-[#84908D] mt-1">
+              <p className="text-xs text-[#84908D] mt-1">
                 Registered: {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Active'}
               </p>
             </div>
@@ -55,7 +55,7 @@ export const StudentProfilePage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-[#E1E8E4]">
               <div>
                 <p className="font-semibold text-[#202B2A]">Always Start Live Classes in Audio-Only Mode</p>
-                <p className="text-[11px] text-[#687775]">
+                <p className="text-xs text-[#687775]">
                   Saves ~85% mobile data by muting presenter video streams unless explicitly toggled.
                 </p>
               </div>
@@ -70,7 +70,7 @@ export const StudentProfilePage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-[#202B2A]">Current Network Diagnostic</p>
-                <p className="text-[11px] text-[#687775]">
+                <p className="text-xs text-[#687775]">
                   Status: {isOnline ? `Online (${quality})` : 'Offline'} • Latency: {latencyMs}ms
                 </p>
               </div>
@@ -94,7 +94,7 @@ export const StudentProfilePage: React.FC = () => {
           >
             Sign Out of EduVillage
           </Button>
-          <p className="text-[11px] text-[#687775] text-center mt-2">
+          <p className="text-xs text-[#687775] text-center mt-2">
             Signing out wipes draft tokens and pending queue records from this device for privacy.
           </p>
         </div>
