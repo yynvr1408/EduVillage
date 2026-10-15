@@ -9,6 +9,9 @@ export interface UseAdaptiveAudioOptions {
   sustainedThresholdMs?: number
   /** How long GOOD quality must persist before video is restored (longer than the drop, to avoid flapping). */
   recoveryThresholdMs?: number
+  /** How long quality must stay at the worst tier (Lost), while already audio-only, before even
+   * audio is considered too unreliable and a text fallback is offered instead. */
+  severeThresholdMs?: number
 }
 
 const isPoor = (q: ConnectionQuality) => q === ConnectionQuality.Poor || q === ConnectionQuality.Lost
@@ -27,11 +30,13 @@ export function useAdaptiveAudio({
   autoAdaptiveEnabled = true,
   sustainedThresholdMs = 5000,
   recoveryThresholdMs = 15000,
+  severeThresholdMs = 8000,
 }: UseAdaptiveAudioOptions) {
   const [isAudioOnly, setIsAudioOnly] = useState<boolean>(initialAudioOnly)
   const [isManualOverride, setIsManualOverride] = useState<boolean>(false)
   const [isAdaptiveActive, setIsAdaptiveActive] = useState<boolean>(false)
   const [poorQualityDuration, setPoorQualityDuration] = useState<number>(0)
+  const [severeDegradation, setSevereDegradation] = useState<boolean>(false)
 
   // Latest values for use inside timers/event handlers without re-subscribing on every change.
   const audioOnlyRef = useRef(isAudioOnly)
@@ -40,6 +45,7 @@ export function useAdaptiveAudio({
   const qualityRef = useRef<ConnectionQuality | null>(null)
   const poorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const recoveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const severeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const poorSince = useRef<number | null>(null)
   audioOnlyRef.current = isAudioOnly
   manualRef.current = isManualOverride
@@ -66,9 +72,12 @@ export function useAdaptiveAudio({
   const clearTimers = () => {
     if (poorTimer.current) clearTimeout(poorTimer.current)
     if (recoveryTimer.current) clearTimeout(recoveryTimer.current)
+    if (severeTimer.current) clearTimeout(severeTimer.current)
     poorTimer.current = null
     recoveryTimer.current = null
+    severeTimer.current = null
     poorSince.current = null
+    setSevereDegradation(false)
   }
 
   // Toggle manual audio-only mode
@@ -97,6 +106,14 @@ export function useAdaptiveAudio({
       applySubscriptionPolicy(true)
     }
 
+    const engageSevere = () => {
+      severeTimer.current = null
+      // Only meaningful once already audio-only, and only if it's still truly Lost (not just Poor).
+      if (!audioOnlyRef.current || qualityRef.current !== ConnectionQuality.Lost) return
+      console.debug('[adaptive] Lost quality sustained while audio-only: offering text fallback')
+      setSevereDegradation(true)
+    }
+
     const restoreVideo = () => {
       recoveryTimer.current = null
       if (manualRef.current || !adaptiveRef.current) return
@@ -121,13 +138,29 @@ export function useAdaptiveAudio({
           poorTimer.current = setTimeout(engageAudioOnly, sustainedThresholdMs)
         }
         setPoorQualityDuration(Date.now() - poorSince.current)
+
+        if (quality === ConnectionQuality.Lost) {
+          if (audioOnlyRef.current && !severeTimer.current) {
+            severeTimer.current = setTimeout(engageSevere, severeThresholdMs)
+          }
+        } else if (severeTimer.current) {
+          // Poor but not Lost: audio is viable again, don't offer the text fallback.
+          clearTimeout(severeTimer.current)
+          severeTimer.current = null
+          setSevereDegradation(false)
+        }
       } else if (isGood(quality)) {
         if (poorTimer.current) {
           clearTimeout(poorTimer.current) // it was only a blip
           poorTimer.current = null
         }
+        if (severeTimer.current) {
+          clearTimeout(severeTimer.current)
+          severeTimer.current = null
+        }
         poorSince.current = null
         setPoorQualityDuration(0)
+        setSevereDegradation(false)
         if (adaptiveRef.current && !manualRef.current && !recoveryTimer.current) {
           recoveryTimer.current = setTimeout(restoreVideo, recoveryThresholdMs)
         }
@@ -146,7 +179,10 @@ export function useAdaptiveAudio({
       // The old quality reading is stale; wait for a fresh one before judging, and re-assert subscriptions.
       qualityRef.current = null
       if (recoveryTimer.current) clearTimeout(recoveryTimer.current)
+      if (severeTimer.current) clearTimeout(severeTimer.current)
       recoveryTimer.current = null
+      severeTimer.current = null
+      setSevereDegradation(false)
       reapply()
     }
     const handleStateChanged = (state: string) => {
@@ -187,5 +223,7 @@ export function useAdaptiveAudio({
     isAdaptiveActive,
     toggleAudioOnly,
     poorQualityDuration,
+    /** True once audio-only mode has itself been unreliable (Lost quality) for severeThresholdMs. */
+    severeDegradation,
   }
 }

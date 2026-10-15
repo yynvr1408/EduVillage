@@ -31,6 +31,7 @@ import { useConnectionRecovery } from '../../hooks/useConnectionRecovery'
 import { useNetworkStatus } from '../../context/NetworkContext'
 import { diagnoseConnectivity } from '../../services/connectivity'
 import { ConnectionLostPanel } from '../../components/class/ConnectionLostPanel'
+import { TextFallbackPanel } from '../../components/class/TextFallbackPanel'
 import { classService } from '../../services/classService'
 import { summaryService } from '../../services/summaryService'
 import { useAuth } from '../../context/AuthContext'
@@ -61,6 +62,7 @@ const ClassroomStage: React.FC<{
     isAudioOnly,
     isAdaptiveActive,
     toggleAudioOnly,
+    severeDegradation,
   } = useAdaptiveAudio({
     room,
     initialAudioOnly: !isTeacher && false,
@@ -138,8 +140,19 @@ const ClassroomStage: React.FC<{
         </div>
       </div>
 
+      {/* Severe degradation: even audio-only is unreliable, fall back to text */}
+      {severeDegradation && !isTeacher && (
+        <div className="bg-[#FDE8E7] border-b border-[#B42318]/30 px-4 py-2 flex items-center gap-2 text-xs text-[#B42318]">
+          <WifiOff className="w-4 h-4 shrink-0" />
+          <span>
+            <strong>Text Fallback Mode:</strong> Your connection can't sustain audio right now. Showing the latest
+            lecture summary instead.
+          </span>
+        </div>
+      )}
+
       {/* Adaptive Audio-Only Banner Notification */}
-      {isAudioOnly && (
+      {isAudioOnly && !severeDegradation && (
         <div className="bg-[#E8F3FC] border-b border-[#CBD7D1] px-4 py-2 flex items-center justify-between text-xs text-[#2364AA]">
           <div className="flex items-center gap-2">
             <Radio className="w-4 h-4 text-[#2364AA] shrink-0" />
@@ -161,7 +174,10 @@ const ClassroomStage: React.FC<{
       <div className="flex-1 flex min-h-0 relative overflow-hidden">
         {/* Media Region */}
         <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 bg-[#000000] overflow-y-auto">
-          {isAudioOnly ? (
+          {severeDegradation && !isTeacher ? (
+            /* Even audio-only is unreliable: fall back to the latest lecture summary as text. */
+            <TextFallbackPanel classId={classroom.id} />
+          ) : isAudioOnly ? (
             /* Audio-Only Visualizer Mode */
             <div className="flex flex-col items-center justify-center p-8 max-w-md text-center">
               <div className="w-24 h-24 rounded-full bg-[#121A19] border-2 border-[#374947] flex items-center justify-center text-[#FFFFFF] mb-5 shadow-2xl relative">
