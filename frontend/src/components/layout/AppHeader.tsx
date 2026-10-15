@@ -21,6 +21,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
   const { pendingCount } = useSync()
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false)
   const [showLogoutWarning, setShowLogoutWarning] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [unsavedDrafts, setUnsavedDrafts] = useState<string[]>([])
   const navigate = useNavigate()
 
@@ -31,6 +32,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
       setShowLogoutWarning(true)
       return
     }
+    setShowLogoutConfirm(true) // always ask before signing out
+  }
+
+  const handleConfirmPlainLogout = async () => {
+    setShowLogoutConfirm(false)
     await logout()
     navigate('/login')
   }
@@ -123,9 +129,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
                 <span className="text-xs font-semibold text-[#202B2A] leading-tight truncate max-w-52">
                   {user.full_name}
                 </span>
-                <span className="text-xs text-[#687775] leading-tight truncate max-w-52">
-                  {user.email}
-                </span>
               </div>
 
               {isSharedDevice && (
@@ -164,6 +167,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onToggleMobileMenu }) => {
         isOpen={isSyncModalOpen}
         onClose={() => setIsSyncModalOpen(false)}
       />
+
+      {/* Sign-out confirmation */}
+      <Dialog
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        title="Confirm sign out"
+        description="Are you sure you want to log out of EduVillage?"
+        maxWidth="sm"
+      >
+        <div className="flex items-center justify-end space-x-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setShowLogoutConfirm(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleConfirmPlainLogout}>
+            Log out
+          </Button>
+        </div>
+      </Dialog>
 
       {/* Unsynchronized Draft Warning Dialog */}
       <Dialog
