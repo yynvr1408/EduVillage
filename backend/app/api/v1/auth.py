@@ -18,12 +18,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _set_session_cookie(response: Response, token: str, settings: Settings) -> None:
+    samesite = settings.session_cookie_samesite.lower()
+    # SameSite=None is rejected by browsers unless the cookie is also Secure.
+    secure = settings.is_production or samesite == "none"
     response.set_cookie(
         key=settings.session_cookie_name,
         value=token,
         httponly=True,
-        secure=settings.is_production,
-        samesite="lax",
+        secure=secure,
+        samesite=samesite,
         max_age=settings.session_ttl_hours * 3600,
         path="/",
     )

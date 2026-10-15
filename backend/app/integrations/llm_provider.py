@@ -31,7 +31,7 @@ def _stub_summary(transcript_text: str) -> dict:
 def _openai_summary(transcript_text: str) -> dict:
     from openai import OpenAI
 
-    client = OpenAI(api_key=settings.llm_api_key)
+    client = OpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url or None)
     prompt = (
         "You are generating a study aid from a class transcript. "
         "Return strict JSON with keys: overview (string), key_concepts (list of strings), "

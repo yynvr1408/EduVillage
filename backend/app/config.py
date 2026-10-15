@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     session_secret: str = "dev-secret-change-me"
     session_cookie_name: str = "eduvillage_session"
     session_ttl_hours: int = 72
+    # "lax" works when the SPA and API share a registrable domain (e.g. app.x.com / api.x.com).
+    # Use "none" when they're on unrelated domains (e.g. a Netlify/Vercel default URL and a
+    # Render default URL) — browsers then require the cookie to also be Secure.
+    session_cookie_samesite: str = "lax"
 
     database_url: str = "sqlite:///./dev.db"
 
@@ -41,6 +45,9 @@ class Settings(BaseSettings):
 
     llm_api_key: str | None = None
     llm_model: str = "gpt-4o-mini"
+    # Leave unset for real OpenAI. Set this when LLM_API_KEY belongs to an OpenAI-compatible
+    # third-party/proxy provider instead (its docs will give you this URL).
+    llm_base_url: str | None = None
     speech_to_text_api_key: str | None = None
 
     @property

@@ -1,0 +1,83 @@
+services:
+  - type: web
+    name: eduvillage-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    preDeployCommand: alembic upgrade head
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SESSION_COOKIE_SAMESITE
+        value: none
+      - key: FRONTEND_ORIGIN
+        sync: false # set to the deployed frontend URL, e.g. https://eduvillage.netlify.app
+      - key: DATABASE_URL
+        sync: false # Neon connection string, must include ?sslmode=require
+      - key: TEACHER_INVITE_CODE
+        sync: false
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: OBJECT_STORAGE_ENDPOINT
+        sync: false # e.g. https://<accountid>.r2.cloudflarestorage.com
+      - key: OBJECT_STORAGE_BUCKET
+        sync: false
+      - key: OBJECT_STORAGE_ACCESS_KEY
+        sync: false
+      - key: OBJECT_STORAGE_SECRET_KEY
+        sync: false
+      - key: OBJECT_STORAGE_REGION
+        value: auto
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      - key: LLM_BASE_URL
+        sync: false # only needed for a non-OpenAI, OpenAI-compatible provider
+      - key: SPEECH_TO_TEXT_API_KEY
+        sync: false
+
+  - type: worker
+    name: eduvillage-worker
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python -m app.worker
+    plan: free
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # same Neon connection string as eduvillage-api
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: OBJECT_STORAGE_ENDPOINT
+        sync: false
+      - key: OBJECT_STORAGE_BUCKET
+        sync: false
+      - key: OBJECT_STORAGE_ACCESS_KEY
+        sync: false
+      - key: OBJECT_STORAGE_SECRET_KEY
+        sync: false
+      - key: OBJECT_STORAGE_REGION
+        value: auto
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      - key: LLM_BASE_URL
+        sync: false
+      - key: SPEECH_TO_TEXT_API_KEY
+        sync: false

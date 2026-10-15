@@ -11,6 +11,14 @@ _TEST_DB_PATH = tempfile.mktemp(suffix=".db")
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_TEST_DB_PATH}"
 os.environ["APP_ENV"] = "test"
 os.environ["SESSION_COOKIE_NAME"] = "eduvillage_session"
+# The suite is written against the local-disk storage backend and the labeled stub AI
+# providers; a developer's real .env (real S3/LiveKit/LLM credentials) must not leak into
+# tests, or they silently start hitting live third-party services instead of the fakes.
+os.environ["STORAGE_BACKEND"] = "local"
+# Set (not pop) to "": pydantic-settings reads backend/.env for any var absent from os.environ,
+# so a bare pop() would still leak a developer's real .env values into the test process.
+for _var in ("LLM_API_KEY", "LLM_BASE_URL", "SPEECH_TO_TEXT_API_KEY", "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"):
+    os.environ[_var] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 
