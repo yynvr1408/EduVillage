@@ -2,7 +2,9 @@ services:
   - type: web
     name: eduvillage-api
     runtime: docker
-    rootDir: backend
+    # No rootDir: dockerfilePath/dockerContext are both given relative to the repo root instead,
+    # since Render resolves dockerContext relative to rootDir (when set) but dockerfilePath
+    # relative to the repo root regardless — mixing the two caused a bad "backend/backend" path.
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
     plan: free
