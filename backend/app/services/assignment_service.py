@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -95,6 +97,16 @@ def save_submission(
         raise ConflictError("This assignment is closed and no longer accepts submissions.", code="ASSIGNMENT_CLOSED")
     if assignment.status != AssignmentStatus.published and not course_service.is_teaching(db, student, course):
         raise ConflictError("This assignment is not open for submissions.", code="ASSIGNMENT_NOT_PUBLISHED")
+    # The frontend sends due_at as `.toISOString()` (tz-aware, "Z"-suffixed); utcnow() is
+    # deliberately naive UTC (see db/base.py). Normalize before comparing so this never raises
+    # "can't compare offset-naive and offset-aware datetimes" regardless of which form arrived.
+    # Checked only on an actual submit — saving a draft past the deadline is still allowed, so
+    # nothing already typed is lost.
+    due_at = assignment.due_at
+    if due_at is not None and due_at.tzinfo is not None:
+        due_at = due_at.astimezone(timezone.utc).replace(tzinfo=None)
+    if submit and due_at is not None and utcnow() > due_at:
+        raise ConflictError("The deadline for this assignment has passed; the submission was not accepted.", code="SUBMISSION_EXPIRED")
 
     submission = _get_submission(db, assignment.id, student.id)
     if submission is None:

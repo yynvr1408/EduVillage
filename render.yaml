@@ -17,9 +17,9 @@ services:
       - key: SESSION_COOKIE_SAMESITE
         value: none
       - key: FRONTEND_ORIGIN
-        sync: false # set to the deployed frontend URL, e.g. https://eduvillage.netlify.app
+        sync: false # set to the deployed frontend URL, e.g. https://eduvillage.vercel.app
       - key: DATABASE_URL
-        sync: false # Neon connection string, must include ?sslmode=require
+        sync: false # Neon connection string (free 1GB tier), must include ?sslmode=require
       - key: TEACHER_INVITE_CODE
         sync: false
       - key: STORAGE_BACKEND
@@ -49,35 +49,9 @@ services:
       - key: SPEECH_TO_TEXT_API_KEY
         sync: false
 
-  - type: worker
-    name: eduvillage-worker
-    runtime: docker
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
-    dockerCommand: python -m app.worker
-    plan: free
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false # same Neon connection string as eduvillage-api
-      - key: STORAGE_BACKEND
-        value: s3
-      - key: OBJECT_STORAGE_ENDPOINT
-        sync: false
-      - key: OBJECT_STORAGE_BUCKET
-        sync: false
-      - key: OBJECT_STORAGE_ACCESS_KEY
-        sync: false
-      - key: OBJECT_STORAGE_SECRET_KEY
-        sync: false
-      - key: OBJECT_STORAGE_REGION
-        value: auto
-      - key: LLM_API_KEY
-        sync: false
-      - key: LLM_MODEL
-        value: gpt-4o-mini
-      - key: LLM_BASE_URL
-        sync: false
-      - key: SPEECH_TO_TEXT_API_KEY
-        sync: false
+# No separate worker service: Render's free tier has no free Background Worker plan.
+# The API itself kicks off summary/transcription jobs via FastAPI BackgroundTasks on request,
+# so the pipeline still runs end to end — the only thing lost without a standalone worker is
+# automatic recovery of a job stuck mid-"processing" after a crash/restart, and retry of a
+# transient failure until the next relevant request happens to re-trigger one. Run
+# `python -m app.worker --once` manually (e.g. via Render's one-off Shell) if a job looks stuck.
