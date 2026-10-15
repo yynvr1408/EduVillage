@@ -41,11 +41,11 @@ services:
       - key: LIVEKIT_API_SECRET
         sync: false
       - key: LLM_API_KEY
-        sync: false
+        sync: false # a Groq API key (gsk_...) — real, verified working against openai/gpt-oss-120b
       - key: LLM_MODEL
-        value: gpt-4o-mini
+        value: openai/gpt-oss-120b
       - key: LLM_BASE_URL
-        sync: false # only needed for a non-OpenAI, OpenAI-compatible provider
+        value: https://api.groq.com/openai/v1
       - key: SPEECH_TO_TEXT_API_KEY
         sync: false
 
