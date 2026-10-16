@@ -37,6 +37,13 @@ Self-registration (student or teacher) requires selecting an existing college an
 12. **Second-device protection** — signing in on a new device while the account is already signed in elsewhere requires an emailed one-time code to approve the new device; once approved, the *older* session is ended automatically.
 13. **Single-admin-session protection** — the one platform-admin account can only be signed in from one place at a time; a second login attempt with the correct password is rejected while the first session is still active, and an idle admin session (2+ minutes with no activity) is automatically treated as dead so a forgotten logout never permanently locks the admin out.
 
+14. **A richer live class** (teacher side) — inside a live class the teacher's camera is a small **floating window** (drag it, enlarge it, hide it; students get the same window for the teacher's video) and the teacher's **background is blurred** by default (toggle in the window or the bottom bar). The teacher can open a **whiteboard** (pen, text, eraser, colours, undo, clear) that every student sees live and can save as an image, and can **share a screen** and then **add more screens or windows**; students get a tab per screen plus "All screens". A student who joins late receives the whole board. (The whiteboard is not part of the class recording; share its tab as a screen to record it.)
+15. **Other Classes** — an "All Sections" teacher creates one branch-wide class; every enrolled student of that branch sees it under **Other Classes** on the Classes page, whatever their section, and joins the same room. Students of other branches or colleges cannot see or join it.
+16. **Assignment files** — on an assignment a student can attach up to 5 **PDF, DOC or DOCX** files (20 MB each) next to the written answer; the teacher sees and downloads them from the submissions list. Files need a connection; the written answer still works offline.
+17. **Lecture notes as PDF or Word** — on a lecture summary the student chooses **PDF** or **DOC** (Word) to download the notes.
+18. **Curriculum import** — on a course's manage page the teacher picks **Import Syllabus**: paste the lessons, or upload a text PDF; the app proposes lessons, the teacher edits or removes any, then adds them all at once.
+19. **Archive, restore, delete** — a teacher can **Archive** a course (hidden from the catalogue, nothing deleted), **Restore** it later, or **Permanently Delete** an archived course.
+
 **What to check if you only have a few minutes:** steps 1–5 (institution → registration → course → enrollment) exercise the core data model; step 6–9 (live class → recording → AI summary) is the most distinctive part of the product; step 10 (offline download + offline assignment draft) is the other half of the "offline-first" claim in the title.
 
 **Honesty about verification status:** this walkthrough describes real, implemented, tested behavior — see [section 3](#3-core-features) and [section 19](#19-testing) for exactly which parts were verified against real infrastructure (real LiveKit Cloud, real EmailJS delivery, real deployed API) versus verified only with automated tests and fakes. The README's own status labels (✅ 🟡 🟠 🔵 ⚪, explained just below) are not decorative — they're an accurate, section-by-section account of what has and hasn't been confirmed.
@@ -97,10 +104,11 @@ Not claimed: these problems are not "solved". The system has not been field-test
 | Authentication | Email + password, argon2 hashing, server-side sessions in an httpOnly cookie, logout, session list and revocation, shared-device mode | ✅ | 72 h absolute session lifetime for students and teachers |
 | Authentication | Password recovery with a 6-digit emailed OTP (5-minute expiry, 5 attempts, resend cooldown, single-use reset authorisation, all sessions revoked after reset) | ✅ backend/frontend tested; 🟡 EmailJS delivery not verified in production | |
 | Authentication | **Second-device sign-in needs an emailed OTP** when the account is already signed in elsewhere (students and teachers) | ✅ tests (backend, unit, real-stack browser) | the older session is ended after approval |
-| Institutions | Administrator panel at `/admin` (separate credential from server config, own session, CSRF header, rate limit): create colleges with unique generated codes, regenerate codes, activate/deactivate, **branches and sections** per college | ✅ | single platform admin; no institution-administrator role |
+| Institutions | Administrator panel at `/admin` (separate credential from server config, own session, CSRF header, rate limit, **one active admin session at a time with a 2-minute idle timeout**): create colleges with unique generated codes, regenerate codes, activate/deactivate, **branches and sections** per college | ✅ | single platform admin; no institution-administrator role |
 | Registration | Student and teacher registration against an active college, its code (teachers and students), branch, and section; teachers may pick **All Sections** (branch-wide); everything validated on the server | ✅ | |
 | Profiles | Name display, role portals; no separate profile model | 🟠 | |
-| Courses | Create, publish, archive, delete; catalogue; enrolment (self or by teacher); co-teachers; lessons | ✅ | courses are **not scoped to a college** (🔵 planned) |
+| Student dashboard | Dashboard sections for courses, classes, recordings and assignments, plus a **teachers** section listing the teachers of the student's own college section/branch (discovery only, no access granted) | ✅ | |
+| Courses | Create, publish, **archive / restore / permanently delete**; catalogue with an **Enroll** button that becomes **View Course**; enrolment (self or by teacher); teacher **roster** of enrolled students; co-teachers; lessons; **curriculum import** (paste or syllabus PDF) | ✅ | courses are **not scoped to a college** (🔵 planned); the old grade/language/institution/region course fields were removed |
 | Sections / cohorts | Course sections with student membership; teachers assigned to a college section or branch can only address their own | ✅ | |
 | Live classes | Schedule, start, end, join with room-scoped token (subscribe-only for students); branch-wide classes with an **Other Classes** area for students of the branch | ✅ with fakes; ✅ real LiveKit Cloud signalling test; 🟡 audio/video content not verified | |
 | Recorded classes | Explicit teacher recording (room composite MP4 to R2), signed webhook, finalisation by object check, publish, signed playback, library, progress | ✅ against an S3 emulator; 🟡 real LiveKit Egress + R2 on production | |
@@ -168,7 +176,11 @@ Authorisation is enforced in the backend services from the server-side session; 
 | Course discovery and enrolment | Catalogue → **Enroll** button on the card becomes **View Course** | ✅ |
 | Teaching | Teacher creates course/sections/classes (branch-wide teachers can target "All sections in <branch>") → start → students join → end → optional recording → publish | ✅ |
 | Other Classes | Branch-wide classes appear for enrolled students of that branch in a separate section | ✅ |
-| Assignments | Student drafts offline → queued → synced idempotently → teacher sees submission | ✅ (grading 🔵) |
+| Assignments | Student drafts offline → queued → synced idempotently; optional PDF/DOC/DOCX attachments (online) → teacher sees submission and files | ✅ (grading 🔵) |
+| Live class tools | Floating video, whiteboard, one or several shared screens, blurred background | ✅ real LiveKit browser test; picture quality ⚪ |
+| Study notes | Summary → download PDF or DOC | ✅ |
+| Course curriculum | Paste lessons or upload a text PDF → review → add | ✅ |
+| Course lifecycle | Archive → restore, or permanently delete from the archive | ✅ |
 | AI-assisted catch-up | Recording → transcript → summary → teacher review → student reads | ✅ pipeline; 🟡 production provider |
 | Membership approval by institution administrators | Not implemented | 🔵 |
 
@@ -241,7 +253,8 @@ Backend-only unless stated. Never commit a populated `.env`; `backend/.env.examp
 | `SESSION_TTL_HOURS` | student/teacher session lifetime (default 72) | no | choose |
 | `DATABASE_URL` | PostgreSQL connection string (SQLite default) | yes | Neon dashboard |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | administrator account (stored hashed); blank disables admin sign-in | for `/admin` | choose; never commit |
-| `ADMIN_RESET_PASSWORD_ON_START`, `ADMIN_SESSION_TTL_MINUTES` | password reset switch; admin session length | no | |
+| `ADMIN_RESET_PASSWORD_ON_START`, `ADMIN_SESSION_TTL_MINUTES`, `ADMIN_IDLE_TIMEOUT_SECONDS` | password reset switch; admin session length; admin idle timeout (default 120) | no | |
+| `SUBMISSION_MAX_MB` | size limit per file attached to an assignment (default 20) | no | |
 | `TEACHER_COLLEGE_REQUIRED`, `STUDENT_COLLEGE_REQUIRED` | require college/code/branch/section at registration (default true) | no | |
 | `TEACHER_INVITE_CODE` | legacy teacher gate when college is not required | no | choose |
 | `CONCURRENT_LOGIN_OTP` | second-device OTP rule (default true) | no | |
@@ -267,6 +280,7 @@ Only `VITE_*` values reach the browser, and the only one in use is the public AP
 | Authorisation | ✅ in services; client role/college/branch/section values are validated server-side; branch-wide audiences enforced for list, detail, token and recordings |
 | LiveKit tokens | ✅ short-lived, room-scoped, enrolment and audience checked, students subscribe-only; webhook signature verified |
 | CORS / CSRF | ✅ single CORS origin; admin writes need a custom header (`X-EduVillage-Admin`) |
+| Admin session | ✅ one active admin session at a time; a second login is refused while the first is fresh; an idle session (`ADMIN_IDLE_TIMEOUT_SECONDS`, 120) is treated as ended |
 | Rate limiting | 🟠 login, admin login and OTP are limited **in process memory**; limits reset on restart and multiply with instances |
 | Input and file validation | ✅ Pydantic schemas; upload size/type/content checks; presigned URLs expire (300 s default) |
 | SQL safety | ✅ SQLAlchemy parameterised queries |
@@ -360,11 +374,14 @@ Triggers, steps and rollback for each change are in [DEPLOYMENT_UPGRADE_ROADMAP.
 | No institution administrators or membership approval | the earlier [multi-institution plan](docs/MULTI_INSTITUTION_AUDIT.md) is a plan, not implemented |
 | Courses are not scoped to a college | catalogue is global |
 | No grading, notifications, attendance report | 🔵 |
+| Whiteboard is not in the class recording and is not saved after class; shared screens pause in audio-only mode; screen sharing is unavailable on most phones | recording captures video tracks only |
+| Notes export: PDF cannot show non-Latin scripts | the DOC export can |
+| Assignment files need a connection | the written answer is offline-capable |
+| Blur downloads a segmentation model from a CDN on first use | needs internet; otherwise video is sent unblurred |
 | Video-only room-composite recording | audio-only recording would cut LiveKit egress cost; not implemented |
 | In-process rate limits; migrations on every start; worker not deployed | needed before multiple instances |
 | No CI, error tracking, usage alerts, staging | recommended next |
 | No load-test data | see [section 17](#17-performance-and-capacity-testing) |
-| `student_dashboard` layout tests: 4 "sparse data" layout tests fail | the student home page gained a fifth section; the layout test still expects four (a pre-existing mismatch, not fixed) |
 | Free-plan server-side EmailJS use unconfirmed | check the EmailJS account |
 
 ## 19. Testing
@@ -379,7 +396,7 @@ cd frontend && npm run test:e2e:real                  # real backend + SQLite + 
 cd frontend && npm run test:e2e:live                  # real LiveKit Cloud (needs credentials in backend/.env)
 ```
 
-Last recorded results (2026-10-16, on the developer machine): backend **387 passed, 1 skipped** on SQLite; on PostgreSQL 18 all passed except one test written by another contributor that deletes a user who still has audit records (fails on PostgreSQL only, also without these changes); frontend **156 unit tests passed**, type-check and build clean; real-stack browser suite **15 of 15 passed**; offline suite **12 of 12 passed**; layout suite **31 passed, 4 failed** (the known mismatch above). Missing: load tests, CI, accessibility audit, field tests on real networks, a real LiveKit audio/video content test.
+Last recorded results (2026-10-16, on the developer machine): backend **421 passed, 1 skipped** on SQLite and **422 passed** on PostgreSQL 18; frontend **179 unit tests passed**, type-check and production build clean; real-stack browser suite **15 of 15**; offline suite **12 of 12**; layout suite **35 of 35**; live LiveKit Cloud suite **2 of 2** (before the final merge, not re-run after it). The live suite proves the classroom tools run and that data and tracks arrive; it does not judge picture quality. Missing: load tests, CI, accessibility audit, field tests on real networks, a test of real R2 presigned uploads.
 
 ## 20. Project structure
 
