@@ -108,6 +108,11 @@ Not claimed: these problems are not "solved". The system has not been field-test
 | Assignments | Create, draft, submit, revise, deadlines, idempotent offline sync | ✅ | grading is 🔵 not built |
 | Attendance | Join/leave records per class (`class_participants`) | 🟠 | no attendance report UI |
 | AI | Whisper transcription (chunked via ffmpeg) and LLM summary with teacher review; labelled stub when no key | ✅ pipeline; 🟡 provider on production | |
+| Live classroom tools | Floating teacher video (draggable, enlarge, hide), teacher **whiteboard** (type or draw, shared live, students can save it), **screen sharing** of one or several screens, **blurred teacher background** | ✅ real LiveKit Cloud browser test (features run, data/tracks arrive); picture quality and recording of the whiteboard are not verified/not included | see [docs/CLASSROOM_AND_COURSE_TOOLS.md](docs/CLASSROOM_AND_COURSE_TOOLS.md) |
+| Assignment files | Students attach PDF / DOC / DOCX (5 files, 20 MB each) to a submission | ✅ backend + frontend tests; 🟡 real R2 upload not exercised | |
+| Lecture notes export | Download as PDF or DOC (Word) | ✅ unit tests (real PDF/DOCX bytes) | PDF cannot show non-Latin scripts; DOC can |
+| Curriculum import | Paste lessons or upload a text PDF syllabus; review, then add | ✅ backend (real PDF) + frontend tests | scanned PDFs unsupported |
+| Course archive | Archive, restore, permanent delete | ✅ | |
 | Notifications | Not built | 🔵 | |
 | Offline / PWA | IndexedDB drafts, sync queue, downloads, service worker | ✅ real-Chromium offline suite | |
 

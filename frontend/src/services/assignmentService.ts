@@ -1,7 +1,24 @@
 import { api, ApiError } from './apiClient'
-import type { Assignment, Submission } from '../types'
+import type { Assignment, Submission, SubmissionAttachment } from '../types'
 
 export const assignmentService = {
+  listAttachments(assignmentId: string): Promise<SubmissionAttachment[]> {
+    return api.listAttachments(assignmentId)
+  },
+
+  /** Uploads a PDF / Word file (init, upload to storage, server check). Needs a connection. */
+  uploadAttachment(assignmentId: string, file: File): Promise<SubmissionAttachment> {
+    return api.uploadAttachment(assignmentId, file)
+  },
+
+  deleteAttachment(assignmentId: string, attachmentId: string): Promise<void> {
+    return api.deleteAttachment(assignmentId, attachmentId)
+  },
+
+  attachmentDownloadUrl(assignmentId: string, attachmentId: string): string {
+    return api.attachmentDownloadUrl(assignmentId, attachmentId)
+  },
+
   getAssignments(courseId?: string): Promise<Assignment[]> {
     return api.getAssignments(courseId)
   },

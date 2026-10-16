@@ -38,7 +38,13 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${FRONTEND_PORT}`,
     launchOptions: {
-      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+      args: [
+        '--use-fake-device-for-media-stream',
+        '--use-fake-ui-for-media-stream',
+        // lets getDisplayMedia pick a screen without a human, so screen sharing can be exercised
+        '--auto-select-desktop-capture-source=Entire screen',
+        '--enable-usermedia-screen-capturing',
+      ],
     },
   },
   projects: [{ name: 'Chromium', use: { ...devices['Desktop Chrome'] } }],

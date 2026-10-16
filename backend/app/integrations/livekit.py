@@ -37,7 +37,14 @@ def generate_access_token(
     _require_configured()
     from livekit import api
 
-    grants = api.VideoGrants(room_join=True, room=room_name, can_publish=can_publish, can_subscribe=can_subscribe)
+    grants = api.VideoGrants(
+        room_join=True,
+        room=room_name,
+        can_publish=can_publish,
+        can_subscribe=can_subscribe,
+        # Only the presenter may send data messages (the whiteboard rides on them): a student cannot forge it.
+        can_publish_data=can_publish,
+    )
     token = (
         api.AccessToken(settings.livekit_api_key, settings.livekit_api_secret)
         .with_identity(identity)

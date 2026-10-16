@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     signed_url_ttl_seconds: int = 300
 
 
+    submission_max_mb: int = 20  # per attached file on an assignment submission
     max_upload_mb: int = 500  # per file; large media is streamed to storage, never held in memory
 
     # FFmpeg / transcription of long recordings

@@ -37,6 +37,27 @@ class SubmissionSave(BaseModel):
     submit: bool = False  # false = draft save; true = finalize as submitted
 
 
+class AttachmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    filename: str
+    size_bytes: int
+    mime_type: str
+    created_at: UtcDatetime
+
+
+class AttachmentInitRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    mime_type: str = Field(default="application/octet-stream", max_length=120)
+    size_bytes: int = Field(gt=0)
+
+
+class AttachmentInitResponse(BaseModel):
+    attachment_id: str
+    upload: dict
+
+
 class SubmissionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,3 +69,4 @@ class SubmissionOut(BaseModel):
     version: int
     submitted_at: UtcDatetime | None
     updated_at: UtcDatetime
+    attachments: list[AttachmentOut] = []

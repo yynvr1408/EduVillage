@@ -23,6 +23,7 @@ import type {
   RecordingStatus,
   Section,
   Submission,
+  SubmissionAttachment,
   Summary,
   SummaryStatus,
   SyncOperation,
@@ -332,6 +333,7 @@ function mapSubmission(s: Raw): Submission {
     submitted_at: s.submitted_at ?? s.updated_at,
     score: undefined,
     feedback: undefined,
+    attachments: s.attachments ?? [],
   }
 }
 
@@ -408,6 +410,26 @@ export const api = {
     })
     return { deleted: res.deleted, course: res.course ? mapCourse(res.course) : null }
   },
+  previewSyllabusText: async (courseId: string, text: string) =>
+    (await apiRequest<{ lessons: { title: string; content: string | null }[] }>(`/courses/${courseId}/syllabus/preview`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    })).lessons,
+  previewSyllabusPdf: async (courseId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return (await apiRequest<{ lessons: { title: string; content: string | null }[] }>(`/courses/${courseId}/syllabus/preview-pdf`, {
+      method: 'POST',
+      body: form,
+    })).lessons
+  },
+  createLessonsBulk: async (courseId: string, lessons: { title: string; content?: string | null }[]) =>
+    (await apiRequest<Raw[]>(`/courses/${courseId}/lessons/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ lessons: lessons.map((l) => ({ title: l.title.trim(), content: l.content ?? null })).filter((l) => l.title) }),
+    })).length,
+  archiveCourse: async (id: string) => mapCourse(await apiRequest<Raw>(`/courses/${id}/archive`, { method: 'POST' })),
+  restoreCourse: async (id: string) => mapCourse(await apiRequest<Raw>(`/courses/${id}/restore`, { method: 'POST' })),
   createLesson: async (courseId: string, data: { title: string; content?: string; order_index?: number }) =>
     mapLesson(
       await apiRequest<Raw>(`/courses/${courseId}/lessons`, {
@@ -700,6 +722,37 @@ export const api = {
       }),
       await courseIndex()
     ),
+  // --- Files attached to a submission (PDF / Word) ---
+  listAttachments: async (assignmentId: string): Promise<SubmissionAttachment[]> =>
+    apiRequest<SubmissionAttachment[]>(`/assignments/${assignmentId}/attachments`),
+  uploadAttachment: async (assignmentId: string, file: File): Promise<SubmissionAttachment> => {
+    const init = await apiRequest<{ attachment_id: string; upload: { url: string; headers?: Record<string, string> } }>(
+      `/assignments/${assignmentId}/attachments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ filename: file.name, mime_type: file.type || 'application/octet-stream', size_bytes: file.size }),
+      }
+    )
+    const contentType = file.type || 'application/octet-stream'
+    if (/^https?:\/\//i.test(init.upload.url)) {
+      // Presigned URL straight to object storage: no cookies, exactly the headers that were signed.
+      const res = await fetch(init.upload.url, {
+        method: 'PUT',
+        body: file,
+        headers: init.upload.headers ?? { 'Content-Type': contentType },
+        credentials: 'omit',
+      })
+      if (!res.ok) throw new ApiError('Upload to storage failed.', res.status)
+    } else {
+      await apiRequest<void>(init.upload.url, { method: 'PUT', body: file, headers: { 'Content-Type': contentType }, timeoutMs: 0 })
+    }
+    return apiRequest<SubmissionAttachment>(`/assignments/${assignmentId}/attachments/${init.attachment_id}/complete`, { method: 'POST' })
+  },
+  deleteAttachment: async (assignmentId: string, attachmentId: string): Promise<void> => {
+    await apiRequest<void>(`/assignments/${assignmentId}/attachments/${attachmentId}`, { method: 'DELETE' })
+  },
+  attachmentDownloadUrl: (assignmentId: string, attachmentId: string): string =>
+    apiUrl(`/assignments/${assignmentId}/attachments/${attachmentId}/download`),
   getSubmissions: async (assignmentId: string) =>
     (await apiRequest<Raw[]>(`/assignments/${assignmentId}/submissions`)).filter((s) => s.status === 'submitted').map(mapSubmission),
 

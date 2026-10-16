@@ -295,3 +295,33 @@ def test_enrollment_persists_across_a_fresh_session_and_db_read(teacher, publish
         select(CourseEnrollment).where(CourseEnrollment.course_id == published_course["id"], CourseEnrollment.student_id == user["id"])
     ).scalar_one_or_none()
     assert row is not None and row.status.value == "active"
+
+
+def test_archive_then_restore_round_trip_keeps_everything(teacher, published_course, student):
+    tclient, _ = teacher
+    sclient, _ = student
+    sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+    tclient.post(f"/api/v1/courses/{published_course['id']}/lessons", json={"title": "Intro", "position": 1, "status": "published"})
+
+    archived = tclient.post(f"/api/v1/courses/{published_course['id']}/archive")
+    assert archived.status_code == 200 and archived.json()["status"] == "archived"
+    assert all(c["id"] != published_course["id"] for c in sclient.get("/api/v1/courses/catalog").json())  # hidden from the catalogue
+
+    restored = tclient.post(f"/api/v1/courses/{published_course['id']}/restore")
+    assert restored.status_code == 200 and restored.json()["status"] == "published"
+    assert any(c["id"] == published_course["id"] for c in sclient.get("/api/v1/courses/catalog").json())  # back in the catalogue
+    assert len(tclient.get(f"/api/v1/courses/{published_course['id']}/lessons").json()) == 1  # nothing was lost
+    assert sclient.get("/api/v1/courses").json()  # the student is still enrolled
+
+
+def test_archive_and_restore_are_idempotent_and_owner_only(teacher, published_course, student, make_user):
+    tclient, _ = teacher
+    cid = published_course["id"]
+    assert tclient.post(f"/api/v1/courses/{cid}/restore").json()["status"] == "published"  # not archived: no-op
+    tclient.post(f"/api/v1/courses/{cid}/archive")
+    assert tclient.post(f"/api/v1/courses/{cid}/archive").json()["status"] == "archived"
+    sclient, _ = student
+    assert sclient.post(f"/api/v1/courses/{cid}/restore").status_code == 403
+    assert sclient.post(f"/api/v1/courses/{cid}/archive").status_code == 403
+    other, _ = make_user(role="teacher", prefix="other")
+    assert other.post(f"/api/v1/courses/{cid}/restore").status_code == 403

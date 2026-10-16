@@ -26,6 +26,12 @@ import {
   ArrowLeft,
   X,
   Radio,
+  Mic,
+  MicOff,
+  Droplet,
+  LayoutGrid,
+  PencilLine,
+  Monitor,
 } from 'lucide-react'
 import { api } from '../../services/apiClient'
 import { useConnectionRecovery } from '../../hooks/useConnectionRecovery'
@@ -39,6 +45,11 @@ import { useAuth } from '../../context/AuthContext'
 import { useAdaptiveAudio } from '../../hooks/useAdaptiveAudio'
 import type { ClassParticipant, ClassRoom, JoinTokenResponse, Summary } from '../../types'
 import { ClassroomControls } from '../../components/class/ClassroomControls'
+import { FloatingVideo, type FloatSize } from '../../components/class/FloatingVideo'
+import { Whiteboard } from '../../components/class/whiteboard/Whiteboard'
+import { useWhiteboard } from '../../components/class/whiteboard/useWhiteboard'
+import { useScreenShares } from '../../hooks/useScreenShares'
+import { useBackgroundBlur } from '../../hooks/useBackgroundBlur'
 import { SummaryViewer } from '../../components/summary/SummaryViewer'
 import { Sheet, Badge, Button, LoadingState, ErrorState } from '../../components/ui'
 
@@ -108,6 +119,10 @@ const ClassroomStage: React.FC<{
   const remoteParticipants = useRemoteParticipants()
 
   const [isSummaryPanelOpen, setIsSummaryPanelOpen] = useState(false)
+  const [wantBlur, setWantBlur] = useState(true) // teacher's video is blurred by default
+  const [floatSizeChoice, setFloatSizeChoice] = useState<FloatSize | null>(null)
+  const [videoHidden, setVideoHidden] = useState(false)
+  const [activeKey, setActiveKey] = useState<string | null>(null)
   const [connectionStateStr, setConnectionStateStr] = useState<string>('connected')
 
   // Teacher-only roster panel: who has joined (name/email) and a way to remove a student.
@@ -207,10 +222,36 @@ const ClassroomStage: React.FC<{
   const { isBrowserOnline, isServerReachable } = useNetworkStatus()
   const diagnosis = diagnoseConnectivity({ browserOnline: isBrowserOnline, apiReachable: isServerReachable, liveKitState: connectionStateStr })
 
-  // Get video tracks from publishers
-  const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare], {
-    onlySubscribed: false,
-  })
+  // The presenter's camera (the teacher sees their own, students see the teacher's)
+  const cameraTracks = useTracks([Track.Source.Camera], { onlySubscribed: false })
+  const cameraTrack = cameraTracks.find((t) =>
+    isTeacher ? t.participant.isLocal : !t.participant.isLocal && t.participant.permissions?.canPublish
+  )
+
+  // Whiteboard (shared over the data channel) and screen sharing (one or several screens)
+  const { board, dispatch, applyLocal, send, setOpen } = useWhiteboard(room, isTeacher)
+  const { shares, hiddenCount, addScreen, stopShare, supported: canShareScreen, error: shareError } = useScreenShares(room)
+  const blur = useBackgroundBlur(isTeacher ? room : undefined, Boolean(isCameraEnabled), wantBlur)
+
+  // What is on the stage: the whiteboard and every shared screen. New content takes over the stage automatically.
+  const views = [
+    ...(board.open ? [{ key: 'board', label: 'Whiteboard' }] : []),
+    ...shares.map((sh) => ({ key: sh.key, label: sh.isLocal ? `${sh.name} (yours)` : sh.name })),
+    ...(shares.length > 1 ? [{ key: 'all', label: 'All screens' }] : []),
+  ]
+  const viewKeys = views.map((v) => v.key).join('|')
+  const previousKeys = useRef<string[]>([])
+  useEffect(() => {
+    const now = viewKeys ? viewKeys.split('|') : []
+    const added = now.filter((k) => !previousKeys.current.includes(k) && k !== 'all')
+    if (added.length > 0) setActiveKey(added[added.length - 1])
+    else if (activeKey && !now.includes(activeKey)) setActiveKey(now[0] ?? null)
+    previousKeys.current = now
+  }, [viewKeys]) // eslint-disable-line react-hooks/exhaustive-deps
+  const hasContent = views.length > 0
+  const currentKey = views.some((v) => v.key === activeKey) ? activeKey : views[0]?.key
+  // Small once something is presented, larger while the video is all there is - unless the user chose a size.
+  const floatSize: FloatSize = floatSizeChoice ?? (hasContent ? 'small' : 'large')
 
   const handleToggleMic = async () => {
     if (localParticipant) {
@@ -303,62 +344,146 @@ const ClassroomStage: React.FC<{
 
       {/* Main Classroom Stage Area (Media Region + Side Summary Panel on Desktop) */}
       <div className="flex-1 flex min-h-0 relative overflow-hidden">
-        {/* Media Region */}
-        <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 bg-[#000000] overflow-y-auto">
-          {severeDegradation && !isTeacher ? (
-            /* Even audio-only is unreliable: fall back to the latest lecture summary as text. */
-            <TextFallbackPanel classId={classroom.id} />
-          ) : isAudioOnly ? (
-            /* Audio-Only Visualizer Mode */
-            <div className="flex flex-col items-center justify-center p-8 max-w-md text-center">
-              <div className="w-24 h-24 rounded-full bg-[#121A19] border-2 border-[#374947] flex items-center justify-center text-[#FFFFFF] mb-5 shadow-2xl relative">
-                <Volume2 className="w-10 h-10 text-[#2364AA] animate-pulse" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#2364AA] border-2 border-[#121A19]" />
+        {/* Media Region: what the teacher presents, with the teacher's camera as a small floating window */}
+        <div className="flex-1 relative bg-[#000000] overflow-hidden" data-testid="stage">
+          <div className="absolute inset-0 overflow-y-auto p-3 sm:p-6 flex flex-col items-center">
+            {severeDegradation && !isTeacher ? (
+              /* Even audio-only is unreliable: fall back to the latest lecture summary as text. */
+              <div className="my-auto w-full flex justify-center">
+                <TextFallbackPanel classId={classroom.id} />
               </div>
-              <h2 className="text-lg font-bold text-[#FFFFFF] mb-1">
-                {classroom.teacher_name || 'Instructor'} Speaking
-              </h2>
-              <p className="text-xs text-[#84908D] max-w-xs mb-4">
-                Adaptive Low-Bandwidth Mode. Live audio playback stream is actively sustained.
-              </p>
-              <Badge variant="secondary" size="sm" className="font-mono text-xs">
-                WebRTC OPUS • ~24 kbps Stream
-              </Badge>
-            </div>
-          ) : tracks.length > 0 ? (
-            /* Video Tracks Grid */
-            <div className="w-full h-full max-w-5xl flex items-center justify-center">
-              <div className="w-full aspect-video max-h-[75vh] bg-[#121A19] rounded-xl overflow-hidden border border-[#202B2A] relative shadow-2xl flex items-center justify-center">
-                {tracks[0].publication?.track ? (
-                  <VideoTrack trackRef={tracks[0]} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-[#84908D]">
-                    <User className="w-16 h-16 mb-2" />
-                    <span className="text-sm font-medium">{classroom.teacher_name}</span>
+            ) : hasContent ? (
+              <div className="w-full max-w-5xl flex flex-col gap-3">
+                {views.length > 1 && (
+                  <div className="flex flex-wrap gap-2" role="tablist" aria-label="Shared content">
+                    {views.map((v) => (
+                      <button
+                        key={v.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={currentKey === v.key}
+                        onClick={() => setActiveKey(v.key)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer inline-flex items-center gap-1.5 ${
+                          currentKey === v.key
+                            ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+                            : 'bg-[#202B2A] text-[#CBD7D1] border-[#374947] hover:bg-[#374947]'
+                        }`}
+                      >
+                        {v.key === 'board' ? <PencilLine className="w-3.5 h-3.5" /> : v.key === 'all' ? <LayoutGrid className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+                        {v.label}
+                      </button>
+                    ))}
                   </div>
                 )}
-                <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-xs px-2.5 py-1 rounded text-xs font-semibold text-white">
-                  {classroom.teacher_name} (Presenter)
+
+                {currentKey === 'board' ? (
+                  <Whiteboard board={board} {...(isTeacher ? { onAction: dispatch, applyLocal, send } : {})} />
+                ) : (
+                  <div className={currentKey === 'all' ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : ''}>
+                    {shares
+                      .filter((sh) => currentKey === 'all' || sh.key === currentKey)
+                      .map((sh) => (
+                        <div key={sh.key} className="relative w-full aspect-video bg-[#121A19] rounded-xl overflow-hidden border border-[#202B2A] shadow-2xl" data-testid="screen-share">
+                          <VideoTrack trackRef={{ participant: sh.participant, publication: sh.publication as any, source: Track.Source.ScreenShare }} className="w-full h-full object-contain" />
+                          <div className="absolute bottom-3 left-3 bg-black/70 px-2.5 py-1 rounded text-xs font-semibold text-white">{sh.name}</div>
+                          {sh.isLocal && (
+                            <button
+                              type="button"
+                              onClick={() => stopShare(sh)}
+                              className="absolute top-3 right-3 px-3 py-1.5 rounded-md bg-[#B42318] hover:bg-[#911C13] text-white text-xs font-semibold cursor-pointer"
+                            >
+                              Stop sharing
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Nothing is being presented */
+              <div className="my-auto flex flex-col items-center justify-center text-center p-6">
+                <div className="w-16 h-16 rounded-full bg-[#121A19] border border-[#202B2A] flex items-center justify-center mb-3 text-[#84908D]">
+                  <Video className="w-8 h-8 text-[#0F5B57]" />
                 </div>
+                <h3 className="font-semibold text-base text-[#FFFFFF] mb-1">
+                  {isTeacher ? 'Nothing is shared yet' : cameraTrack ? 'No screen or whiteboard shared' : 'Waiting for the teacher'}
+                </h3>
+                <p className="text-xs text-[#84908D] max-w-sm">
+                  {isTeacher
+                    ? 'Share your screen or open the whiteboard from the bar below. Your students see it here.'
+                    : 'When your teacher shares a screen or opens the whiteboard it appears here. Their video stays in the small window.'}
+                </p>
               </div>
-            </div>
-          ) : (
-            /* Waiting for presenter stream */
-            <div className="flex flex-col items-center justify-center text-center p-6">
-              <div className="w-16 h-16 rounded-full bg-[#121A19] border border-[#202B2A] flex items-center justify-center mb-3 text-[#84908D]">
-                <Video className="w-8 h-8 text-[#0F5B57]" />
-              </div>
-              <h3 className="font-semibold text-base text-[#FFFFFF] mb-1">Waiting for Video Stream</h3>
-              <p className="text-xs text-[#84908D] max-w-sm mb-4">
-                Connected to room {classroom.livekit_room_name}. Media will stream when instructor starts video.
+            )}
+
+            {hiddenCount > 0 && !isTeacher && (
+              <p className="mt-3 text-xs text-[#DDF3EA] bg-[#202B2A] border border-[#374947] rounded-lg px-3 py-2 max-w-md text-center" role="status">
+                {hiddenCount === 1 ? 'A screen is being shared' : `${hiddenCount} screens are being shared`}, but video is paused in
+                audio-only mode. Switch to video to see it. The whiteboard still works.
               </p>
-              {isTeacher && (
-                <Button size="sm" variant="primary" onClick={handleToggleCamera}>
-                  Start Presenter Camera
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+            {(shareError || blur.error) && isTeacher && (
+              <p className="mt-3 text-xs text-[#FDE8E7] bg-[#B42318]/30 border border-[#B42318] rounded-lg px-3 py-2 max-w-md text-center" role="alert">
+                {shareError || blur.error}
+              </p>
+            )}
+          </div>
+
+          <FloatingVideo
+            label={isTeacher ? 'You' : `${classroom.teacher_name || 'Teacher'}`}
+            size={floatSize}
+            onSizeChange={setFloatSizeChoice}
+            hidden={videoHidden}
+            onHiddenChange={setVideoHidden}
+            status={isTeacher ? (blur.active ? 'blur-on' : blur.supported ? 'blur-off' : 'blur-unsupported') : undefined}
+            actions={
+              isTeacher ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleToggleMic}
+                    className="p-1 rounded text-[#CBD7D1] hover:text-[#FFFFFF] hover:bg-[#374947] cursor-pointer"
+                    aria-label={isMicrophoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                  >
+                    {isMicrophoneEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5 text-[#F97066]" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleCamera}
+                    className="p-1 rounded text-[#CBD7D1] hover:text-[#FFFFFF] hover:bg-[#374947] cursor-pointer"
+                    aria-label={isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
+                  >
+                    {isCameraEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5 text-[#F97066]" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWantBlur((v) => !v)}
+                    disabled={!blur.supported}
+                    aria-pressed={wantBlur}
+                    className={`p-1 rounded hover:bg-[#374947] cursor-pointer disabled:opacity-40 ${blur.active ? 'text-[#7EE2B8]' : 'text-[#CBD7D1]'}`}
+                    aria-label="Blur background"
+                  >
+                    <Droplet className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              ) : undefined
+            }
+          >
+            {isAudioOnly && !isTeacher ? (
+              <div className="flex flex-col items-center text-[#CBD7D1] text-[11px]">
+                <Volume2 className="w-6 h-6 text-[#2364AA] animate-pulse mb-1" />
+                Audio only
+              </div>
+            ) : cameraTrack?.publication?.track ? (
+              <VideoTrack trackRef={cameraTrack} className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center text-[#84908D] text-[11px]">
+                <User className="w-8 h-8 mb-1" />
+                {isTeacher ? (isCameraEnabled ? 'Starting camera...' : 'Camera off') : cameraTrack ? 'Video off' : 'Waiting for video'}
+              </div>
+            )}
+          </FloatingVideo>
         </div>
 
         {/* Desktop Side Summary Panel (Does not disconnect active call!) */}
@@ -477,6 +602,20 @@ const ClassroomStage: React.FC<{
         isSummaryOpen={isSummaryPanelOpen}
         onLeave={onLeave}
         connectionState={connectionStateStr}
+        teacherTools={
+          isTeacher
+            ? {
+                canShareScreen,
+                isSharingScreen: shares.some((sh) => sh.isLocal),
+                onAddScreen: () => void addScreen(),
+                isBoardOpen: board.open,
+                onToggleBoard: () => setOpen(!board.open),
+                blurOn: wantBlur,
+                blurSupported: blur.supported,
+                onToggleBlur: () => setWantBlur((v) => !v),
+              }
+            : undefined
+        }
       />
 
       {/* Audio Renderer for WebRTC audio playback */}

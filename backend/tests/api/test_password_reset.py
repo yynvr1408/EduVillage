@@ -406,6 +406,15 @@ def test_reset_token_whose_account_no_longer_exists_is_rejected(client, db_sessi
     email, user = _register(client, email=unique_email("ghostacct"))
     reset_token = _full_flow(client, email)
 
+    # Remove the account for real. PostgreSQL enforces foreign keys (SQLite does not by default), so the rows that
+    # point at the user (audit events, sessions) go first.
+    from sqlalchemy import delete
+
+    from app.db.models.sync_operation import AuditEvent
+    from app.db.models.user import UserSession
+
+    db_session.execute(delete(AuditEvent).where(AuditEvent.actor_id == user["id"]))
+    db_session.execute(delete(UserSession).where(UserSession.user_id == user["id"]))
     db_session.query(User).filter_by(id=user["id"]).delete()
     db_session.commit()
 

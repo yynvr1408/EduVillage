@@ -164,8 +164,9 @@ test.describe('sparse data (one course, nothing scheduled)', () => {
           return { top: Math.round(r.top + window.scrollY), height: Math.round(r.height), left: Math.round(r.left), width: Math.round(r.width) }
         })
       )
-      expect(sections.length).toBe(4)
-      // The four sections are stacked one after another at every width, in reading order,
+      // Assignments, classes, courses, recordings and (since teacher discovery was added) the teachers section.
+      expect(sections.length).toBe(5)
+      // The sections are stacked one after another at every width, in reading order,
       // each as wide as the content area.
       for (let i = 1; i < sections.length; i++) {
         expect(sections[i].top).toBeGreaterThan(sections[i - 1].top + sections[i - 1].height - 1)

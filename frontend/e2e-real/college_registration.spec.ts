@@ -54,6 +54,13 @@ async function createCollege(page: Page, name: string, branches: Record<string, 
 const label = (page: Page, text: RegExp) => page.getByLabel(text)
 
 test.describe.serial('admin-managed colleges drive registration', () => {
+  // Only one administrator session may be active at a time: end it after every test so the next one can sign in.
+  test.afterEach(async ({ page }) => {
+    await page.request
+      .post('http://localhost:8010/api/v1/admin/auth/logout', { headers: { 'X-EduVillage-Admin': '1' } })
+      .catch(() => undefined)
+  })
+
   test('admin creates two colleges with sections (real backend)', async ({ page }) => {
     await adminLogin(page)
     state.codeA = await createCollege(page, COLLEGE_A, { 'Computer Science': ['Section A', 'Section B'], Electronics: ['Section A'] })

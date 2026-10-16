@@ -94,6 +94,13 @@ def assert_before_deadline(assignment: Assignment, *, as_of=None) -> None:
         )
 
 
+def assert_submission_open(assignment: Assignment, *, is_teacher: bool = False) -> None:
+    if assignment.status == AssignmentStatus.closed:
+        raise ConflictError("This assignment is closed and no longer accepts submissions.", code="ASSIGNMENT_CLOSED")
+    if assignment.status != AssignmentStatus.published and not is_teacher:
+        raise ConflictError("This assignment is not open for submissions.", code="ASSIGNMENT_NOT_PUBLISHED")
+
+
 def save_submission(
     db: Session, student: User, assignment: Assignment, *, answer: dict, submit: bool, commit: bool = True, as_of=None
 ) -> AssignmentSubmission:
@@ -105,10 +112,7 @@ def save_submission(
     course = course_service.get_course_or_404(db, assignment.course_id)
     course_service.assert_enrolled(db, student, course)
 
-    if assignment.status == AssignmentStatus.closed:
-        raise ConflictError("This assignment is closed and no longer accepts submissions.", code="ASSIGNMENT_CLOSED")
-    if assignment.status != AssignmentStatus.published and not course_service.is_teaching(db, student, course):
-        raise ConflictError("This assignment is not open for submissions.", code="ASSIGNMENT_NOT_PUBLISHED")
+    assert_submission_open(assignment, is_teacher=course_service.is_teaching(db, student, course))
     # The deadline applies to a final submission. Saving a draft after it is still allowed, so nothing the
     # student already typed is lost (a late draft is never counted as submitted).
     if submit:
