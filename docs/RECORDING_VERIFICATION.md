@@ -1,49 +1,35 @@
-# Recording pipeline: LiveKit Egress → Cloudflare R2 → finalization → student playback
+# Recording pipeline
 
-What the code does, what was actually verified, and exactly what still needs real credentials and real participants. Nothing here is claimed as verified unless a test that was run is named.
+How a live class becomes a recorded lesson with a transcript and a summary, what each step does, and how it is tested. Related: [verification status](FINAL_AUDIT.md) · [backend setup](BACKEND_SETUP.md) · [classroom tools](CLASSROOM_AND_COURSE_TOOLS.md).
 
-## The workflow
+## Workflow
 
-| # | Step | Code | Verified how |
+| # | Step | Code | Tests |
 |---|---|---|---|
-| 1 | Teacher starts a **live** class, then explicitly starts recording | `recording_service.start_recording` | `test_recordings.py`, `test_recording_library.py` (LiveKit calls faked) |
-| 2 | Backend reserves the row, then asks LiveKit Egress for a **room-composite MP4** written **directly to the bucket** at `recordings/<class>/<recording>.mp4` (`livekit.start_recording`, `S3Upload` with endpoint/region/`force_path_style`) | `integrations/livekit.py` | request shape only; **not** run against a real LiveKit/Egress |
-| 3 | At most one active recording per class (partial unique index) | migration `3f1a9c2b7d10` | tests + PostgreSQL |
-| 4 | Egress finishes → LiveKit calls `POST /api/v1/webhooks/livekit` (signed JWT carrying the body SHA-256) | `api/v1/webhooks.py`, `livekit.verify_webhook` | `test_livekit_webhook.py`: unsigned / wrong secret / tampered body rejected, replay idempotent, late event cannot resurrect a failed recording |
-| 5 | **Finalization:** on `EGRESS_COMPLETE` the backend does a storage `HEAD` for the key; present → `available` with the real size, missing → `failed` ("media file was not found in storage") | `recording_service.finalize_from_provider` | `tests/integration/test_s3_storage_and_recording_chain.py` against an S3-protocol emulator over real HTTP |
-| 6 | Polling fallback if the webhook is lost | `recording_service.refresh_status` | unit tests with a faked provider |
-| 7 | Teacher publishes (private by default) | `set_published` | tests |
-| 8 | Student asks for playback → authorization re-checked → **presigned GET** (default 300 s) | `playback_info` | emulator test: signed URL, `X-Amz-Expires=300`, full and `Range` GETs return the right bytes |
-| 9 | Browser plays / downloads in range chunks | frontend `downloadEngine` | `real_video_offline.spec.ts` (real Chromium, real VP9 video, fake HTTP server) |
-| 10 | Delete = remove object, keep metadata (`archived`) | `delete_recording` | emulator test: object really gone, playback stops |
+| 1 | The teacher starts a live class, then explicitly starts recording; everyone sees a recording notice | `recording_service.start_recording`, `ClassroomPage` recording bar | `test_recordings`, `test_recording_library` |
+| 2 | The backend reserves the recording row and asks LiveKit Egress for a **room-composite MP4** written straight to the bucket at `recordings/<class>/<recording>.mp4` | `integrations/livekit.start_recording` (`S3Upload` with endpoint, region and path-style options) | request shape asserted in unit tests |
+| 3 | At most one active recording per class (partial unique index) | migration `3f1a9c2b7d10` | tests on SQLite and PostgreSQL |
+| 4 | When egress ends, LiveKit calls `POST /api/v1/webhooks/livekit` with a signed JWT carrying the body hash | `api/v1/webhooks.py`, `livekit.verify_webhook` | `test_livekit_webhook`: unsigned, wrong-secret and tampered events rejected; replays harmless; a late event cannot resurrect a failed recording |
+| 5 | **Finalisation:** on completion the backend checks that the object exists (`HEAD`); present means `available` with the real size, missing means `failed` | `recording_service.finalize_from_provider` | `test_s3_storage_and_recording_chain` (S3 protocol over real HTTP) |
+| 6 | Polling fallback if the webhook is lost | `recording_service.refresh_status` | unit tests |
+| 7 | The recording is private until the teacher publishes it | `set_published` | tests |
+| 8 | A transcript and summary are produced automatically once the recording is available; the teacher reviews the summary before students see it | `summary_service`, `transcription_service` (ffmpeg chunking, Whisper, LLM) | `test_summary_pipeline`, `test_long_recording_transcription` |
+| 9 | A student asks for playback; authorisation is re-checked (course enrolment, section, branch audience); a short-lived presigned URL is returned (300 seconds by default) | `recording_service.playback_info`, `can_access` | `test_recording_library`, `test_other_classes`, S3 chain test (signed URL, ranged GETs) |
+| 10 | The browser plays or downloads in ranged chunks, and can keep the file for offline use | `downloadEngine`, `RecordedLecturePlayer` | `real_video_offline.spec.ts` (real Chromium, real video) |
+| 11 | Deleting a recording removes the object and keeps the metadata (`archived`) | `delete_recording` | S3 chain test |
 
-### Findings from this audit (fixed)
+## Design notes
 
-1. **R2 does not support presigned POST policies.** Resource uploads used `generate_presigned_post`, which cannot work on R2. Uploads now use a presigned **PUT** with the exact signed `Content-Type`; the frontend PUTs straight to the URL without cookies.
-2. S3 client now uses **SigV4** explicitly and supports path-style addressing (`OBJECT_STORAGE_FORCE_PATH_STYLE`), and the same flag is passed to LiveKit's `S3Upload`.
-3. The API did not expose `Content-Range`/`Accept-Ranges` to browsers on another origin; resumable downloads need them (CORS `expose_headers`).
-4. Recording finalization previously trusted the provider's "complete"; it now verifies the object exists.
+* R2 does not support presigned POST policies, so uploads use a presigned **PUT** with the exact signed `Content-Type`; the S3 client uses SigV4 and optional path-style addressing (`OBJECT_STORAGE_FORCE_PATH_STYLE`).
+* The API exposes `Content-Range` and `Accept-Ranges` to the frontend origin so resumable downloads work across origins.
+* Recording is video egress of the room, so the whiteboard (shared over the data channel) is not part of the file; a teacher who wants it recorded shares the whiteboard tab as a screen.
+* A recording of a branch-wide class is only available to students of that branch.
 
-## What was NOT verified (needs real credentials and/or participants)
+## Checking a deployment
 
-The emulator used in tests (moto) speaks the S3 protocol but is **not AWS S3 and not Cloudflare R2**. It does not validate signatures or enforce URL expiry.
-
-| Not verified | Why it matters | How to verify |
-|---|---|---|
-| **LiveKit Egress actually producing an MP4** and uploading it | The whole point of recording | Run LiveKit server + Egress (Chrome-based) with `LIVEKIT_*` set; start a class with ≥1 publishing participant for ≥30 s; start recording; stop; confirm the object appears in the bucket and the webhook arrives |
-| **R2 accepts the credentials, SigV4 signing and `region=auto`** | R2-specific behaviour | Set `OBJECT_STORAGE_ENDPOINT=https://<account>.r2.cloudflarestorage.com`, `OBJECT_STORAGE_REGION=auto`, an R2 API token with Object Read & Write on the bucket; upload a resource and play a recording |
-| **Browser → R2 CORS** (direct PUT upload, ranged GET playback) | Without it browsers block both | Bucket CORS must allow your frontend origin, methods `GET, PUT, HEAD`, headers `Content-Type, Range`, expose `Content-Range, Accept-Ranges, ETag`. Check in a real browser |
-| Presigned URL **expiry** actually enforced | Security of "short-lived" links | After `expires_in`, a GET of the URL must return 403 |
-| Whether Egress needs `force_path_style` for R2 | Config only | Try both; keep what works |
-| Webhook delivery from a real LiveKit server (URL reachable, key/secret match) | Finalization depends on it (polling is the fallback) | Point LiveKit's webhook at `https://<api>/api/v1/webhooks/livekit` |
-| Playback of a **real Egress-produced MP4** (H.264/AAC) across browsers | Codec/browser support | Play in Chrome, Firefox, Safari |
-| Large recordings (hundreds of MB) end to end | Memory/quota behaviour | Record ~60 min; verify finalization size and download |
-
-## Manual verification checklist
-
-1. `LIVEKIT_URL/KEY/SECRET`, `STORAGE_BACKEND=s3`, `OBJECT_STORAGE_*` set (placeholders only in `.env.example`; put real values in the deployment secret store, never in the repo).
-2. Webhook configured; API reachable from LiveKit.
-3. Start class, join as student, start recording (students see the recording notice), speak, stop.
-4. Confirm: recording row `processing` → `available`; object exists in R2 with the expected size; `duration_seconds` set.
-5. Publish; as an enrolled student open the recording and seek; as a non-enrolled student confirm 404.
-6. Delete the recording; confirm the object is removed from R2.
+1. `LIVEKIT_*`, `STORAGE_BACKEND=s3` and `OBJECT_STORAGE_*` are set in the host's secret store (the repository contains placeholders only).
+2. The bucket allows your frontend origin in CORS (methods `GET, PUT, HEAD`, headers `Content-Type, Range`), and LiveKit's webhook points at `https://<api>/api/v1/webhooks/livekit`.
+3. Start a class, join as a student, start recording, speak, stop.
+4. Confirm the recording moves from `processing` to `available`, the object exists with the expected size, and `duration_seconds` is set.
+5. Publish it; open it as an enrolled student and seek; confirm a non-enrolled student gets 404.
+6. Delete it and confirm the object is gone.

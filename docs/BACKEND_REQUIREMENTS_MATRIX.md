@@ -1,32 +1,48 @@
-# Backend Requirements Matrix
+# Requirements matrix
 
-Results are from runs in this environment on 2026-10-15: backend `pytest` **159 passed** on SQLite, **157 passed** on a real PostgreSQL 18 server (the two subprocess migration tests only run on SQLite and were verified against PostgreSQL by running Alembic directly); frontend `vitest` 25 passed; `tsc -b` and `vite build` clean.
+What EduVillage does, where it is implemented, and which tests exercise it. Test files are under `backend/tests/` (pytest) and `frontend/` (Vitest and Playwright). Where a test replaces an external service (LiveKit's network calls, S3, an AI provider) with a fake it proves EduVillage's own logic around that boundary; real-service runs are listed in [FINAL_AUDIT.md](FINAL_AUDIT.md).
 
-**Evidence caveat.** LiveKit, S3, an LLM and a speech-to-text service were *not* available. Tests of those boundaries use fakes (`mock_recording_pipeline`, `fake_storage`, a monkeypatched STT). A fake proves the backend's logic around the boundary, not that the real service works. Rows are marked accordingly; none is marked PASS for live-service behaviour.
+Related: [backend overview](BACKEND_AUDIT.md) · [API reference](API_CONTRACTS.md) · [README](../README.md)
 
-| Requirement | Implementation | Evidence | Test result | Status |
-|---|---|---|---|---|
-| Student authentication | `auth_service`, `POST /auth/register|login|logout`, httpOnly session cookie, argon2, hashed session store | `tests/api/test_auth.py`, `test_sessions.py` | pass | PASS |
-| Teacher authentication | same; teacher role needs `TEACHER_INVITE_CODE` (closed in production if unset) | `test_registration_policy.py` (wrong/missing code 403, valid 201, production closed, no role escalation via profile PATCH) | pass | PASS |
-| Role-based + resource-level authorization | `core/permissions`, `course_service.is_teaching/assert_enrolled/assert_owns_course`, `assignment_service.assert_can_view_assignment`, `recording_service.can_access` | `test_access_control.py` (draft assignments hidden, unenrolled 403, cross-student submission 404/403), `test_recording_library.py::test_another_teacher_has_no_automatic_access`, existing `test_courses/classes/resources` | pass | PASS |
-| Live classes (state + tokens) | `classroom_service` start/end/join-token; `integrations/livekit.generate_access_token` (room-scoped, short-lived, publish only for teachers) | `test_classes.py`, `test_recording_library.py` (join token, `recording_active`, wrong-section 403) | pass; real LiveKit server not available | PASS for backend logic / **BLOCKED** for live media |
-| Live-class section gating (multi-section) | `class_sections`, `classroom_service.assert_enrolled_in_class` | `test_sections.py`, `test_recording_library.py::test_section_scoped_recording_is_hidden_from_other_sections` | pass | PASS |
-| Recorded lectures (lifecycle + library + playback) | `recording_service`, `api/v1/recordings.py`, `api/v1/classes.py`; states recording→processing→available/failed→archived; teacher publication; signed playback URL | `test_recording_library.py` (17), `test_recordings.py` (6), `test_livekit_webhook.py` (6) | pass with fakes; **no real recording was ever produced here** | PARTIAL (PASS on logic; real egress BLOCKED) |
-| Recording provider callbacks | `POST /webhooks/livekit`, JWT + SHA-256 body verification, idempotent `finalize_from_provider` | `test_livekit_webhook.py`: unsigned/wrong-secret/tampered → 401 and no state change; replayed complete event is harmless; late complete cannot resurrect a failed recording; unknown egress ignored | pass | PASS (signature logic exercised with locally signed JWTs; LiveKit itself not contacted) |
-| Duplicate recording prevention | partial unique index `uq_one_active_recording_per_class` + pre-check | `test_recordings.py::test_full_recording_lifecycle` (409 `ALREADY_RECORDING`), migration `check` | pass | PASS |
-| Recording storage | `ObjectStorage` (local/S3), `verify_uploaded` before `available`, delete on retention | `test_recording_library.py` (missing media → `failed`/`RECORDING_MEDIA_MISSING`; delete removes object, keeps metadata) using `fake_storage` | pass with fake | PARTIAL (S3 BLOCKED) |
-| Recording privacy/policy | opt-in start, private until published, `RECORDING_ENABLED` kill switch, `recording_active` in join token, delete/archive, revoked share removes access | `test_recording_library.py` | pass | PASS |
-| AI transcription | `summary_service._transcribe` → `speech_to_text.transcribe` from a stored recording/resource | `test_summary_pipeline.py::test_recording_transcription_with_mocked_provider...` (mocked STT), `test_stt_not_configured_fails_honestly...` (real code path, no key → `STT_NOT_CONFIGURED`, no fake summary, recording still plays) | pass | PARTIAL (real STT BLOCKED) |
-| AI summaries | `summary_service`, `llm_provider` (labeled stub when no key), provenance columns, content-hash idempotency | `test_summary_pipeline.py`, `test_summaries.py` | pass with the stub generator | PARTIAL (real LLM BLOCKED) |
-| Background processing / retries | atomic claim, bounded retries (3) for transient errors, stale-job requeue, `python -m app.worker` | `test_summary_pipeline.py` (worker, single claimant, retry cap → `failed`, stuck job requeued) | pass | PASS |
-| Teacher review | edit (`PATCH /summaries/{id}`, flagged), approve, request-changes (new job); students see approved only | `test_summary_pipeline.py`, `test_access_control.py::test_summary_list...` | pass | PASS |
-| Multiple sections | `sections`, `section_members`, `class_sections`; teacher-managed membership requiring course enrollment | `test_sections.py` (9) | pass | PASS |
-| Recording reuse across sections | `recording_sections` association (no media copy); sharing requires teaching both the recording's course and the target section's course; unshare removes only the link | `test_recording_library.py::test_reuse_recording_across_sections_without_copying`, `::test_cannot_share_into_a_section_you_do_not_teach` | pass | PASS (same-teacher scope; cross-institution NOT REQUIRED) |
-| Resource reuse across sections | `resource_sections` + `resource_service.assert_can_access_resource` | `test_sections.py::test_resources_can_be_shared_with_a_section_without_copying` | pass | PASS |
-| Offline synchronization (idempotent) | `synchronization_service`: unique `(user_id, operation_id)`, payload hash, single transaction, bounded race retry | `test_sync.py`, `test_sync_hardening.py` (replay identical; different payload → `OPERATION_ID_REUSED`, not applied; rejected/conflict replays stable; per-user scope; **6 simultaneous duplicates → 1 submission, version 1**, run 3×) | pass (SQLite; PostgreSQL run of the same suite also passed) | PASS |
-| Server-confirmed submission status | sync result `accepted/rejected/conflict`; frontend marks synced only on `accepted`; server refusal no longer queued as "offline" | `test_sync_hardening.py`, frontend `sync_offline.test.ts` | pass | PASS |
-| Shared-device security (backend) | session revoke/expiry, password-reset session revocation, no client-supplied identity | `test_shared_device.py`, `test_sessions.py`, frontend `recorded_classes_shared_device.test.tsx` | pass | PASS |
-| File security | MIME/size validation, enrollment- or section-gated download, bounded local upload, one upload per pending resource, signed URLs for S3 | `test_resources.py`, `test_sections.py::test_local_upload_rejects...`, `test_recording_library.py` (signed URL TTL) | pass | PASS (local); S3 **BLOCKED** |
-| Migrations preserve data | Alembic `3f1a9c2b7d10`, additive, server defaults | `tests/unit/test_migrations.py`; manual upgrade/downgrade/upgrade/`check` on SQLite and PostgreSQL 18 | pass | PASS |
-| Health/readiness | `/health`, `/ready` (no internals exposed) | live `uvicorn` smoke test; `test_health.py` | pass | PASS |
-| Hosted deployment | Dockerfile, `compose.yaml` (db, api, worker) | not built or run (Docker image build not attempted) | — | BLOCKED |
+## Accounts and access
+
+| Capability | Implementation | Tests |
+|---|---|---|
+| Student and teacher registration against an active college, its code, branch and section; teachers may pick All Sections | `auth_service.register_user`, `college_service.validate_registration_target`, `api/v1/registration.py` | `test_college_registration`, `test_branches`, `test_registration_policy`, `register_college.test.tsx`, `e2e-real/college_registration` |
+| Sign-in, sessions, logout, session list and revocation, shared-device mode | `auth_service`, `dependencies.get_current_user` | `test_auth`, `test_sessions`, `test_shared_device`, `auth.test.tsx`, `logout_confirm.test.tsx` |
+| Second-device sign-in needs an emailed OTP; the older session ends | `auth_service.login_requires_otp / request_login_otp / verify_login_otp` | `test_login_otp` (16), `login_otp.test.tsx`, `e2e-real` |
+| Password recovery by emailed OTP | `auth_service.request_password_reset / verify_reset_otp / reset_password`, `integrations/email.py` | `test_password_reset` (33), `password_reset_otp.test.tsx` |
+| Role-based and resource-level authorisation | `core/permissions`, `course_service`, `assignment_service`, `recording_service.can_access` | `test_access_control`, `test_users`, `test_student_teacher_visibility` |
+| Administrator panel: colleges, codes, branches, sections; single active session with idle timeout | `admin_service`, `college_service`, `api/v1/admin.py` | `test_admin`, `test_branches`, `admin_panel.test.tsx`, `e2e-layout/admin`, `e2e-real` |
+| Teachers limited to their section or branch when targeting classes | `teaching_scope_service` | `test_branches`, `test_other_classes` |
+
+## Teaching and learning
+
+| Capability | Implementation | Tests |
+|---|---|---|
+| Courses: create, publish, archive, restore, permanently delete; catalogue; enrolment; roster; co-teachers | `course_service`, `api/v1/courses.py` | `test_courses`, `test_enrollments`, `test_co_teachers`, `course_enroll_button.test.tsx`, `teacher_course_roster.test.tsx` |
+| Lessons, bulk lessons, curriculum import from pasted text or a text PDF | `course_service`, `syllabus_service` | `test_lessons`, `test_syllabus`, `syllabus_import.test.tsx` |
+| Sections (cohorts) and membership; resources and recordings shared per section | `section_service`, `resource_service`, `recording_service` | `test_sections`, `test_resources` |
+| Live classes: schedule, start, end, join tokens, audience by section or branch ("Other Classes") | `classroom_service`, `livekit.generate_access_token` | `test_classes`, `test_other_classes`, `test_multi_student_live_class`, `test_livekit_token`, `other_classes.test.tsx`, `e2e-live`, `e2e-real/other_classes` |
+| Classroom tools: floating video, whiteboard, one or several shared screens, blurred background | `frontend/src/components/class`, `hooks/useScreenShares`, `hooks/useBackgroundBlur` | `classroom_tools.test.tsx`, `e2e-live/classroom_tools` |
+| Recording to object storage, signed webhook, publication, signed playback, library, progress | `recording_service`, `integrations/livekit`, `api/v1/webhooks.py` | `test_recordings`, `test_recording_library`, `test_livekit_webhook`, `test_s3_storage_and_recording_chain` |
+| Teacher resource uploads with content validation | `resource_service`, `media_validation` | `test_resource_uploads`, `test_resources` |
+| Assignments, drafts, revisions, deadlines, offline sync | `assignment_service`, `synchronization_service` | `test_assignments`, `test_deadlines`, `test_sync`, `test_sync_hardening`, `assignment_status.test.tsx`, `e2e-offline/assignment_status` |
+| PDF / DOC / DOCX files on a submission | `submission_file_service` | `test_submission_files` (14), `submission_files.test.tsx` |
+| AI summaries: chunked transcription, LLM summary, teacher review, PDF/Word notes | `summary_service`, `transcription_service`, `utils/summaryExport.ts` | `test_summaries`, `test_summary_pipeline`, `test_long_recording_transcription`, `summary_export.test.ts`, `downloads_summary.test.tsx` |
+
+## Offline and connectivity
+
+| Capability | Implementation | Tests |
+|---|---|---|
+| Offline shell and service worker; offline downloads and playback | `vite-plugin-pwa`, `downloadEngine`, `downloadManager`, `playbackStore` | `download_engine.test.ts`, `download_manager.test.ts`, `offline_playback.test.tsx`, `e2e-offline/offline_shell`, `real_video_offline` |
+| Adaptive audio-only mode and connection recovery | `hooks/useAdaptiveAudio`, `useConnectionRecovery`, `services/connectivity.ts` | `adaptive_audio.test.ts`, `live_connectivity.test.tsx`, `e2e-offline/live_class_connectivity`, `e2e-live/adaptive_bandwidth` |
+| Idempotent retrying sync | `synchronization_service`, `services/syncManager.ts` | `sync_offline.test.ts`, `test_sync*` |
+
+## Platform
+
+| Capability | Implementation | Tests |
+|---|---|---|
+| Migrations (single linear chain) | `backend/alembic/versions` | `test_migrations` (upgrade, check, downgrade, data preservation) |
+| Pagination, error model, audit trail, health and readiness | `utils/pagination`, `core/exceptions`, `audit_service`, `/health`, `/ready` | `test_pagination`, `test_audit`, `test_health` |
+| Responsive layout across desktop, tablet and phone | Tailwind v4 design system, `components/ui` | `e2e-layout/layout`, `e2e-layout/admin` |
