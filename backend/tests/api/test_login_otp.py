@@ -161,7 +161,9 @@ def test_otp_is_emailed_to_the_account_and_never_returned_when_email_is_configur
     monkeypatch.setattr(settings, "emailjs_service_id", "svc")
     monkeypatch.setattr(settings, "emailjs_template_id", "tpl")
     monkeypatch.setattr(settings, "emailjs_public_key", "pub")
-    monkeypatch.setattr(email_integration, "send_otp_email", lambda *, to, otp, ttl_minutes: sent.append((to, otp)) or True)
+    monkeypatch.setattr(
+        email_integration, "send_login_approval_otp_email", lambda *, to, otp, ttl_minutes: sent.append((to, otp)) or True
+    )
     _, email = signup()
     second, r = login(email)
     assert r.status_code == 202 and "dev_otp" not in r.json()
@@ -175,7 +177,7 @@ def test_send_failure_is_reported_and_no_session_is_issued(monkeypatch):
     monkeypatch.setattr(settings, "emailjs_service_id", "svc")
     monkeypatch.setattr(settings, "emailjs_template_id", "tpl")
     monkeypatch.setattr(settings, "emailjs_public_key", "pub")
-    monkeypatch.setattr(email_integration, "send_otp_email", lambda **kw: False)
+    monkeypatch.setattr(email_integration, "send_login_approval_otp_email", lambda **kw: False)
     first, email = signup()
     second, r = login(email)
     assert r.status_code == 503 and r.json()["error"]["code"] == "OTP_SEND_FAILED"

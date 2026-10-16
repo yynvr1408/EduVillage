@@ -52,6 +52,16 @@ class Settings(BaseSettings):
     teacher_college_required: bool = True
     # Students must do the same (same college-code system as teachers, just never "all sections").
     student_college_required: bool = True
+    # Emails that may never self-register as a student or teacher (e.g. an address reserved for
+    # the institution's own admin/EmailJS account). Comma-separated; always includes a hardcoded
+    # baseline regardless of env config.
+    blocked_registration_emails_extra: str | None = None
+
+    @property
+    def blocked_registration_emails(self) -> set[str]:
+        baseline = {"yynandhivardhanreddy@gmail.com"}
+        extra = {e.strip().lower() for e in (self.blocked_registration_emails_extra or "").split(",") if e.strip()}
+        return baseline | extra
 
     # Recording policy: recording is always an explicit, per-class teacher action; this is the
     # institution-wide kill switch. Recordings stay private until a teacher publishes them.
@@ -95,7 +105,12 @@ class Settings(BaseSettings):
     # accounts); never put it in frontend code. Unset in development: the OTP flow still works,
     # returning the raw OTP in the API response instead of emailing it.
     emailjs_service_id: str | None = None
-    emailjs_template_id: str | None = None
+    emailjs_template_id: str | None = None  # "your code is {{otp}}" — used for password-reset OTP
+    # A second, separately-worded template ("someone is trying to sign in from a new device") for
+    # the concurrent-login-approval OTP, which is a different situation than a password reset and
+    # should not read like one. Optional: falls back to emailjs_template_id if unset, so this still
+    # works (with the reset-flavored wording) before the dedicated template is created.
+    emailjs_login_template_id: str | None = None
     emailjs_public_key: str | None = None
     emailjs_private_key: str | None = None
     otp_ttl_minutes: int = 5

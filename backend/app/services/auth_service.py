@@ -74,6 +74,9 @@ def register_user(
 ) -> User:
     if role == UserRole.admin:
         raise ForbiddenError("This role cannot be self-registered.", code="ROLE_NOT_ALLOWED")
+    normalized_email = email.strip().lower()
+    if normalized_email in settings.blocked_registration_emails:
+        raise ForbiddenError("This email address cannot be used to register an account.", code="EMAIL_NOT_ALLOWED")
     from app.services import college_service
 
     # Everything is validated before the first row is written, so a rejection leaves no partial account.
@@ -89,7 +92,6 @@ def register_user(
         if role == UserRole.teacher:
             _assert_may_register_as(role, invite_code)
     # (with a valid target the admin-issued college code is the proof; it grants nothing beyond the role)
-    normalized_email = email.strip().lower()
     existing = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if existing:
         raise ConflictError("An account with this email already exists.", code="EMAIL_TAKEN")
@@ -505,7 +507,7 @@ def request_login_otp(db: Session, user: User, *, ip: str | None = None) -> tupl
     db.commit()
     audit_service.record(db, actor_id=user.id, action="login_otp_requested", resource_type="user", resource_id=user.id)
 
-    sent = email_integration.send_otp_email(to=user.email, otp=otp, ttl_minutes=settings.otp_ttl_minutes)
+    sent = email_integration.send_login_approval_otp_email(to=user.email, otp=otp, ttl_minutes=settings.otp_ttl_minutes)
     if not sent and settings.emailjs_configured:
         challenge.revoked_at = utcnow()
         db.commit()

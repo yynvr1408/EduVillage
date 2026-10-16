@@ -65,7 +65,10 @@ services:
       - key: EMAILJS_SERVICE_ID
         sync: false
       - key: EMAILJS_TEMPLATE_ID
-        sync: false
+        sync: false # password-reset OTP wording: "{{otp}} is your EduVillage password reset code"
+      - key: EMAILJS_LOGIN_TEMPLATE_ID
+        sync: false # optional: a separate template for the new-device-login-approval OTP (falls
+        # back to EMAILJS_TEMPLATE_ID if left unset)
       - key: EMAILJS_PUBLIC_KEY
         sync: false
       - key: EMAILJS_PRIVATE_KEY

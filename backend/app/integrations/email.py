@@ -33,12 +33,12 @@ def ensure_configured() -> None:
         logger.warning("EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY are not set — email is disabled.")
 
 
-def _send(*, to_email: str, template_params: dict) -> bool:
+def _send(*, to_email: str, template_id: str, template_params: dict) -> bool:
     if not settings.emailjs_configured:
         return False
     payload = {
         "service_id": settings.emailjs_service_id,
-        "template_id": settings.emailjs_template_id,
+        "template_id": template_id,
         "user_id": settings.emailjs_public_key,
         "template_params": {"to_email": to_email, **template_params},
     }
@@ -60,9 +60,18 @@ def _send(*, to_email: str, template_params: dict) -> bool:
 
 
 def send_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
-    """template_params match the template described in the task: {{otp}} is the only sensitive
-    one — never logged, never returned to any API caller."""
-    return _send(to_email=to, template_params={"otp": otp, "ttl_minutes": ttl_minutes})
+    """Password-reset OTP. template_params match the template described in the task: {{otp}} is
+    the only sensitive one — never logged, never returned to any API caller."""
+    return _send(to_email=to, template_id=settings.emailjs_template_id, template_params={"otp": otp, "ttl_minutes": ttl_minutes})
+
+
+def send_login_approval_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
+    """Concurrent-login-approval OTP: a different situation (someone is signing in to an
+    already-signed-in account from a new device) than a password reset, so it uses its own
+    template when configured. Falls back to the password-reset template if the dedicated one
+    hasn't been set up yet, so the flow still works (just with reset-flavored wording) either way."""
+    template_id = settings.emailjs_login_template_id or settings.emailjs_template_id
+    return _send(to_email=to, template_id=template_id, template_params={"otp": otp, "ttl_minutes": ttl_minutes})
 
 
 # No send_password_changed_email(): the EmailJS setup in this task configures exactly one
