@@ -22,6 +22,8 @@ if not _shutil.which("ffmpeg") and not os.environ.get("FFMPEG_PATH"):
         pass
 os.environ["SESSION_COOKIE_NAME"] = "eduvillage_session"
 # Legacy fixtures register teachers/students without a college; tests of the college rule switch this back on.
+# Many existing tests sign the same user in from several clients; the second-device OTP rule has its own tests.
+os.environ["CONCURRENT_LOGIN_OTP"] = "false"
 os.environ["TEACHER_COLLEGE_REQUIRED"] = "false"
 os.environ["STUDENT_COLLEGE_REQUIRED"] = "false"
 # The suite is written against the local-disk storage backend and the labeled stub AI

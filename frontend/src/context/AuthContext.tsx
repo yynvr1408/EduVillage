@@ -1,7 +1,7 @@
 import type { CollegeSelection } from '../services/registrationApi'
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { User, Role } from '../types'
-import { authService } from '../services/authService'
+import { authService, isOtpChallenge, type LoginOtpChallenge } from '../services/authService'
 import { db } from '../db/db'
 import { ApiError } from '../services/apiClient'
 
@@ -13,7 +13,8 @@ interface AuthContextType {
   isLoading: boolean
   isSharedDevice: boolean
   setSharedDevice: (enabled: boolean) => void
-  login: (email: string, password: string) => Promise<User>
+  login: (email: string, password: string) => Promise<User | LoginOtpChallenge>
+  verifyLoginOtp: (email: string, otp: string) => Promise<User>
   register: (email: string, fullName: string, password: string, role: Role, inviteCode?: string, college?: CollegeSelection) => Promise<User>
   logout: () => Promise<void>
   switchUser: () => Promise<void>
@@ -70,8 +71,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [])
 
-  const login = async (email: string, password: string): Promise<User> => {
+  const login = async (email: string, password: string): Promise<User | LoginOtpChallenge> => {
     const res = await authService.login(email, password)
+    if (isOtpChallenge(res)) return res
+    setUser(res.user)
+    return res.user
+  }
+
+  const verifyLoginOtp = async (email: string, otp: string): Promise<User> => {
+    const res = await authService.verifyLoginOtp(email, otp)
     setUser(res.user)
     return res.user
   }
@@ -142,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSharedDevice,
         setSharedDevice,
         login,
+        verifyLoginOtp,
         register,
         logout,
         switchUser,

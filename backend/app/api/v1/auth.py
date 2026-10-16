@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
@@ -7,6 +8,7 @@ from app.db.models.user import User
 from app.schemas.auth import (
     AuthResponse,
     ForgotPasswordRequest,
+    LoginOtpRequired,
     LoginRequest,
     RegisterRequest,
     ResetAuthorizationOut,
@@ -51,14 +53,43 @@ def register(
     return AuthResponse(user=UserOut.model_validate(user))
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login", response_model=AuthResponse, responses={202: {"model": LoginOtpRequired}})
 def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
     user = auth_service.authenticate_user(db, email=payload.email, password=payload.password)
+    ip = request.client.host if request.client else None
+    if auth_service.login_requires_otp(db, user, request.cookies.get(settings.session_cookie_name)):
+        # Somebody is already signed in to this account: no session until the owner approves via emailed code.
+        sent, dev_otp = auth_service.request_login_otp(db, user, ip=ip)
+        body = {
+            "otp_required": True,
+            "email": user.email,
+            "message": "This account is signed in on another device. Enter the verification code we emailed to approve this sign-in.",
+            "otp_ttl_minutes": settings.otp_ttl_minutes,
+            "resend_cooldown_seconds": settings.otp_request_cooldown_seconds,
+        }
+        if dev_otp:
+            body["dev_otp"] = dev_otp
+        return JSONResponse(status_code=202, content=body)
+    token = auth_service.create_session(db, user)
+    _set_session_cookie(response, token, settings)
+    return AuthResponse(user=UserOut.model_validate(user))
+
+
+@router.post("/login/verify-otp", response_model=AuthResponse)
+def verify_login_otp(
+    payload: VerifyResetOtpRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    user = auth_service.verify_login_otp(db, email=payload.email, otp=payload.otp, ip=request.client.host if request.client else None)
     token = auth_service.create_session(db, user)
     _set_session_cookie(response, token, settings)
     return AuthResponse(user=UserOut.model_validate(user))

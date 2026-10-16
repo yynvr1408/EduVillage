@@ -118,7 +118,7 @@ test.describe.serial('admin-managed colleges drive registration', () => {
     await page.click('button:has-text("Register")')
     await page.waitForURL(/\/student\/dashboard/)
 
-    await page.context().clearCookies()
+    await page.request.post('http://localhost:8010/api/v1/auth/logout') // end the session properly: a second sign-in while one is active needs the emailed code
     await page.goto('/login/student')
     await page.fill('#email', `student-${tag}@example.com`)
     await page.fill('#password', 'password123')
@@ -186,11 +186,27 @@ test.describe.serial('admin-managed colleges drive registration', () => {
     await expect(branch.locator('option', { hasText: 'Electronics' })).toHaveCount(0)
   })
 
-  test('existing teacher can sign in through the normal login', async ({ page }) => {
+  test('signing in again while already signed in elsewhere needs the emailed code', async ({ page }) => {
+    // the teacher registered earlier still has a live session, so a password-only sign-in must not succeed
     await page.goto('/login/teacher')
     await page.fill('#email', `teacher-${tag}@example.com`)
     await page.fill('#password', 'password123')
     await page.click('button:has-text("Sign In")')
+    await expect(page.getByRole('button', { name: 'Verify and Sign In' })).toBeVisible()
+    await expect(page).toHaveURL(/\/login\/teacher/)
+    // the password alone gave this browser no session
+    const other = await page.context().newPage()
+    await other.goto('/teacher/dashboard')
+    await expect(other).toHaveURL(/\/login/)
+    await other.close()
+
+    // email is not configured in this run, so the code is shown on screen; a wrong code is refused first
+    const code = (await page.getByText(/Your code is/).locator('strong').innerText()).trim()
+    await page.fill('#login-otp', code === '000000' ? '111111' : '000000')
+    await page.click('button:has-text("Verify and Sign In")')
+    await expect(page.getByText('That code is incorrect or has expired.')).toBeVisible()
+    await page.fill('#login-otp', code)
+    await page.click('button:has-text("Verify and Sign In")')
     await page.waitForURL(/\/teacher\/dashboard/)
   })
 })

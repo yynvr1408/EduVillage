@@ -40,6 +40,12 @@ export default defineConfig({
         STORAGE_BACKEND: 'local',
         TEACHER_COLLEGE_REQUIRED: 'true',
         TEACHER_INVITE_CODE: '',
+        // never send real email from a test run; the sign-in code is then shown on screen (development mode)
+        EMAILJS_SERVICE_ID: '',
+        EMAILJS_TEMPLATE_ID: '',
+        EMAILJS_PUBLIC_KEY: '',
+        EMAILJS_PRIVATE_KEY: '',
+        CONCURRENT_LOGIN_OTP: 'true',
         ADMIN_USERNAME: process.env.E2E_ADMIN_USERNAME,
         ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD,
       },
