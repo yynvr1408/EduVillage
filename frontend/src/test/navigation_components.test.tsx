@@ -82,6 +82,7 @@ describe('Navigation & Domain Components', () => {
       title: 'Intro to Off-Grid Inverters',
       status: 'SCHEDULED',
       scheduled_at: new Date().toISOString(),
+      livekit_room_name: 'eduvillage-class-sched-1',
     }
 
     const onCancel = vi.fn()
@@ -111,6 +112,7 @@ describe('Navigation & Domain Components', () => {
       title: 'Intro to Off-Grid Inverters',
       status: 'SCHEDULED',
       scheduled_at: new Date().toISOString(),
+      livekit_room_name: 'eduvillage-class-sched-2',
     }
 
     const onCancel = vi.fn()
@@ -140,6 +142,7 @@ describe('Navigation & Domain Components', () => {
       title: 'Intro to Off-Grid Inverters',
       status: 'CANCELLED',
       scheduled_at: new Date().toISOString(),
+      livekit_room_name: 'eduvillage-class-cancelled-1',
     }
 
     const { rerender } = render(
