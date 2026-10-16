@@ -122,3 +122,35 @@ def test_offline_sync_submission_after_deadline_is_a_conflict_not_a_crash(teache
     result = resp.json()["results"][0]
     assert result["status"] == "conflict"
     assert result["error_code"] == "SUBMISSION_EXPIRED"
+
+
+def test_teacher_grades_a_submission_and_student_sees_it(teacher, enrolled_student, published_assignment):
+    sclient, _ = enrolled_student
+    aid = published_assignment["id"]
+    sub = sclient.put(f"/api/v1/assignments/{aid}/submissions/me", json={"answer": {"text": "done"}, "submit": True}).json()
+
+    tclient, _ = teacher
+    listed = tclient.get(f"/api/v1/assignments/{aid}/submissions").json()
+    assert listed[0]["student_name"] and listed[0]["score"] is None
+
+    graded = tclient.put(f"/api/v1/assignments/{aid}/submissions/{sub['id']}/grade", json={"score": 82.5, "feedback": " Well done "})
+    assert graded.status_code == 200
+    assert graded.json()["score"] == 82.5 and graded.json()["feedback"] == "Well done" and graded.json()["graded_at"]
+
+    mine = sclient.get(f"/api/v1/assignments/{aid}/submissions/me").json()
+    assert mine["score"] == 82.5 and mine["feedback"] == "Well done"
+
+
+def test_grade_rules(teacher, enrolled_student, published_assignment):
+    sclient, _ = enrolled_student
+    aid = published_assignment["id"]
+    draft = sclient.put(f"/api/v1/assignments/{aid}/submissions/me", json={"answer": {"text": "wip"}, "submit": False}).json()
+    tclient, _ = teacher
+    url = f"/api/v1/assignments/{aid}/submissions/{draft['id']}/grade"
+    assert tclient.put(url, json={"score": 5}).status_code == 409  # a draft cannot be graded
+
+    sub = sclient.put(f"/api/v1/assignments/{aid}/submissions/me", json={"answer": {"text": "final"}, "submit": True}).json()
+    url = f"/api/v1/assignments/{aid}/submissions/{sub['id']}/grade"
+    assert tclient.put(url, json={"score": 101}).status_code == 422  # above the default maximum of 100
+    assert tclient.put(url, json={"score": -1}).status_code == 422
+    assert sclient.put(url, json={"score": 50}).status_code == 403  # students cannot grade

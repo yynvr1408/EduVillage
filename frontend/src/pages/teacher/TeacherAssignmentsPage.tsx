@@ -43,6 +43,9 @@ export const TeacherAssignmentsPage: React.FC = () => {
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loadingSubmissions, setLoadingSubmissions] = useState(false)
+  // Manual grading: per-submission score/feedback inputs and save state
+  const [gradeInputs, setGradeInputs] = useState<Record<string, { score: string; feedback: string }>>({})
+  const [gradeState, setGradeState] = useState<Record<string, { saving?: boolean; error?: string; saved?: boolean }>>({})
 
   const loadData = async () => {
     setIsLoading(true)
@@ -108,8 +111,30 @@ export const TeacherAssignmentsPage: React.FC = () => {
     try {
       const list = await assignmentService.getSubmissions(a.id)
       setSubmissions(list)
+      setGradeState({})
+      setGradeInputs(
+        Object.fromEntries(list.map((x) => [x.id, { score: x.score !== undefined ? String(x.score) : '', feedback: x.feedback ?? '' }]))
+      )
     } finally {
       setLoadingSubmissions(false)
+    }
+  }
+
+  const handleGrade = async (sub: Submission) => {
+    const input = gradeInputs[sub.id] ?? { score: '', feedback: '' }
+    const max = selectedAssignment?.max_score ?? 100
+    const value = Number(input.score)
+    if (input.score.trim() === '' || Number.isNaN(value) || value < 0 || value > max) {
+      setGradeState((g) => ({ ...g, [sub.id]: { error: `Enter a score between 0 and ${max}.` } }))
+      return
+    }
+    setGradeState((g) => ({ ...g, [sub.id]: { saving: true } }))
+    try {
+      const updated = await assignmentService.gradeSubmission(sub.assignment_id, sub.id, value, input.feedback.trim())
+      setSubmissions((list) => list.map((x) => (x.id === sub.id ? { ...x, status: updated.status, score: updated.score, feedback: updated.feedback } : x)))
+      setGradeState((g) => ({ ...g, [sub.id]: { saved: true } }))
+    } catch (err: any) {
+      setGradeState((g) => ({ ...g, [sub.id]: { error: err.message || 'Could not save the grade.' } }))
     }
   }
 
@@ -290,8 +315,8 @@ export const TeacherAssignmentsPage: React.FC = () => {
                     <span className="font-bold text-[#202B2A]">
                       {sub.student_name || 'Student'}
                     </span>
-                    <Badge variant="success" size="sm">
-                      {sub.status}
+                    <Badge variant={sub.status === 'GRADED' ? 'success' : 'warning'} size="sm">
+                      {sub.status === 'GRADED' ? `Graded ${sub.score}/${selectedAssignment?.max_score ?? 100}` : 'Needs grading'}
                     </Badge>
                   </div>
                   <span className="text-xs text-[#687775]">
@@ -315,6 +340,32 @@ export const TeacherAssignmentsPage: React.FC = () => {
                     ))}
                   </ul>
                 )}
+                <div className="grid grid-cols-1 sm:grid-cols-[8rem_1fr_auto] gap-2 items-end pt-2 border-t border-[#E1E8E4]">
+                  <FormField label={`Score (max ${selectedAssignment?.max_score ?? 100})`} htmlFor={`score-${sub.id}`}>
+                    <Input
+                      id={`score-${sub.id}`}
+                      type="number"
+                      min={0}
+                      max={selectedAssignment?.max_score ?? 100}
+                      step="0.5"
+                      value={gradeInputs[sub.id]?.score ?? ''}
+                      onChange={(e) => setGradeInputs((g) => ({ ...g, [sub.id]: { score: e.target.value, feedback: g[sub.id]?.feedback ?? '' } }))}
+                    />
+                  </FormField>
+                  <FormField label="Feedback (optional)" htmlFor={`fb-${sub.id}`}>
+                    <Input
+                      id={`fb-${sub.id}`}
+                      value={gradeInputs[sub.id]?.feedback ?? ''}
+                      maxLength={4000}
+                      onChange={(e) => setGradeInputs((g) => ({ ...g, [sub.id]: { score: g[sub.id]?.score ?? '', feedback: e.target.value } }))}
+                    />
+                  </FormField>
+                  <Button size="sm" variant="primary" isLoading={gradeState[sub.id]?.saving} onClick={() => handleGrade(sub)}>
+                    {sub.status === 'GRADED' ? 'Update grade' : 'Save grade'}
+                  </Button>
+                </div>
+                {gradeState[sub.id]?.error && <p className="text-[#B42318] font-medium">{gradeState[sub.id]?.error}</p>}
+                {gradeState[sub.id]?.saved && <p className="text-[#247A4D] font-medium">Grade saved. The student can see it now.</p>}
               </div>
             ))
           )}

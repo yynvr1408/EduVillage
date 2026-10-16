@@ -49,10 +49,10 @@ def list_assignments(db: Session, user: User, course_id: str | None = None) -> l
     return list(db.execute(stmt).scalars())
 
 
-def create_assignment(db: Session, teacher: User, course_id: str, *, title: str, instructions: str | None, due_at, status) -> Assignment:
+def create_assignment(db: Session, teacher: User, course_id: str, *, title: str, instructions: str | None, due_at, status, max_score: int = 100) -> Assignment:
     course = course_service.get_course_or_404(db, course_id)
     course_service.assert_owns_course(db, teacher, course)
-    assignment = Assignment(course_id=course_id, created_by=teacher.id, title=title, instructions=instructions, due_at=due_at, status=status)
+    assignment = Assignment(course_id=course_id, created_by=teacher.id, title=title, instructions=instructions, due_at=due_at, status=status, max_score=max_score)
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
@@ -165,3 +165,26 @@ def list_submissions(db: Session, teacher: User, assignment: Assignment, *, limi
     course_service.assert_owns_course(db, teacher, course)
     stmt = select(AssignmentSubmission).where(AssignmentSubmission.assignment_id == assignment.id)
     return paginate(db, stmt, limit=limit, offset=offset)
+
+
+def grade_submission(
+    db: Session, teacher: User, assignment: Assignment, submission_id: str, *, score: float, feedback: str | None
+) -> AssignmentSubmission:
+    from app.core.exceptions import ValidationFailedError
+
+    course = course_service.get_course_or_404(db, assignment.course_id)
+    course_service.assert_owns_course(db, teacher, course)
+    submission = db.get(AssignmentSubmission, submission_id)
+    if not submission or submission.assignment_id != assignment.id:
+        raise NotFoundError("Submission not found.")
+    if submission.status != SubmissionStatus.submitted:
+        raise ConflictError("Only a submitted answer can be graded.", code="SUBMISSION_NOT_SUBMITTED")
+    if score > assignment.max_score:
+        raise ValidationFailedError(f"The score cannot exceed {assignment.max_score}.", code="SCORE_ABOVE_MAXIMUM")
+    submission.score = score
+    submission.feedback = (feedback or "").strip() or None
+    submission.graded_at = utcnow()
+    submission.graded_by = teacher.id
+    db.commit()
+    db.refresh(submission)
+    return submission

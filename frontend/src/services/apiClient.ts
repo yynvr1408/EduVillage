@@ -331,10 +331,11 @@ function mapSubmission(s: Raw): Submission {
     assignment_id: s.assignment_id,
     student_id: s.student_id,
     content: s.answer?.text ?? '',
-    status: 'SUBMITTED',
+    student_name: s.student_name ?? undefined,
+    status: s.score !== null && s.score !== undefined ? 'GRADED' : 'SUBMITTED',
     submitted_at: s.submitted_at ?? s.updated_at,
-    score: undefined,
-    feedback: undefined,
+    score: s.score ?? undefined,
+    feedback: s.feedback ?? undefined,
     attachments: s.attachments ?? [],
   }
 }
@@ -347,7 +348,7 @@ function mapAssignment(a: Raw, courses: CourseIndex, mine?: Raw | null, submissi
     title: a.title,
     instructions: a.instructions ?? '',
     due_date: a.due_at ?? '',
-    max_score: 100,
+    max_score: a.max_score ?? 100,
     created_at: a.created_at ?? '',
     submissions_count: submissionsCount,
     // Only a *submitted* server record counts as submitted; a saved draft is not a submission.
@@ -720,7 +721,7 @@ export const api = {
     const mine = await apiRequest<Raw>(`/assignments/${id}/submissions/me`).catch(() => null)
     return mapAssignment(a, courses, mine)
   },
-  createAssignment: async (data: { course_id: string; title: string; instructions: string; due_date: string }) =>
+  createAssignment: async (data: { course_id: string; title: string; instructions: string; due_date: string; max_score?: number }) =>
     mapAssignment(
       await apiRequest<Raw>(`/assignments?course_id=${encodeURIComponent(data.course_id)}`, {
         method: 'POST',
@@ -729,6 +730,7 @@ export const api = {
           instructions: data.instructions,
           due_at: data.due_date ? new Date(data.due_date).toISOString() : null,
           status: 'published',
+          max_score: data.max_score ?? 100,
         }),
       }),
       await courseIndex()
@@ -764,6 +766,13 @@ export const api = {
   },
   attachmentDownloadUrl: (assignmentId: string, attachmentId: string): string =>
     apiUrl(`/assignments/${assignmentId}/attachments/${attachmentId}/download`),
+  gradeSubmission: async (assignmentId: string, submissionId: string, score: number, feedback: string) =>
+    mapSubmission(
+      await apiRequest<Raw>(`/assignments/${assignmentId}/submissions/${submissionId}/grade`, {
+        method: 'PUT',
+        body: JSON.stringify({ score, feedback: feedback || null }),
+      })
+    ),
   getSubmissions: async (assignmentId: string) =>
     (await apiRequest<Raw[]>(`/assignments/${assignmentId}/submissions`)).filter((s) => s.status === 'submitted').map(mapSubmission),
 

@@ -11,6 +11,7 @@ class AssignmentCreate(BaseModel):
     instructions: str | None = None
     due_at: UtcDatetime | None = None
     status: AssignmentStatus = AssignmentStatus.draft
+    max_score: int = Field(default=100, ge=1, le=1000)
 
 
 class AssignmentUpdate(BaseModel):
@@ -18,6 +19,7 @@ class AssignmentUpdate(BaseModel):
     instructions: str | None = None
     due_at: UtcDatetime | None = None
     status: AssignmentStatus | None = None
+    max_score: int | None = Field(default=None, ge=1, le=1000)
 
 
 class AssignmentOut(BaseModel):
@@ -30,6 +32,7 @@ class AssignmentOut(BaseModel):
     instructions: str | None
     due_at: UtcDatetime | None
     status: AssignmentStatus
+    max_score: int = 100
 
 
 class SubmissionSave(BaseModel):
@@ -69,4 +72,13 @@ class SubmissionOut(BaseModel):
     version: int
     submitted_at: UtcDatetime | None
     updated_at: UtcDatetime
+    score: float | None = None
+    feedback: str | None = None
+    graded_at: UtcDatetime | None = None
+    student_name: str | None = None
     attachments: list[AttachmentOut] = []
+
+
+class SubmissionGrade(BaseModel):
+    score: float = Field(ge=0)
+    feedback: str | None = Field(default=None, max_length=4000)
