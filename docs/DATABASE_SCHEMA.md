@@ -15,6 +15,10 @@ Generated from the SQLAlchemy models by `backend/scripts/generate_docs.py`; do n
 | `version` | INTEGER | no |  |
 | `submitted_at` | DATETIME | yes |  |
 | `updated_at` | DATETIME | no |  |
+| `score` | FLOAT | yes |  |
+| `feedback` | TEXT | yes |  |
+| `graded_at` | DATETIME | yes |  |
+| `graded_by` | VARCHAR(36) | yes | -> `users.id` |
 | `id` | VARCHAR(36) | no | primary key |
 
 Constraints: unique (assignment_id, student_id).
@@ -29,6 +33,7 @@ Constraints: unique (assignment_id, student_id).
 | `instructions` | TEXT | yes |  |
 | `due_at` | DATETIME | yes |  |
 | `status` | VARCHAR(9) | no |  |
+| `max_score` | INTEGER | no |  |
 | `id` | VARCHAR(36) | no | primary key |
 | `created_at` | DATETIME | no |  |
 | `updated_at` | DATETIME | no |  |

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { Assignment, AssignmentDraft } from '../../types'
 import { syncManager } from '../../services/syncManager'
+import { db } from '../../db/db'
 import { assignmentService } from '../../services/assignmentService'
 import { ApiError } from '../../services/apiClient'
 import { useAuth } from '../../context/AuthContext'
@@ -50,6 +51,8 @@ export const OfflineDraftEditor: React.FC<OfflineDraftEditorProps> = ({
     async function loadInitial() {
       // If already submitted on server, set content
       if (assignment.my_submission) {
+        // The server already holds this submission, so a leftover local copy is not unsynced work.
+        await db.assignmentDrafts.delete(assignment.id).catch(() => undefined)
         if (isMounted) {
           setContent(assignment.my_submission.content)
           setSaveStatus('server_confirmed')

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Enum, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
@@ -18,6 +18,7 @@ class Assignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[AssignmentStatus] = mapped_column(
         Enum(AssignmentStatus, native_enum=False), nullable=False, default=AssignmentStatus.draft
     )
+    max_score: Mapped[int] = mapped_column(Integer, nullable=False, default=100, server_default="100")
 
 
 class AssignmentSubmission(UUIDPrimaryKeyMixin, Base):
@@ -33,6 +34,11 @@ class AssignmentSubmission(UUIDPrimaryKeyMixin, Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     submitted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     updated_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow, onupdate=utcnow)
+    # Manual grading by the course's teacher (a graded submission has a score).
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    graded_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    graded_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class SubmissionRevision(UUIDPrimaryKeyMixin, Base):

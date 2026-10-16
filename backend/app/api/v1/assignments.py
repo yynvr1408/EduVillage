@@ -15,6 +15,7 @@ from app.schemas.assignment import (
     AttachmentInitRequest,
     AttachmentInitResponse,
     AttachmentOut,
+    SubmissionGrade,
     SubmissionOut,
     SubmissionSave,
 )
@@ -23,6 +24,8 @@ from app.services import assignment_service, course_service, submission_file_ser
 
 def _submission_out(db: Session, submission) -> SubmissionOut:
     out = SubmissionOut.model_validate(submission)
+    student = db.get(User, submission.student_id)
+    out.student_name = student.full_name if student else None
     out.attachments = [AttachmentOut.model_validate(a) for a in submission_file_service.list_for_student(db, submission.assignment_id, submission.student_id)]
     return out
 
@@ -38,7 +41,8 @@ def list_assignments(course_id: str | None = None, user: User = Depends(get_curr
 def create_assignment(payload: AssignmentCreate, course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     require_role(user, UserRole.teacher)
     assignment = assignment_service.create_assignment(
-        db, user, course_id, title=payload.title, instructions=payload.instructions, due_at=payload.due_at, status=payload.status
+        db, user, course_id, title=payload.title, instructions=payload.instructions, due_at=payload.due_at, status=payload.status,
+        max_score=payload.max_score,
     )
     return AssignmentOut.model_validate(assignment)
 
@@ -81,6 +85,16 @@ def list_submissions(
     assignment = assignment_service.get_assignment_or_404(db, assignment_id)
     submissions = assignment_service.list_submissions(db, user, assignment, limit=limit, offset=offset)
     return [_submission_out(db, s) for s in submissions]
+
+
+@router.put("/{assignment_id}/submissions/{submission_id}/grade", response_model=SubmissionOut)
+def grade_submission(
+    assignment_id: str, submission_id: str, payload: SubmissionGrade, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    require_role(user, UserRole.teacher)
+    assignment = assignment_service.get_assignment_or_404(db, assignment_id)
+    submission = assignment_service.grade_submission(db, user, assignment, submission_id, score=payload.score, feedback=payload.feedback)
+    return _submission_out(db, submission)
 
 
 # ---- files attached to a submission (PDF / Word) ----------------------------------------------------

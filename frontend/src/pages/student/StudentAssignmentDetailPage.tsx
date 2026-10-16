@@ -111,7 +111,7 @@ export const StudentAssignmentDetailPage: React.FC = () => {
               <p className="font-bold text-[#247A4D]">Submission Confirmed by Server</p>
               <p className="text-xs text-[#247A4D]">
                 Submitted on {new Date(assignment.my_submission!.submitted_at).toLocaleString()}
-                {assignment.my_submission!.score !== null &&
+                {assignment.my_submission!.score !== undefined &&
                   ` • Score: ${assignment.my_submission!.score} / ${assignment.max_score}`}
               </p>
             </div>

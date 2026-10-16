@@ -2,7 +2,7 @@
 
 Generated from the running application by `backend/scripts/generate_docs.py`; do not edit by hand. Interactive documentation is served by the backend at `/docs` (Swagger) and `/openapi.json`.
 
-124 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
+125 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
 
 **Authentication.** Students and teachers authenticate with an httpOnly session cookie (`eduvillage_session`). The administrator uses a separate cookie (`eduvillage_admin_session`) and must send `X-EduVillage-Admin: 1` on every request that changes data. "public" means no session is required.
 
@@ -47,6 +47,7 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 | GET | `/api/v1/assignments/{assignment_id}/submissions` | signed-in user | list submissions |
 | GET | `/api/v1/assignments/{assignment_id}/submissions/me` | signed-in user | get my submission |
 | PUT | `/api/v1/assignments/{assignment_id}/submissions/me` | signed-in user | save my submission |
+| PUT | `/api/v1/assignments/{assignment_id}/submissions/{submission_id}/grade` | signed-in user | grade submission |
 
 ## auth
 

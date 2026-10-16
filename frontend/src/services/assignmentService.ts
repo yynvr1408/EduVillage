@@ -62,6 +62,10 @@ export const assignmentService = {
     return { submissionId: result.server_entity_id ?? '' }
   },
 
+  gradeSubmission(assignmentId: string, submissionId: string, score: number, feedback: string): Promise<Submission> {
+    return api.gradeSubmission(assignmentId, submissionId, score, feedback)
+  },
+
   getSubmissions(assignmentId: string): Promise<Submission[]> {
     return api.getSubmissions(assignmentId)
   },

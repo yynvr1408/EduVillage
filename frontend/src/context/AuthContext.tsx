@@ -2,6 +2,7 @@ import type { CollegeSelection } from '../services/registrationApi'
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { User, Role } from '../types'
 import { authService, isOtpChallenge, type LoginOtpChallenge } from '../services/authService'
+import { assignmentService } from '../services/assignmentService'
 import { db } from '../db/db'
 import { ApiError } from '../services/apiClient'
 
@@ -108,9 +109,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkUnsavedWork = async (): Promise<{ hasUnsaved: boolean; count: number; draftTitles: string[] }> => {
     try {
-      const drafts = await db.assignmentDrafts
+      let drafts = await db.assignmentDrafts
         .filter(d => d.syncStatus === 'pending_sync' || d.syncStatus === 'local_only')
         .toArray()
+      // A typed-but-never-submitted draft is real unsynced work, but once the server already holds that
+      // assignment's submission (e.g. submitted from another tab or with an attached file) it is not.
+      if (navigator.onLine) {
+        const stale = new Set<string>()
+        await Promise.all(
+          drafts.filter(d => d.syncStatus === 'local_only').map(async d => {
+            const a = await assignmentService.getAssignmentById(d.assignmentId).catch(() => null)
+            if (a?.my_submission) stale.add(d.id)
+          })
+        )
+        if (stale.size) {
+          await db.assignmentDrafts.bulkDelete([...stale])
+          drafts = drafts.filter(d => !stale.has(d.id))
+        }
+      }
       return {
         hasUnsaved: drafts.length > 0,
         count: drafts.length,
