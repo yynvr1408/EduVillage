@@ -11,10 +11,14 @@ import {
   AlertCircle,
   Pencil,
   Trash2,
+  Archive,
+  FileUp,
+  RotateCcw,
 } from 'lucide-react'
 import { courseService } from '../../services/courseService'
 import type { Course, CourseEnrollment, Lesson } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
+import { SyllabusImportDialog } from '../../components/course/SyllabusImportDialog'
 import {
   Card,
   CardHeader,
@@ -43,6 +47,8 @@ export const TeacherManageCoursePage: React.FC = () => {
 
   // Add Lesson Modal state
   const [isAddLessonOpen, setIsAddLessonOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
+  const [importNotice, setImportNotice] = useState<string | null>(null)
   const [lessonTitle, setLessonTitle] = useState('')
   const [lessonDescription, setLessonDescription] = useState('')
   const [lessonContent, setLessonContent] = useState('')
@@ -55,6 +61,11 @@ export const TeacherManageCoursePage: React.FC = () => {
   const [editDescription, setEditDescription] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  // Archive / restore state
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
 
   // Delete confirmation state
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
@@ -150,6 +161,35 @@ export const TeacherManageCoursePage: React.FC = () => {
     }
   }
 
+  const handleArchive = async () => {
+    if (!courseId) return
+    setIsArchiving(true)
+    setArchiveError(null)
+    try {
+      await courseService.archiveCourse(courseId)
+      setIsArchiveConfirmOpen(false)
+      await loadData()
+    } catch (err: any) {
+      setArchiveError(err.message || 'Failed to archive this course.')
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
+  const handleRestore = async () => {
+    if (!courseId) return
+    setIsArchiving(true)
+    setArchiveError(null)
+    try {
+      await courseService.restoreCourse(courseId)
+      await loadData()
+    } catch (err: any) {
+      setArchiveError(err.message || 'Failed to restore this course.')
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!courseId) return
     setIsDeleting(true)
@@ -233,16 +273,38 @@ export const TeacherManageCoursePage: React.FC = () => {
           <Button size="sm" variant="outline" onClick={openEdit} icon={<Pencil className="w-3.5 h-3.5" />}>
             Edit Course
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setDeleteError(null)
-              setIsDeleteConfirmOpen(true)
-            }}
-            icon={<Trash2 className="w-3.5 h-3.5" />}
-          >
-            {course.status === 'archived' ? 'Permanently Delete' : 'Delete Course'}
+          {course.status === 'archived' ? (
+            <>
+              <Button size="sm" variant="outline" onClick={handleRestore} isLoading={isArchiving} icon={<RotateCcw className="w-3.5 h-3.5" />}>
+                Restore Course
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setDeleteError(null)
+                  setIsDeleteConfirmOpen(true)
+                }}
+                icon={<Trash2 className="w-3.5 h-3.5" />}
+              >
+                Permanently Delete
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setArchiveError(null)
+                setIsArchiveConfirmOpen(true)
+              }}
+              icon={<Archive className="w-3.5 h-3.5" />}
+            >
+              Archive Course
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => setIsImportOpen(true)} icon={<FileUp className="w-3.5 h-3.5" />}>
+            Import Syllabus
           </Button>
           <Button
             size="sm"
@@ -443,6 +505,54 @@ export const TeacherManageCoursePage: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Dialog>
+
+      {importNotice && (
+        <div className="mb-4 p-3 bg-[#E5F5EB] text-[#247A4D] border border-[#247A4D]/30 rounded-lg text-xs font-medium" role="status">
+          {importNotice}
+        </div>
+      )}
+
+      {archiveError && course.status === 'archived' && (
+        <div className="mb-4 p-3 bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] rounded-lg text-xs font-medium" role="alert">
+          {archiveError}
+        </div>
+      )}
+
+      <SyllabusImportDialog
+        courseId={courseId ?? ''}
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImported={(count) => {
+          setIsImportOpen(false)
+          setImportNotice(`${count} lesson${count === 1 ? '' : 's'} added to the curriculum.`)
+          void loadData()
+        }}
+      />
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog
+        isOpen={isArchiveConfirmOpen}
+        onClose={() => !isArchiving && setIsArchiveConfirmOpen(false)}
+        title="Archive This Course?"
+        description="The course leaves the catalogue and new self-enrolment. Nothing is deleted: lessons, students, assignments and recordings stay, and you can restore it at any time. You can permanently delete it afterwards if you want."
+        maxWidth="md"
+      >
+        <div className="flex flex-col gap-4 text-xs">
+          {archiveError && (
+            <div className="p-3 bg-[#FDE8E7] text-[#B42318] border border-[#CBD7D1] rounded-lg font-medium" role="alert">
+              {archiveError}
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E1E8E4]">
+            <Button type="button" variant="ghost" size="sm" disabled={isArchiving} onClick={() => setIsArchiveConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" size="sm" variant="primary" isLoading={isArchiving} onClick={handleArchive}>
+              Archive Course
+            </Button>
+          </div>
+        </div>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}

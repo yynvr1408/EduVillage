@@ -2,6 +2,11 @@ import { api } from './apiClient'
 import { db } from '../db/db'
 import type { Course, CourseEnrollment, Lesson, Material } from '../types'
 
+export interface ProposedLesson {
+  title: string
+  content: string | null
+}
+
 export const courseService = {
   async getCourses(): Promise<Course[]> {
     return api.getCourses()
@@ -56,6 +61,31 @@ export const courseService = {
    * activity. force=true permanently deletes an already-archived course regardless of history. */
   async deleteCourse(id: string, force: boolean = false): Promise<{ deleted: boolean; course: Course | null }> {
     return api.deleteCourse(id, force)
+  },
+
+  /** Proposes lessons from pasted text. Saves nothing. */
+  async previewSyllabusText(courseId: string, text: string): Promise<ProposedLesson[]> {
+    return api.previewSyllabusText(courseId, text)
+  },
+
+  /** Proposes lessons from a syllabus PDF (text PDFs). Saves nothing. */
+  async previewSyllabusPdf(courseId: string, file: File): Promise<ProposedLesson[]> {
+    return api.previewSyllabusPdf(courseId, file)
+  },
+
+  /** Creates the confirmed lessons in one transaction; resolves to how many were added. */
+  async createLessonsBulk(courseId: string, lessons: ProposedLesson[]): Promise<number> {
+    return api.createLessonsBulk(courseId, lessons)
+  },
+
+  /** Archives (hides from the catalogue, deletes nothing). Reversible with restoreCourse. */
+  async archiveCourse(id: string): Promise<Course> {
+    return api.archiveCourse(id)
+  },
+
+  /** Reverts an archive. */
+  async restoreCourse(id: string): Promise<Course> {
+    return api.restoreCourse(id)
   },
 
   async createLesson(courseId: string, data: {

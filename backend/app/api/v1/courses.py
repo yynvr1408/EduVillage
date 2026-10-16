@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_role
@@ -6,8 +6,15 @@ from app.dependencies import get_current_user, get_db
 from app.db.models.enums import UserRole
 from app.db.models.user import User
 from app.schemas.course import CoTeacherCreate, CoTeacherOut, CourseCreate, CourseDeleteOut, CourseOut, CourseUpdate, EnrollmentCreate, EnrollmentOut
-from app.schemas.lesson import LessonCreate, LessonOut, LessonUpdate
-from app.services import course_service
+from app.schemas.lesson import (
+    BulkLessonsCreate,
+    LessonCreate,
+    LessonOut,
+    LessonUpdate,
+    SyllabusPreview,
+    SyllabusTextRequest,
+)
+from app.services import course_service, syllabus_service
 
 router = APIRouter(tags=["courses"])
 
@@ -84,6 +91,20 @@ def delete_course(
     return CourseDeleteOut(deleted=deleted, course=_course_out(db, remaining) if remaining else None)
 
 
+@router.post("/courses/{course_id}/archive", response_model=CourseOut)
+def archive_course(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Explicit archive: out of the catalog and self-enrolment, nothing deleted, reversible with /restore."""
+    course = course_service.get_course_or_404(db, course_id)
+    return _course_out(db, course_service.archive_course(db, user, course))
+
+
+@router.post("/courses/{course_id}/restore", response_model=CourseOut)
+def restore_course(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Reverts an archive (back to published)."""
+    course = course_service.get_course_or_404(db, course_id)
+    return _course_out(db, course_service.restore_course(db, user, course))
+
+
 @router.get("/courses/{course_id}/lessons", response_model=list[LessonOut])
 def list_lessons(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     course = course_service.get_course_or_404(db, course_id)
@@ -101,6 +122,40 @@ def create_lesson(
         db, course, title=payload.title, content=payload.content, position=payload.position, status=payload.status
     )
     return LessonOut.model_validate(lesson)
+
+
+@router.post("/courses/{course_id}/syllabus/preview", response_model=SyllabusPreview)
+def preview_syllabus_text(
+    course_id: str, payload: SyllabusTextRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Proposes lessons from pasted text. Saves nothing."""
+    course = course_service.get_course_or_404(db, course_id)
+    course_service.assert_owns_course(db, user, course)
+    return SyllabusPreview(lessons=syllabus_service.split_into_lessons(payload.text))
+
+
+@router.post("/courses/{course_id}/syllabus/preview-pdf", response_model=SyllabusPreview)
+async def preview_syllabus_pdf(
+    course_id: str, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Proposes lessons from an uploaded syllabus PDF (text PDFs only). Saves nothing."""
+    course = course_service.get_course_or_404(db, course_id)
+    course_service.assert_owns_course(db, user, course)
+    data = await file.read(syllabus_service.MAX_PDF_BYTES + 1)
+    text, pages = syllabus_service.extract_pdf_text(data)
+    return SyllabusPreview(lessons=syllabus_service.split_into_lessons(text), pages=pages)
+
+
+@router.post("/courses/{course_id}/lessons/bulk", response_model=list[LessonOut], status_code=201)
+def create_lessons_bulk(
+    course_id: str, payload: BulkLessonsCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    course = course_service.get_course_or_404(db, course_id)
+    course_service.assert_owns_course(db, user, course)
+    created = course_service.create_lessons_bulk(
+        db, course, lessons=[item.model_dump() for item in payload.lessons], status=payload.status
+    )
+    return [LessonOut.model_validate(lesson) for lesson in created]
 
 
 @router.get("/lessons/{lesson_id}", response_model=LessonOut)

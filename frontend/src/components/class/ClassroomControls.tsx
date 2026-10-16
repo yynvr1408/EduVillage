@@ -10,6 +10,9 @@ import {
   PhoneOff,
   Radio,
   Wifi,
+  MonitorUp,
+  PencilLine,
+  Droplet,
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -27,6 +30,18 @@ export interface ClassroomControlsProps {
   isSummaryOpen: boolean
   onLeave: () => void
   connectionState: string
+  /** Teacher only: screen sharing, whiteboard and background blur. */
+  teacherTools?: {
+    canShareScreen: boolean
+    isSharingScreen: boolean
+    onAddScreen: () => void
+    isBoardOpen: boolean
+    onToggleBoard: () => void
+    blurOn: boolean
+    blurSupported: boolean
+    onToggleBlur: () => void
+    notice?: string | null
+  }
 }
 
 export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
@@ -42,6 +57,7 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
   isSummaryOpen,
   onLeave,
   connectionState,
+  teacherTools,
 }) => {
   return (
     <div className="bg-[#121A19] text-[#FFFFFF] border-t border-[#202B2A] p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 safe-bottom">
@@ -119,6 +135,63 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
             {isAudioOnly ? 'Audio Only (Active)' : 'Save Data'}
           </span>
         </button>
+
+        {teacherTools && (
+          <>
+            <button
+              type="button"
+              onClick={teacherTools.onAddScreen}
+              disabled={!teacherTools.canShareScreen}
+              className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors border ${
+                teacherTools.isSharingScreen
+                  ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+                  : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
+              } ${teacherTools.canShareScreen ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+              title={
+                teacherTools.canShareScreen
+                  ? teacherTools.isSharingScreen
+                    ? 'Share another screen or window with the class'
+                    : 'Share your screen with the class'
+                  : 'Screen sharing is not supported on this device'
+              }
+              aria-label={teacherTools.isSharingScreen ? 'Share another screen' : 'Share screen'}
+            >
+              <MonitorUp className="w-4 h-4" />
+              <span className="hidden sm:inline">{teacherTools.isSharingScreen ? 'Add screen' : 'Share screen'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={teacherTools.onToggleBoard}
+              aria-pressed={teacherTools.isBoardOpen}
+              className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors cursor-pointer border ${
+                teacherTools.isBoardOpen
+                  ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+                  : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
+              }`}
+              title="Open the whiteboard for the class"
+              aria-label="Whiteboard"
+            >
+              <PencilLine className="w-4 h-4" />
+              <span className="hidden sm:inline">Whiteboard</span>
+            </button>
+            <button
+              type="button"
+              onClick={teacherTools.onToggleBlur}
+              disabled={!teacherTools.blurSupported}
+              aria-pressed={teacherTools.blurOn}
+              className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors border ${
+                teacherTools.blurOn
+                  ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
+                  : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
+              } ${teacherTools.blurSupported ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+              title={teacherTools.blurSupported ? 'Blur your background' : 'Background blur is not supported in this browser'}
+              aria-label="Blur background"
+            >
+              <Droplet className="w-4 h-4" />
+              <span className="hidden sm:inline">Blur</span>
+            </button>
+          </>
+        )}
 
         {/* Summary side panel toggle */}
         <button

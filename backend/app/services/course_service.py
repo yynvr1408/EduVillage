@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -244,6 +244,20 @@ def archive_course(db: Session, teacher: User, course: Course) -> Course:
     return course
 
 
+def restore_course(db: Session, teacher: User, course: Course) -> Course:
+    """Reverts an archive: the course goes back to `published` (the state every course is created in), so it
+    is visible in the catalog and open for self-enrolment again. Nothing was ever removed by archiving, so
+    nothing needs rebuilding. Idempotent for a course that is not archived."""
+    assert_owns_course(db, teacher, course)
+    if course.status != CourseStatus.archived:
+        return course
+    course.status = CourseStatus.published
+    db.commit()
+    db.refresh(course)
+    audit_service.record(db, actor_id=teacher.id, action="course_restored", resource_type="course", resource_id=course.id)
+    return course
+
+
 def list_lessons(db: Session, course_id: str) -> list[Lesson]:
     stmt = select(Lesson).where(Lesson.course_id == course_id).order_by(Lesson.position)
     return list(db.execute(stmt).scalars())
@@ -262,6 +276,22 @@ def create_lesson(db: Session, course: Course, *, title: str, content: str | Non
     db.commit()
     db.refresh(lesson)
     return lesson
+
+
+def create_lessons_bulk(db: Session, course: Course, *, lessons: list[dict], status) -> list[Lesson]:
+    """Adds several lessons after the existing ones, in one transaction (all or none)."""
+    last = db.execute(select(func.max(Lesson.position)).where(Lesson.course_id == course.id)).scalar()
+    position = (last if last is not None else 0) + 1
+    created = []
+    for item in lessons:
+        lesson = Lesson(course_id=course.id, title=item["title"], content=item.get("content"), position=position, status=status)
+        db.add(lesson)
+        created.append(lesson)
+        position += 1
+    db.commit()
+    for lesson in created:
+        db.refresh(lesson)
+    return created
 
 
 def update_lesson(db: Session, lesson: Lesson, **fields) -> Lesson:

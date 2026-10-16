@@ -7,6 +7,7 @@ import {
   Users,
   AlertCircle,
   Eye,
+  Paperclip,
 } from 'lucide-react'
 import { assignmentService } from '../../services/assignmentService'
 import { courseService } from '../../services/courseService'
@@ -298,8 +299,22 @@ export const TeacherAssignmentsPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="p-3 bg-[#FFFFFF] border border-[#E1E8E4] rounded-lg text-[#202B2A] whitespace-pre-wrap leading-relaxed">
-                  {sub.content}
+                  {sub.content || <span className="text-[#687775]">No written answer.</span>}
                 </div>
+                {sub.attachments && sub.attachments.length > 0 && (
+                  <ul className="flex flex-col gap-1.5" aria-label="Attached files">
+                    {sub.attachments.map((f) => (
+                      <li key={f.id}>
+                        <a
+                          href={assignmentService.attachmentDownloadUrl(sub.assignment_id, f.id)}
+                          className="inline-flex items-center gap-2 text-[#0F5B57] font-semibold hover:underline"
+                        >
+                          <Paperclip className="w-3.5 h-3.5" /> {f.filename}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))
           )}

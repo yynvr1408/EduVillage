@@ -6,6 +6,7 @@ import { formatDueDate } from '../../utils/dates'
 import type { Assignment } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { OfflineDraftEditor } from '../../components/assignment/OfflineDraftEditor'
+import { SubmissionFiles } from '../../components/assignment/SubmissionFiles'
 import { Badge, Card, CardHeader, CardContent, LoadingState, ErrorState } from '../../components/ui'
 
 export const StudentAssignmentDetailPage: React.FC = () => {
@@ -134,6 +135,8 @@ export const StudentAssignmentDetailPage: React.FC = () => {
           onSubmitted={() => loadData()}
         />
       </section>
+
+      <SubmissionFiles assignmentId={assignment.id} />
     </PageContainer>
   )
 }

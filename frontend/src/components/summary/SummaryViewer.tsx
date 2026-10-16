@@ -14,6 +14,7 @@ import type { Summary } from '../../types'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card, CardHeader, CardContent } from '../ui/Card'
+import { exportSummary, type SummaryExportFormat } from '../../utils/summaryExport'
 
 export interface SummaryViewerProps {
   summary: Summary
@@ -32,42 +33,21 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
   const isPendingReview = summary.review_status === 'PENDING'
   const isRevisionRequested = summary.review_status === 'REVISION_REQUESTED'
 
-  const handleDownload = () => {
-    let md = `# EduVillage Lecture Summary\nClass Session: ${summary.class_id}\nDate: ${new Date(
-      summary.created_at
-    ).toLocaleDateString()}\nStatus: ${summary.review_status}\n\n## Overview\n${
-      summary.overview || 'N/A'
-    }\n\n`
+  const [exporting, setExporting] = React.useState<SummaryExportFormat | null>(null)
+  const [exportError, setExportError] = React.useState<string | null>(null)
 
-    if (summary.key_concepts && summary.key_concepts.length > 0) {
-      md += `## Key Concepts\n${summary.key_concepts.map((c) => `- ${c}`).join('\n')}\n\n`
+  const handleDownload = async (format: SummaryExportFormat) => {
+    setExporting(format)
+    setExportError(null)
+    const result = await exportSummary(summary, format)
+    if (!result.ok) {
+      setExportError(
+        result.reason === 'UNSUPPORTED_SCRIPT'
+          ? 'This summary contains text a PDF cannot display here. Please download the DOC version instead.'
+          : 'Could not create the file. Please try again.'
+      )
     }
-
-    if (summary.definitions && summary.definitions.length > 0) {
-      md += `## Definitions\n${summary.definitions
-        .map((d) => `### ${d.term}\n${d.definition}`)
-        .join('\n\n')}\n\n`
-    }
-
-    if (summary.examples && summary.examples.length > 0) {
-      md += `## Practical Examples\n${summary.examples.map((e) => `- ${e}`).join('\n')}\n\n`
-    }
-
-    if (summary.revision_questions && summary.revision_questions.length > 0) {
-      md += `## Revision Questions\n${summary.revision_questions
-        .map((q, i) => `${i + 1}. ${q}`)
-        .join('\n')}\n\n`
-    }
-
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `eduvillage-summary-${summary.class_id}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    setExporting(null)
   }
 
   return (
@@ -95,10 +75,22 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
           <Button
             size="sm"
             variant="outline"
-            onClick={handleDownload}
+            isLoading={exporting === 'pdf'}
+            disabled={exporting !== null}
+            onClick={() => handleDownload('pdf')}
             icon={<Download className="w-3.5 h-3.5" />}
           >
-            Download Notes
+            PDF
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            isLoading={exporting === 'docx'}
+            disabled={exporting !== null}
+            onClick={() => handleDownload('docx')}
+            icon={<FileText className="w-3.5 h-3.5" />}
+          >
+            DOC
           </Button>
 
           {isTeacher && onReview && (
@@ -108,6 +100,12 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
           )}
         </div>
       </div>
+
+      {exportError && (
+        <div className="p-3 bg-[#FDE8E7] border border-[#B42318]/30 rounded-lg text-xs text-[#B42318]" role="alert">
+          {exportError}
+        </div>
+      )}
 
       {/* Teacher notice banner */}
       {!isApproved && (

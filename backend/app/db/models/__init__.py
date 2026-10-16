@@ -1,4 +1,4 @@
-from app.db.models.assignment import Assignment, AssignmentSubmission, SubmissionRevision
+from app.db.models.assignment import Assignment, AssignmentSubmission, SubmissionAttachment, SubmissionRevision
 from app.db.models.classroom import Class, ClassParticipant, ClassRecording, ClassSection, RecordingProgress, RecordingSection
 from app.db.models.college import College, CollegeBranch, CollegeCodeHistory, CollegeSection, UserBranchAssignment, UserCollegeSection
 from app.db.models.course import Course, CourseEnrollment, CourseTeacher
@@ -17,6 +17,7 @@ __all__ = [
     "UserCollegeSection",
     "Assignment",
     "AssignmentSubmission",
+    "SubmissionAttachment",
     "SubmissionRevision",
     "Class",
     "ClassParticipant",

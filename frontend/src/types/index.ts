@@ -145,6 +145,14 @@ export interface JoinTokenResponse {
   recording_active: boolean
 }
 
+export interface SubmissionAttachment {
+  id: string
+  filename: string
+  size_bytes: number
+  mime_type: string
+  created_at: string
+}
+
 export interface Submission {
   id: string
   assignment_id: string
@@ -156,6 +164,7 @@ export interface Submission {
   feedback?: string
   submitted_at: string
   idempotency_key?: string
+  attachments?: SubmissionAttachment[]
 }
 
 export interface Assignment {

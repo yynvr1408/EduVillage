@@ -26,3 +26,22 @@ class LessonOut(BaseModel):
     content: str | None
     position: int
     status: LessonStatus
+
+
+class SyllabusTextRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=200_000)
+
+
+class ProposedLesson(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    content: str | None = None
+
+
+class SyllabusPreview(BaseModel):
+    lessons: list[ProposedLesson]
+    pages: int | None = None
+
+
+class BulkLessonsCreate(BaseModel):
+    lessons: list[ProposedLesson] = Field(min_length=1, max_length=200)
+    status: LessonStatus = LessonStatus.published
