@@ -1,4 +1,5 @@
 import type { Summary } from '../types'
+import { loadChunk } from './loadChunk'
 
 /**
  * Study-notes export for a lecture summary: PDF or DOCX (Word). Generated in the browser (so it also works
@@ -44,7 +45,7 @@ export function pdfCanRender(blocks: ExportBlock[]): boolean {
 }
 
 export async function buildPdf(blocks: ExportBlock[]): Promise<Blob> {
-  const { jsPDF } = await import('jspdf')
+  const { jsPDF } = await loadChunk(() => import('jspdf'))
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const margin = 56
   const width = doc.internal.pageSize.getWidth() - margin * 2
@@ -80,7 +81,7 @@ export async function buildPdf(blocks: ExportBlock[]): Promise<Blob> {
 }
 
 export async function buildDocx(blocks: ExportBlock[]): Promise<Blob> {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx')
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await loadChunk(() => import('docx'))
   const children = blocks.map((b) => {
     switch (b.kind) {
       case 'title':

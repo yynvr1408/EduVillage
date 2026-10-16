@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RoomEvent, Track, type LocalVideoTrack, type Room } from 'livekit-client'
+import { loadChunk } from '../utils/loadChunk'
 
 /**
  * Blurs the teacher's background before the video is sent, so students receive an already-blurred picture.
@@ -27,7 +28,7 @@ export function useBackgroundBlur(room: Room | undefined, cameraOn: boolean, wan
     try {
       if (wanted) {
         if (appliedTo.current === track.sid) return
-        const lib = await import('@livekit/track-processors')
+        const lib = await loadChunk(() => import('@livekit/track-processors'))
         if (!lib.supportsBackgroundProcessors()) {
           setSupported(false)
           setActive(false)
