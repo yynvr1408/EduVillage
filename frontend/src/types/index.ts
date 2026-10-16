@@ -145,6 +145,18 @@ export interface JoinTokenResponse {
   recording_active: boolean
 }
 
+export type ParticipationStatus = 'JOINED' | 'LEFT' | 'REMOVED'
+
+export interface ClassParticipant {
+  id: string
+  user_id: string
+  full_name: string
+  email: string
+  joined_at: string | null
+  left_at: string | null
+  status: ParticipationStatus
+}
+
 export interface Submission {
   id: string
   assignment_id: string

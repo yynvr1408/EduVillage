@@ -49,6 +49,13 @@ def update_class(class_id: str, payload: ClassUpdate, user: User = Depends(get_c
     return ClassOut.model_validate(cls)
 
 
+@router.post("/{class_id}/cancel", response_model=ClassOut)
+def cancel_class(class_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    cls = classroom_service.get_class_or_404(db, class_id)
+    cls = classroom_service.cancel_class(db, user, cls)
+    return ClassOut.model_validate(cls)
+
+
 @router.post("/{class_id}/start", response_model=ClassOut)
 async def start_class(class_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     cls = classroom_service.get_class_or_404(db, class_id)
@@ -74,6 +81,14 @@ def list_participants(class_id: str, user: User = Depends(get_current_user), db:
     cls = classroom_service.get_class_or_404(db, class_id)
     classroom_service.assert_teaches_class(db, user, cls)
     return [ParticipantOut.model_validate(p) for p in classroom_service.list_participants(db, cls)]
+
+
+@router.post("/{class_id}/participants/{student_id}/remove", status_code=204)
+async def remove_participant(
+    class_id: str, student_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    cls = classroom_service.get_class_or_404(db, class_id)
+    await classroom_service.remove_participant(db, user, cls, student_id)
 
 
 @router.post("/{class_id}/recordings/start", response_model=RecordingOut, status_code=201)

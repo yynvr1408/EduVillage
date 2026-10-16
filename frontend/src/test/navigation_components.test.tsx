@@ -71,6 +71,94 @@ describe('Navigation & Domain Components', () => {
     expect(screen.getByRole('button', { name: /Join Live Room/i })).toBeInTheDocument()
   })
 
+  it('lets a teacher cancel a scheduled class after confirming, and shows the cancelled state', () => {
+    const scheduledClass: ClassRoom = {
+      id: 'class-sched-1',
+      course_id: 'course-1',
+      course_title: 'Solar Energy',
+      course_code: 'STEM-201',
+      teacher_id: 't-1',
+      teacher_name: 'Dr. Elena Rostova',
+      title: 'Intro to Off-Grid Inverters',
+      status: 'SCHEDULED',
+      scheduled_at: new Date().toISOString(),
+    }
+
+    const onCancel = vi.fn()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(
+      <BrowserRouter>
+        <ClassCard classroom={scheduledClass} isTeacher={true} onCancel={onCancel} />
+      </BrowserRouter>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancel/i }))
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalledWith('class-sched-1')
+
+    confirmSpy.mockRestore()
+  })
+
+  it('does not call onCancel when the teacher dismisses the confirmation', () => {
+    const scheduledClass: ClassRoom = {
+      id: 'class-sched-2',
+      course_id: 'course-1',
+      course_title: 'Solar Energy',
+      course_code: 'STEM-201',
+      teacher_id: 't-1',
+      teacher_name: 'Dr. Elena Rostova',
+      title: 'Intro to Off-Grid Inverters',
+      status: 'SCHEDULED',
+      scheduled_at: new Date().toISOString(),
+    }
+
+    const onCancel = vi.fn()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    render(
+      <BrowserRouter>
+        <ClassCard classroom={scheduledClass} isTeacher={true} onCancel={onCancel} />
+      </BrowserRouter>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancel/i }))
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+
+    confirmSpy.mockRestore()
+  })
+
+  it('renders the cancelled state for a teacher and hides the join affordance for a student', () => {
+    const cancelledClass: ClassRoom = {
+      id: 'class-cancelled-1',
+      course_id: 'course-1',
+      course_title: 'Solar Energy',
+      course_code: 'STEM-201',
+      teacher_id: 't-1',
+      teacher_name: 'Dr. Elena Rostova',
+      title: 'Intro to Off-Grid Inverters',
+      status: 'CANCELLED',
+      scheduled_at: new Date().toISOString(),
+    }
+
+    const { rerender } = render(
+      <BrowserRouter>
+        <ClassCard classroom={cancelledClass} isTeacher={true} />
+      </BrowserRouter>
+    )
+    expect(screen.getByText('CANCELLED')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Start Class/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cancel/i })).not.toBeInTheDocument()
+
+    rerender(
+      <BrowserRouter>
+        <ClassCard classroom={cancelledClass} isTeacher={false} />
+      </BrowserRouter>
+    )
+    expect(screen.queryByRole('button', { name: /Join Live Room/i })).not.toBeInTheDocument()
+  })
+
   it('renders AssignmentCard with "Saved on this device" when draft exists in IndexedDB', () => {
     const assignment: Assignment = {
       id: 'asg-test-1',

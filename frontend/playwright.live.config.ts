@@ -68,7 +68,7 @@ export default defineConfig({
       url: `http://localhost:${FRONTEND_PORT}`,
       reuseExistingServer: false,
       timeout: 180_000,
-      env: { VITE_API_BASE_URL: `http://localhost:${BACKEND_PORT}` },
+      env: { VITE_API_BASE_URL: `http://localhost:${BACKEND_PORT}`, VITE_E2E_TEST_HOOKS: 'true' },
     },
   ],
 })

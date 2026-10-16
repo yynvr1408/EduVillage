@@ -137,6 +137,24 @@ async def start_class(db: Session, teacher: User, cls: Class) -> Class:
     return cls
 
 
+def cancel_class(db: Session, teacher: User, cls: Class) -> Class:
+    """Only a still-SCHEDULED class can be cancelled — once it's gone live there's a real session
+    (and possibly a recording) to account for, so the only way to stop it is `end_class`. No
+    LiveKit room exists yet for a scheduled class (that's only created in `start_class`), so
+    there's nothing to tear down here beyond the status itself."""
+    assert_teaches_class(db, teacher, cls)
+    if cls.status == ClassStatus.cancelled:
+        return cls  # idempotent
+    if cls.status != ClassStatus.scheduled:
+        raise ConflictError(f"Cannot cancel a class in status '{cls.status.value}'.")
+
+    cls.status = ClassStatus.cancelled
+    db.commit()
+    db.refresh(cls)
+    audit_service.record(db, actor_id=teacher.id, action="class_cancelled", resource_type="class", resource_id=cls.id)
+    return cls
+
+
 async def end_class(db: Session, teacher: User, cls: Class) -> Class:
     from app.services import recording_service  # local import: recording_service depends on this module
 
@@ -173,13 +191,17 @@ def issue_join_token(db: Session, user: User, cls: Class) -> dict:
         raise ConflictError("This class is not currently live.")
 
     room_name = cls.livekit_room_name or _room_name_for(cls.id)
-    token = livekit.generate_access_token(
-        identity=user.id, name=user.full_name, room_name=room_name, can_publish=is_teacher, can_subscribe=True
-    )
 
     participant = db.execute(
         select(ClassParticipant).where(ClassParticipant.class_id == cls.id, ClassParticipant.user_id == user.id)
     ).scalar_one_or_none()
+    if not is_teacher and participant is not None and participant.participation_status == ParticipationStatus.removed:
+        raise ForbiddenError("You have been removed from this class by the teacher.", code="REMOVED_FROM_CLASS")
+
+    token = livekit.generate_access_token(
+        identity=user.id, name=user.full_name, room_name=room_name, can_publish=is_teacher, can_subscribe=True
+    )
+
     if participant is None:
         participant = ClassParticipant(class_id=cls.id, user_id=user.id)
         db.add(participant)
@@ -203,3 +225,26 @@ def issue_join_token(db: Session, user: User, cls: Class) -> dict:
 def list_participants(db: Session, cls: Class) -> list[ClassParticipant]:
     stmt = select(ClassParticipant).where(ClassParticipant.class_id == cls.id)
     return list(db.execute(stmt).scalars())
+
+
+async def remove_participant(db: Session, teacher: User, cls: Class, student_id: str) -> None:
+    """Kicks a student out of the live room right now and blocks them from rejoining this
+    same class session. Teachers/co-teachers can't be removed this way — only students."""
+    assert_teaches_class(db, teacher, cls)
+
+    participant = db.execute(
+        select(ClassParticipant).where(ClassParticipant.class_id == cls.id, ClassParticipant.user_id == student_id)
+    ).scalar_one_or_none()
+    if participant is None:
+        raise NotFoundError("This student has not joined this class.")
+    if participant.user.role != UserRole.student:
+        raise ForbiddenError("Only a student can be removed from a class.")
+
+    if cls.status == ClassStatus.live:
+        room_name = cls.livekit_room_name or _room_name_for(cls.id)
+        await livekit.remove_participant(room_name, student_id)
+
+    participant.participation_status = ParticipationStatus.removed
+    participant.left_at = utcnow()
+    db.commit()
+    audit_service.record(db, actor_id=teacher.id, action="participant_removed", resource_type="class", resource_id=cls.id)

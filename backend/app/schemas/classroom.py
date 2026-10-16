@@ -48,6 +48,8 @@ class ParticipantOut(BaseModel):
 
     id: str
     user_id: str
+    full_name: str
+    email: str
     joined_at: UtcDatetime | None
     left_at: UtcDatetime | None
     participation_status: ParticipationStatus

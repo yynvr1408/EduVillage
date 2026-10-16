@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Video, Calendar, Clock, Sparkles, Play, StopCircle } from 'lucide-react'
+import { Video, Calendar, Clock, Sparkles, Play, StopCircle, XCircle } from 'lucide-react'
 import type { ClassRoom } from '../../types'
 import { Card, CardHeader, CardContent, CardFooter } from '../ui/Card'
 import { Badge } from '../ui/Badge'
@@ -11,8 +11,10 @@ export interface ClassCardProps {
   isTeacher?: boolean
   onStart?: (id: string) => void
   onEnd?: (id: string) => void
+  onCancel?: (id: string) => void
   isStarting?: boolean
   isEnding?: boolean
+  isCancelling?: boolean
 }
 
 export const ClassCard: React.FC<ClassCardProps> = ({
@@ -20,12 +22,15 @@ export const ClassCard: React.FC<ClassCardProps> = ({
   isTeacher = false,
   onStart,
   onEnd,
+  onCancel,
   isStarting = false,
   isEnding = false,
+  isCancelling = false,
 }) => {
   const isLive = classroom.status === 'LIVE'
   const isScheduled = classroom.status === 'SCHEDULED'
   const isEnded = classroom.status === 'ENDED'
+  const isCancelled = classroom.status === 'CANCELLED'
 
   const formattedDate = new Date(classroom.scheduled_at).toLocaleDateString(undefined, {
     weekday: 'short',
@@ -45,7 +50,7 @@ export const ClassCard: React.FC<ClassCardProps> = ({
         </Badge>
         <Badge
           variant={
-            isLive ? 'live' : isScheduled ? 'secondary' : isEnded ? 'default' : 'outline'
+            isLive ? 'live' : isScheduled ? 'secondary' : isEnded ? 'default' : isCancelled ? 'error' : 'outline'
           }
           size="sm"
         >
@@ -103,6 +108,8 @@ export const ClassCard: React.FC<ClassCardProps> = ({
               </Link>
             ) : isScheduled ? (
               <span className="text-xs text-[#687775] italic">Room opens when teacher starts class</span>
+            ) : isCancelled ? (
+              <span className="text-xs text-[#B42318] italic">This class was cancelled</span>
             ) : (
               <Link to={`/student/classes/${classroom.id}/summary`} className="w-full sm:w-auto">
                 <Button size="sm" variant="secondary" icon={<Sparkles className="w-3.5 h-3.5" />}>
@@ -116,16 +123,35 @@ export const ClassCard: React.FC<ClassCardProps> = ({
         {/* Teacher actions */}
         {isTeacher && (
           <div className="w-full flex items-center justify-between gap-2">
-            {isScheduled && onStart && (
-              <Button
-                size="sm"
-                variant="primary"
-                isLoading={isStarting}
-                onClick={() => onStart(classroom.id)}
-                icon={<Play className="w-3.5 h-3.5" />}
-              >
-                Start Class
-              </Button>
+            {isScheduled && (onStart || onCancel) && (
+              <div className="flex items-center gap-2">
+                {onStart && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    isLoading={isStarting}
+                    onClick={() => onStart(classroom.id)}
+                    icon={<Play className="w-3.5 h-3.5" />}
+                  >
+                    Start Class
+                  </Button>
+                )}
+                {onCancel && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    isLoading={isCancelling}
+                    onClick={() => {
+                      if (window.confirm('Cancel this scheduled class? Students will no longer be able to join it.')) {
+                        onCancel(classroom.id)
+                      }
+                    }}
+                    icon={<XCircle className="w-3.5 h-3.5" />}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
             )}
 
             {isLive && (
@@ -156,6 +182,8 @@ export const ClassCard: React.FC<ClassCardProps> = ({
                 </Button>
               </Link>
             )}
+
+            {isCancelled && <span className="text-xs text-[#B42318] italic">This class was cancelled</span>}
           </div>
         )}
       </CardFooter>

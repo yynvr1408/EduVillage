@@ -68,6 +68,7 @@ class ClassStatus(str, enum.Enum):
 class ParticipationStatus(str, enum.Enum):
     joined = "joined"
     left = "left"
+    removed = "removed"  # kicked out by the teacher; blocks rejoining this class
 
 
 class AssignmentStatus(str, enum.Enum):

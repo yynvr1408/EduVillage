@@ -73,6 +73,11 @@ export const TeacherDashboard: React.FC = () => {
     loadData()
   }
 
+  const handleCancelClass = async (classId: string) => {
+    await classService.cancelClass(classId)
+    loadData()
+  }
+
   const pendingSummaries = summaries.filter((s) => s.review_status === 'PENDING')
   const liveClasses = classes.filter((c) => c.status === 'LIVE')
   const upcomingClasses = classes.filter((c) => c.status === 'SCHEDULED')
@@ -223,6 +228,7 @@ export const TeacherDashboard: React.FC = () => {
                   isTeacher={true}
                   onStart={handleStartClass}
                   onEnd={handleEndClass}
+                  onCancel={handleCancelClass}
                 />
               ))}
             </div>

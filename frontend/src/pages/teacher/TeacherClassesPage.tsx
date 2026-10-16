@@ -38,6 +38,11 @@ export const TeacherClassesPage: React.FC = () => {
     loadClasses()
   }
 
+  const handleCancelClass = async (classId: string) => {
+    await classService.cancelClass(classId)
+    loadClasses()
+  }
+
   const filtered = classes.filter((c) => {
     if (filter === 'live') return c.status === 'LIVE'
     if (filter === 'scheduled') return c.status === 'SCHEDULED'
@@ -95,6 +100,7 @@ export const TeacherClassesPage: React.FC = () => {
               isTeacher={true}
               onStart={handleStartClass}
               onEnd={handleEndClass}
+              onCancel={handleCancelClass}
             />
           ))}
         </div>

@@ -16,6 +16,7 @@ import {
   VideoOff,
   User,
   Users,
+  UserMinus,
   Sparkles,
   Volume2,
   VolumeX,
@@ -36,10 +37,62 @@ import { classService } from '../../services/classService'
 import { summaryService } from '../../services/summaryService'
 import { useAuth } from '../../context/AuthContext'
 import { useAdaptiveAudio } from '../../hooks/useAdaptiveAudio'
-import type { ClassRoom, JoinTokenResponse, Summary } from '../../types'
+import type { ClassParticipant, ClassRoom, JoinTokenResponse, Summary } from '../../types'
 import { ClassroomControls } from '../../components/class/ClassroomControls'
 import { SummaryViewer } from '../../components/summary/SummaryViewer'
 import { Sheet, Badge, Button, LoadingState, ErrorState } from '../../components/ui'
+
+/**
+ * Teacher-only roster: who has joined, their name/email, and a way to remove a student
+ * from the live session. Students never see this (it's never fetched for them).
+ */
+export const ParticipantsPanel: React.FC<{
+  participants: ClassParticipant[]
+  isLoading: boolean
+  removingUserId: string | null
+  errorMessage: string | null
+  onRemove: (p: ClassParticipant) => void
+}> = ({ participants, isLoading, removingUserId, errorMessage, onRemove }) => {
+  if (isLoading && participants.length === 0) {
+    return <div className="text-center py-12 text-[#687775] text-xs">Loading participants...</div>
+  }
+  if (participants.length === 0) {
+    return <div className="text-center py-12 text-[#687775] text-xs">No one has joined yet.</div>
+  }
+  return (
+    <div className="space-y-2">
+      {errorMessage && <p className="text-xs text-[#B42318] mb-2">{errorMessage}</p>}
+      {participants.map((p) => (
+        <div
+          key={p.id}
+          className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-[#E1E8E4] bg-[#F8FAF7]"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[#202B2A] truncate">{p.full_name}</p>
+            <p className="text-xs text-[#687775] truncate">{p.email}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant={p.status === 'JOINED' ? 'success' : p.status === 'REMOVED' ? 'error' : 'secondary'} size="sm">
+              {p.status}
+            </Badge>
+            {p.status === 'JOINED' && (
+              <button
+                type="button"
+                onClick={() => onRemove(p)}
+                disabled={removingUserId === p.user_id}
+                className="p-1.5 text-[#B42318] hover:bg-[#FDE8E7] rounded-md disabled:opacity-50 cursor-pointer"
+                aria-label={`Remove ${p.full_name}`}
+                title="Remove from class"
+              >
+                <UserMinus className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 /**
  * Inner room component that accesses LiveKit context hooks
@@ -56,6 +109,52 @@ const ClassroomStage: React.FC<{
 
   const [isSummaryPanelOpen, setIsSummaryPanelOpen] = useState(false)
   const [connectionStateStr, setConnectionStateStr] = useState<string>('connected')
+
+  // Teacher-only roster panel: who has joined (name/email) and a way to remove a student.
+  const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false)
+  const [participants, setParticipants] = useState<ClassParticipant[]>([])
+  const [participantsLoading, setParticipantsLoading] = useState(false)
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null)
+  const [participantsError, setParticipantsError] = useState<string | null>(null)
+
+  const loadParticipants = async () => {
+    if (!isTeacher) return
+    setParticipantsLoading(true)
+    try {
+      const list = await classService.getParticipants(classroom.id)
+      setParticipants(list)
+    } catch {
+      // Keep whatever list is already shown; the panel's own content stays usable.
+    } finally {
+      setParticipantsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isParticipantsPanelOpen) loadParticipants()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isParticipantsPanelOpen])
+
+  const openParticipants = () => {
+    setIsSummaryPanelOpen(false)
+    setIsParticipantsPanelOpen(true)
+  }
+
+  const handleRemoveParticipant = async (p: ClassParticipant) => {
+    if (!window.confirm(`Remove ${p.full_name} from this class? They'll be disconnected immediately and can't rejoin this session.`)) {
+      return
+    }
+    setParticipantsError(null)
+    setRemovingUserId(p.user_id)
+    try {
+      await classService.removeParticipant(classroom.id, p.user_id)
+      await loadParticipants()
+    } catch (err: any) {
+      setParticipantsError(err.message || 'Could not remove this student.')
+    } finally {
+      setRemovingUserId(null)
+    }
+  }
 
   // Adaptive Audio-Only controller hook (manages WebRTC video track subscriptions)
   const {
@@ -79,6 +178,26 @@ const ClassroomStage: React.FC<{
     updateState()
     return () => {
       room.off('connectionStateChanged', updateState)
+    }
+  }, [room])
+
+  // Test-only: lets a real-browser test inspect the real Room/PeerConnection directly, and
+  // synthesize the one external input the browser itself won't reliably simulate — a
+  // ConnectionQuality signal (ordinary DevTools/CDP network throttling only affects Chrome's
+  // HTTP/WebSocket stack, not WebRTC's UDP media path, so it cannot be used to exercise this
+  // reliably). Emitting the event is as far as this override goes: every reaction to it —
+  // useAdaptiveAudio's handler, the real publication.setSubscribed() calls, the real resulting
+  // RTP flow on the real LiveKit Cloud connection — is completely real and unmocked.
+  // Never set in a real build — only the e2e-live harness sets VITE_E2E_TEST_HOOKS.
+  useEffect(() => {
+    if (import.meta.env.VITE_E2E_TEST_HOOKS !== 'true' || !room) return
+    ;(window as any).__livekitRoom = room
+    ;(window as any).__emitConnectionQuality = (quality: ConnectionQuality) => {
+      room.emit('connectionQualityChanged' as any, quality, room.localParticipant)
+    }
+    return () => {
+      delete (window as any).__livekitRoom
+      delete (window as any).__emitConnectionQuality
     }
   }, [room])
 
@@ -129,10 +248,22 @@ const ClassroomStage: React.FC<{
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-1.5 text-xs text-[#CBD7D1] bg-[#202B2A] px-2.5 py-1 rounded-full border border-[#374947]">
-            <Users className="w-3.5 h-3.5 text-[#FFFFFF]" />
-            <span data-testid="participant-count">{remoteParticipants.length + 1}</span>
-          </div>
+          {isTeacher ? (
+            <button
+              type="button"
+              onClick={openParticipants}
+              className="flex items-center gap-1.5 text-xs text-[#CBD7D1] bg-[#202B2A] hover:bg-[#374947] px-2.5 py-1 rounded-full border border-[#374947] cursor-pointer"
+              aria-label="View participants"
+            >
+              <Users className="w-3.5 h-3.5 text-[#FFFFFF]" />
+              <span data-testid="participant-count">{remoteParticipants.length + 1}</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs text-[#CBD7D1] bg-[#202B2A] px-2.5 py-1 rounded-full border border-[#374947]">
+              <Users className="w-3.5 h-3.5 text-[#FFFFFF]" />
+              <span data-testid="participant-count">{remoteParticipants.length + 1}</span>
+            </div>
+          )}
 
           <Badge variant="live" size="sm">
             LIVE
@@ -259,6 +390,35 @@ const ClassroomStage: React.FC<{
             </div>
           </aside>
         )}
+
+        {/* Desktop Side Participants Panel (teacher only; does not disconnect active call) */}
+        {isParticipantsPanelOpen && isTeacher && (
+          <aside className="hidden lg:flex flex-col w-96 bg-[#FFFFFF] text-[#202B2A] border-l border-[#E1E8E4] shrink-0 h-full overflow-hidden">
+            <div className="p-4 border-b border-[#E1E8E4] flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-sm text-[#202B2A]">
+                <Users className="w-4 h-4 text-[#0F5B57]" />
+                <span>Participants ({remoteParticipants.length + 1})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsParticipantsPanelOpen(false)}
+                className="p-1 text-[#687775] hover:text-[#0F5B57] rounded cursor-pointer"
+                aria-label="Close participants"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <ParticipantsPanel
+                participants={participants}
+                isLoading={participantsLoading}
+                removingUserId={removingUserId}
+                errorMessage={participantsError}
+                onRemove={handleRemoveParticipant}
+              />
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* Mobile Bottom Sheet for Lecture Summary (Does not disconnect active call!) */}
@@ -280,6 +440,26 @@ const ClassroomStage: React.FC<{
         </div>
       </Sheet>
 
+      {/* Mobile Bottom Sheet for Participants (teacher only; does not disconnect active call) */}
+      {isTeacher && (
+        <Sheet
+          isOpen={isParticipantsPanelOpen}
+          onClose={() => setIsParticipantsPanelOpen(false)}
+          title={`Participants (${remoteParticipants.length + 1})`}
+          position="bottom"
+        >
+          <div className="text-left text-[#202B2A]">
+            <ParticipantsPanel
+              participants={participants}
+              isLoading={participantsLoading}
+              removingUserId={removingUserId}
+              errorMessage={participantsError}
+              onRemove={handleRemoveParticipant}
+            />
+          </div>
+        </Sheet>
+      )}
+
       {/* Bottom Control Bar */}
       <ClassroomControls
         isMicEnabled={Boolean(isMicrophoneEnabled)}
@@ -290,7 +470,10 @@ const ClassroomStage: React.FC<{
         isAudioOnly={isAudioOnly}
         onToggleAudioOnly={() => toggleAudioOnly()}
         isAdaptiveActive={isAdaptiveActive}
-        onToggleSummary={() => setIsSummaryPanelOpen(!isSummaryPanelOpen)}
+        onToggleSummary={() => {
+          setIsParticipantsPanelOpen(false)
+          setIsSummaryPanelOpen(!isSummaryPanelOpen)
+        }}
         isSummaryOpen={isSummaryPanelOpen}
         onLeave={onLeave}
         connectionState={connectionStateStr}
@@ -462,12 +645,18 @@ export const ClassroomPage: React.FC = () => {
   return (
     <div className="h-screen w-screen flex flex-col bg-[#000000] overflow-hidden select-none">
       <RecordingBar classId={classroom.id} isTeacher={Boolean(isTeacher)} initiallyRecording={joinData.recording_active} />
+      {/* video/audio auto-publish only for participants actually allowed to publish (teachers).
+          Students are subscribe-only (can_publish=False on their token); leaving `audio` always
+          true made every student attempt a real mic publish that the server then rejected on
+          every single join (a real, logged PublishTrackError) for no reason — this prop only
+          controls local publishing, never remote audio playback/reception, which
+          RoomAudioRenderer below handles independently of it. */}
       <LiveKitRoom
         serverUrl={joinData.url}
         token={joinData.token}
         connect={true}
         video={joinData.is_publisher}
-        audio={true}
+        audio={joinData.is_publisher}
         className="flex-1 flex flex-col h-full overflow-hidden"
       >
         <ClassroomStage

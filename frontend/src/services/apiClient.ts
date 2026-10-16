@@ -9,11 +9,13 @@
 
 import type {
   Assignment,
+  ClassParticipant,
   ClassRoom,
   ClassStatus,
   Course,
   CourseEnrollment,
   JoinTokenResponse,
+  ParticipationStatus,
   Lesson,
   Material,
   MaterialType,
@@ -223,6 +225,24 @@ const SUMMARY_STATUS: Record<string, SummaryStatus> = {
   needs_review: 'NEEDS_REVIEW',
   completed: 'COMPLETED',
   failed: 'FAILED',
+}
+
+const PARTICIPATION_STATUS: Record<string, ParticipationStatus> = {
+  joined: 'JOINED',
+  left: 'LEFT',
+  removed: 'REMOVED',
+}
+
+function mapParticipant(p: Raw): ClassParticipant {
+  return {
+    id: p.id,
+    user_id: p.user_id,
+    full_name: p.full_name,
+    email: p.email,
+    joined_at: p.joined_at ?? null,
+    left_at: p.left_at ?? null,
+    status: PARTICIPATION_STATUS[p.participation_status] ?? 'JOINED',
+  }
 }
 
 type CourseIndex = Map<string, Course>
@@ -447,6 +467,14 @@ export const api = {
   },
   startClass: async (id: string) => mapClass(await apiRequest<Raw>(`/classes/${id}/start`, { method: 'POST' }), await courseIndex()),
   endClass: async (id: string) => mapClass(await apiRequest<Raw>(`/classes/${id}/end`, { method: 'POST' }), await courseIndex()),
+  cancelClass: async (id: string) => mapClass(await apiRequest<Raw>(`/classes/${id}/cancel`, { method: 'POST' }), await courseIndex()),
+  getParticipants: async (classId: string): Promise<ClassParticipant[]> => {
+    const list = await apiRequest<Raw[]>(`/classes/${classId}/participants`)
+    return list.map(mapParticipant)
+  },
+  removeParticipant: async (classId: string, studentId: string): Promise<void> => {
+    await apiRequest<void>(`/classes/${classId}/participants/${studentId}/remove`, { method: 'POST' })
+  },
   getJoinToken: async (classId: string): Promise<JoinTokenResponse> => {
     const t = await apiRequest<Raw>(`/classes/${classId}/join-token`, { method: 'POST' })
     return {

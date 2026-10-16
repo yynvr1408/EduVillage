@@ -1,5 +1,5 @@
 import { api } from './apiClient'
-import type { ClassRoom, JoinTokenResponse } from '../types'
+import type { ClassParticipant, ClassRoom, JoinTokenResponse } from '../types'
 
 export const classService = {
   getClasses(): Promise<ClassRoom[]> {
@@ -28,7 +28,19 @@ export const classService = {
     return api.endClass(classId)
   },
 
+  cancelClass(classId: string): Promise<ClassRoom> {
+    return api.cancelClass(classId)
+  },
+
   getJoinToken(classId: string): Promise<JoinTokenResponse> {
     return api.getJoinToken(classId)
+  },
+
+  getParticipants(classId: string): Promise<ClassParticipant[]> {
+    return api.getParticipants(classId)
+  },
+
+  removeParticipant(classId: string, studentId: string): Promise<void> {
+    return api.removeParticipant(classId, studentId)
   },
 }

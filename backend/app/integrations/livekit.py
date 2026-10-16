@@ -62,6 +62,24 @@ async def ensure_room(room_name: str) -> None:
         await client.aclose()
 
 
+async def remove_participant(room_name: str, identity: str) -> None:
+    """Kicks a participant out of a live room immediately. Tolerates the participant already
+    being gone (disconnected on their own just before the teacher's click) instead of treating
+    that race as a failure."""
+    _require_configured()
+    from livekit import api
+
+    client = api.LiveKitAPI(settings.livekit_url, settings.livekit_api_key, settings.livekit_api_secret)
+    try:
+        await client.room.remove_participant(api.RoomParticipantIdentity(room=room_name, identity=identity))
+    except Exception as exc:  # pragma: no cover - network-dependent
+        if "not found" in str(exc).lower():
+            return
+        raise ServiceUnavailableError(f"Could not remove participant: {exc}", code="LIVEKIT_UNREACHABLE") from exc
+    finally:
+        await client.aclose()
+
+
 def _s3_upload_target(storage_key: str):
     from livekit import api
 

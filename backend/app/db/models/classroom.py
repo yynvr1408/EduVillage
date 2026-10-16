@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
 from app.db.models.college import CollegeBranch
 from app.db.models.enums import ClassStatus, ParticipationStatus, RecordingStatus
+from app.db.models.user import User
 
 
 class Class(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -49,6 +50,16 @@ class ClassParticipant(UUIDPrimaryKeyMixin, Base):
     participation_status: Mapped[ParticipationStatus] = mapped_column(
         Enum(ParticipationStatus, native_enum=False), nullable=False, default=ParticipationStatus.joined
     )
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+
+    @property
+    def full_name(self) -> str:
+        return self.user.full_name
+
+    @property
+    def email(self) -> str:
+        return self.user.email
 
 
 class ClassRecording(UUIDPrimaryKeyMixin, TimestampMixin, Base):
