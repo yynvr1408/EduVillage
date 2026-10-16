@@ -47,7 +47,7 @@ def generate_access_token(
         can_subscribe=can_subscribe,
         # Only the presenter may send data messages (the whiteboard rides on them): a student cannot forge it.
         can_publish_data=can_publish and not mic_only,
-        can_publish_sources=[api.TrackSource.MICROPHONE] if mic_only else [],
+        can_publish_sources=["microphone"] if mic_only else [],  # LiveKit wants the source NAME; the protobuf enum int is rejected as an invalid token
     )
     token = (
         api.AccessToken(settings.livekit_api_key, settings.livekit_api_secret)
