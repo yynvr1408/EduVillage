@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, Enum, ForeignKey, Index, Integer, String, Text, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
+from app.db.models.college import CollegeBranch
 from app.db.models.enums import ClassStatus, ParticipationStatus, RecordingStatus
 
 
@@ -20,7 +21,18 @@ class Class(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     livekit_room_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Branch-wide audience ("All Sections" teacher): ONE class for every student of this branch, whatever their
+    # section. NULL = the ordinary course / section-scoped class. No per-section duplicates, one LiveKit room.
+    audience_branch_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("college_branches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    audience_branch: Mapped["CollegeBranch | None"] = relationship(lazy="selectin")
+
     section_links: Mapped[list["ClassSection"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+
+    @property
+    def audience_branch_name(self) -> str | None:
+        return self.audience_branch.name if self.audience_branch else None
 
     @property
     def section_ids(self) -> list[str]:

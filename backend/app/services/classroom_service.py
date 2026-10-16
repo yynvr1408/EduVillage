@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.db.base import utcnow
 from app.db.models.classroom import Class, ClassParticipant, ClassSection
+from app.db.models.college import UserBranchAssignment
 from app.db.models.section import Section
 from app.db.models.enums import ClassStatus, ParticipationStatus, UserRole
 from app.db.models.user import User
@@ -25,6 +26,9 @@ def get_class_or_404(db: Session, class_id: str) -> Class:
 def assert_can_view_class(db: Session, user: User, cls: Class) -> None:
     course = course_service.get_course_or_404(db, cls.course_id)
     course_service.assert_can_view_course(db, user, course)
+    # A branch-wide class is invisible to students outside that branch (another branch or college).
+    if user.role == UserRole.student and not teaching_scope_service.student_in_branch_audience(db, user, cls):
+        raise NotFoundError("Class not found.")
 
 
 def assert_enrolled_in_class(db: Session, user: User, cls: Class) -> None:
@@ -32,6 +36,9 @@ def assert_enrolled_in_class(db: Session, user: User, cls: Class) -> None:
     (joining live media, requesting/viewing a lecture summary), not just published-course preview."""
     course = course_service.get_course_or_404(db, cls.course_id)
     course_service.assert_enrolled(db, user, course)
+    # A branch-wide class is only for students of that branch (never another branch or college).
+    if not course_service.is_teaching(db, user, course) and not teaching_scope_service.student_in_branch_audience(db, user, cls):
+        raise ForbiddenError("This class is for a different branch.", code="WRONG_BRANCH")
     # A class scoped to specific sections is only for members of those sections.
     if cls.section_ids and not course_service.is_teaching(db, user, course):
         if not section_service.is_member_of_any(db, user.id, cls.section_ids):
@@ -61,7 +68,15 @@ def list_classes_for_user(db: Session, user: User, *, limit: int = 50, offset: i
     course_ids = [c.id for c in courses]
     if not course_ids:
         return []
-    stmt = select(Class).where(Class.course_id.in_(course_ids)).order_by(Class.scheduled_start)
+    stmt = select(Class).where(Class.course_id.in_(course_ids))
+    if user.role == UserRole.student:
+        # Branch-wide classes only for students of that branch, and only while the teacher still covers the branch.
+        mine = teaching_scope_service.student_branch_ids(db, user) or {""}
+        still_covered = select(UserBranchAssignment.id).where(
+            UserBranchAssignment.user_id == Class.teacher_id, UserBranchAssignment.branch_id == Class.audience_branch_id
+        )
+        stmt = stmt.where(Class.audience_branch_id.is_(None) | (Class.audience_branch_id.in_(mine) & still_covered.exists()))
+    stmt = stmt.order_by(Class.scheduled_start)
     return paginate(db, stmt, limit=limit, offset=offset)
 
 
@@ -72,7 +87,9 @@ def create_class(
     course = course_service.get_course_or_404(db, course_id)
     course_service.assert_owns_course(db, teacher, course)
     # Branch/section assignment limits which cohorts a teacher may address (enforced here, not only in the UI).
-    section_ids = teaching_scope_service.resolve_class_audience(db, teacher, course, section_ids or [], all_branch_sections)
+    section_ids, audience_branch_id = teaching_scope_service.resolve_class_audience(
+        db, teacher, course, section_ids or [], all_branch_sections
+    )
     cls = Class(
         course_id=course_id,
         teacher_id=teacher.id,
@@ -80,6 +97,7 @@ def create_class(
         scheduled_start=scheduled_start,
         scheduled_end=scheduled_end,
         status=ClassStatus.scheduled,
+        audience_branch_id=audience_branch_id,
     )
     for section_id in dict.fromkeys(section_ids or []):
         section = db.get(Section, section_id)

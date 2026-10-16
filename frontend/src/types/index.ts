@@ -121,6 +121,9 @@ export interface ClassRoom {
   course_id: string
   section_id?: string
   section_name?: string
+  /** Set for a branch-wide ("All Sections") class: shown to every student of that branch under Other Classes. */
+  branch_id?: string
+  branch_name?: string
   course_title?: string
   course_code?: string
   teacher_id: string

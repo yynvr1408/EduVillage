@@ -71,6 +71,14 @@ export const ClassCard: React.FC<ClassCardProps> = ({
           </div>
         )}
 
+        {classroom.branch_name && (
+          <div className="flex items-center gap-1.5 mb-3">
+            <span className="text-xs font-semibold bg-[#DDF3EA] text-[#0F5B57] px-2 py-0.5 rounded-md border border-[#CBD7D1]">
+              Branch: {classroom.branch_name}
+            </span>
+          </div>
+        )}
+
         <div className="flex flex-col gap-1.5 text-xs text-[#687775] mt-auto pt-2 border-t border-[#E1E8E4]">
           <div className="flex items-center gap-2">
             <Calendar className="w-3.5 h-3.5 shrink-0 text-[#687775]" />

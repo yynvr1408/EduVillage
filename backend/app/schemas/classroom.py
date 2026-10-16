@@ -31,6 +31,8 @@ class ClassOut(BaseModel):
     scheduled_end: UtcDatetime | None
     status: ClassStatus
     section_ids: list[str] = []
+    audience_branch_id: str | None = None  # set for a branch-wide ("All Sections") class
+    audience_branch_name: str | None = None
 
 
 class JoinTokenResponse(BaseModel):

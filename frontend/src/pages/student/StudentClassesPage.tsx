@@ -12,6 +12,7 @@ export const StudentClassesPage: React.FC = () => {
   const [classes, setClasses] = useState<ClassRoom[]>([])
   const [filter, setFilter] = useState<'all' | 'live' | 'scheduled' | 'ended'>('all')
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -20,7 +21,10 @@ export const StudentClassesPage: React.FC = () => {
       .then((data) => {
         if (isMounted) setClasses(data)
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error(err)
+        if (isMounted) setLoadError('Could not load your classes. Please try again.')
+      })
       .finally(() => {
         if (isMounted) setIsLoading(false)
       })
@@ -35,6 +39,12 @@ export const StudentClassesPage: React.FC = () => {
     if (filter === 'ended') return c.status === 'ENDED'
     return true
   })
+
+  // Branch-wide classes (created by an "All Sections" teacher) live in their own "Other Classes" section; every
+  // class is in exactly one of the two lists, so nothing can appear twice.
+  const mainClasses = filtered.filter((c) => !c.branch_id)
+  const otherClasses = filtered.filter((c) => !!c.branch_id)
+  const cardGrid = 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4'
 
   return (
     <PageContainer
@@ -65,18 +75,42 @@ export const StudentClassesPage: React.FC = () => {
           <SkeletonCard />
           <SkeletonCard />
         </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Video className="w-6 h-6" />}
-          title="No sessions found"
-          description={`No classes match the filter '${filter}'.`}
-        />
+      ) : loadError ? (
+        <EmptyState icon={<Video className="w-6 h-6" />} title="Classes unavailable" description={loadError} />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
-          {filtered.map((cls) => (
-            <ClassCard key={cls.id} classroom={cls} />
-          ))}
-        </div>
+        <>
+          {mainClasses.length === 0 && otherClasses.length === 0 ? (
+            <EmptyState
+              icon={<Video className="w-6 h-6" />}
+              title="No sessions found"
+              description={`No classes match the filter '${filter}'.`}
+            />
+          ) : (
+            mainClasses.length > 0 && (
+              <div className={cardGrid}>
+                {mainClasses.map((cls) => (
+                  <ClassCard key={cls.id} classroom={cls} />
+                ))}
+              </div>
+            )
+          )}
+
+          <section aria-labelledby="other-classes-heading" className="mt-8" data-testid="other-classes">
+            <h2 id="other-classes-heading" className="text-base font-bold text-[#202B2A] mb-1">
+              Other Classes
+            </h2>
+            <p className="text-xs text-[#687775] mb-4">Classes from teachers who teach every section of your branch.</p>
+            {otherClasses.length === 0 ? (
+              <p className="text-sm text-[#687775]">No other classes right now.</p>
+            ) : (
+              <div className={cardGrid}>
+                {otherClasses.map((cls) => (
+                  <ClassCard key={cls.id} classroom={cls} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
       )}
     </PageContainer>
   )
