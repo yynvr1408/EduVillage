@@ -278,6 +278,34 @@ def list_enrollments(db: Session, course_id: str) -> list[CourseEnrollment]:
     return list(db.execute(stmt).scalars())
 
 
+def roster_student_info(db: Session, student_ids: list[str]) -> dict[str, dict]:
+    """Name/email/branch/section for a roster, batched (not one query per row)."""
+    from app.db.models.college import CollegeBranch, CollegeSection, UserCollegeSection
+
+    if not student_ids:
+        return {}
+    users = {u.id: u for u in db.execute(select(User).where(User.id.in_(student_ids))).scalars()}
+    links = db.execute(select(UserCollegeSection).where(UserCollegeSection.user_id.in_(student_ids))).scalars().all()
+    section_ids = {l.college_section_id for l in links}
+    sections = {s.id: s for s in db.execute(select(CollegeSection).where(CollegeSection.id.in_(section_ids))).scalars()} if section_ids else {}
+    branch_ids = {s.branch_id for s in sections.values()}
+    branches = {b.id: b for b in db.execute(select(CollegeBranch).where(CollegeBranch.id.in_(branch_ids))).scalars()} if branch_ids else {}
+    section_by_user = {l.user_id: sections.get(l.college_section_id) for l in links}
+
+    out: dict[str, dict] = {}
+    for sid in student_ids:
+        user = users.get(sid)
+        section = section_by_user.get(sid)
+        branch = branches.get(section.branch_id) if section else None
+        out[sid] = {
+            "student_name": user.full_name if user else None,
+            "student_email": user.email if user else None,
+            "section": {"id": section.id, "name": section.name} if section else None,
+            "branch": {"id": branch.id, "name": branch.name} if branch else None,
+        }
+    return out
+
+
 def enroll_student(db: Session, course: Course, *, acting_user: User, student_id: str | None) -> CourseEnrollment:
     target_student_id = student_id or acting_user.id
 

@@ -46,6 +46,16 @@ class EnrollmentCreate(BaseModel):
     student_id: str | None = None  # omitted => the authenticated student self-enrolls
 
 
+class RosterBranchOut(BaseModel):
+    id: str
+    name: str
+
+
+class RosterSectionOut(BaseModel):
+    id: str
+    name: str
+
+
 class EnrollmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -54,6 +64,10 @@ class EnrollmentOut(BaseModel):
     student_id: str
     status: EnrollmentStatus
     enrolled_at: UtcDatetime
+    student_name: str | None = None
+    student_email: str | None = None
+    branch: RosterBranchOut | None = None
+    section: RosterSectionOut | None = None
 
 
 class CoTeacherCreate(BaseModel):

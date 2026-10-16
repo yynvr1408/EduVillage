@@ -13,7 +13,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { courseService } from '../../services/courseService'
-import type { Course, Lesson } from '../../types'
+import type { Course, CourseEnrollment, Lesson } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import {
   Card,
@@ -36,6 +36,10 @@ export const TeacherManageCoursePage: React.FC = () => {
   const [course, setCourse] = useState<Course | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Roster (enrolled students)
+  const [roster, setRoster] = useState<CourseEnrollment[]>([])
+  const [rosterStatus, setRosterStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   // Add Lesson Modal state
   const [isAddLessonOpen, setIsAddLessonOpen] = useState(false)
@@ -71,8 +75,20 @@ export const TeacherManageCoursePage: React.FC = () => {
     }
   }
 
+  const loadRoster = async () => {
+    if (!courseId) return
+    setRosterStatus('loading')
+    try {
+      setRoster(await courseService.getEnrollments(courseId))
+      setRosterStatus('ready')
+    } catch {
+      setRosterStatus('error')
+    }
+  }
+
   useEffect(() => {
     loadData()
+    loadRoster()
   }, [courseId])
 
   const handleAddLesson = async (e: React.FormEvent) => {
@@ -273,6 +289,56 @@ export const TeacherManageCoursePage: React.FC = () => {
                   <span className="text-xs text-[#687775]">
                     {lesson.content ? `${lesson.content.length} chars` : 'Empty'}
                   </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Course Roster */}
+      <section className="mb-8">
+        <h2 className="text-base font-bold text-[#202B2A] mb-3 flex items-center gap-2">
+          <Users className="w-4 h-4 text-[#0F5B57]" /> Enrolled Students
+          {rosterStatus === 'ready' && (
+            <Badge variant="secondary" size="sm">
+              {roster.length}
+            </Badge>
+          )}
+        </h2>
+
+        {rosterStatus === 'loading' ? (
+          <LoadingState message="Loading the course roster..." />
+        ) : rosterStatus === 'error' ? (
+          <ErrorState message="Could not load the course roster." onRetry={loadRoster} />
+        ) : roster.length === 0 ? (
+          <div className="p-8 border border-dashed border-[#CBD7D1] bg-[#F8FAF7] rounded-xl text-center text-xs text-[#687775]">
+            No students enrolled yet. Once students enroll, they'll appear here.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {roster.map((e) => (
+              <div
+                key={e.id}
+                className="p-4 bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-[#202B2A] truncate">{e.student_name || 'Unknown student'}</span>
+                    <Badge variant={e.status === 'active' ? 'success' : 'default'} size="sm">
+                      {e.status === 'active' ? 'Enrolled' : 'Removed'}
+                    </Badge>
+                  </div>
+                  <p className="text-[#687775] truncate">{e.student_email}</p>
+                </div>
+                <div className="flex items-center gap-2 text-[#687775] shrink-0">
+                  {e.branch && (
+                    <Badge variant="outline" size="sm">
+                      {e.branch.name}
+                      {e.section ? ` · ${e.section.name}` : ''}
+                    </Badge>
+                  )}
+                  <span>Enrolled {new Date(e.enrolled_at).toLocaleDateString()}</span>
                 </div>
               </div>
             ))}

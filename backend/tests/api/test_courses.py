@@ -190,3 +190,108 @@ def test_archived_course_drops_out_of_the_catalog_but_stays_visible_to_its_teach
 
     assert not any(c["id"] == course["id"] for c in client.get("/api/v1/courses/catalog").json())
     assert any(c["id"] == course["id"] for c in client.get("/api/v1/courses").json())
+
+
+# ---- roster: multiple independent students in one course ----------------------------------------
+
+def test_three_distinct_students_enroll_independently_in_one_course(teacher, published_course, make_user, db_session):
+    from app.db.models.course import CourseEnrollment
+    from sqlalchemy import select
+
+    tclient, _ = teacher
+    students = [make_user(role="student", prefix=f"r{i}") for i in range(3)]
+    for sclient, _ in students:
+        resp = sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+        assert resp.status_code == 201, resp.text
+
+    roster = tclient.get(f"/api/v1/courses/{published_course['id']}/enrollments").json()
+    student_ids = {u["id"] for _, u in students}
+    assert len(roster) == 3
+    assert {r["student_id"] for r in roster} == student_ids
+    assert all(r["status"] == "active" for r in roster)
+
+    # Real DB-level proof: three distinct rows, one real course, no overwrite.
+    rows = db_session.execute(select(CourseEnrollment).where(CourseEnrollment.course_id == published_course["id"])).scalars().all()
+    assert len(rows) == 3 and len({r.id for r in rows}) == 3
+
+
+def test_duplicate_self_enrollment_is_rejected_not_duplicated(student, published_course, db_session):
+    from app.db.models.course import CourseEnrollment
+    from sqlalchemy import select
+
+    sclient, user = student
+    first = sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+    assert first.status_code == 201
+    again = sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+    assert again.status_code == 409
+
+    rows = db_session.execute(
+        select(CourseEnrollment).where(CourseEnrollment.course_id == published_course["id"], CourseEnrollment.student_id == user["id"])
+    ).scalars().all()
+    assert len(rows) == 1
+
+
+def test_roster_shows_student_name_email_and_college_section_when_linked(teacher, published_course, db_session):
+    from tests.api.test_college_registration import admin, make_college, register  # noqa: F401
+
+    tclient, _ = teacher
+    # A student with no college link at all still appears with name/email, just no branch/section.
+    from app.config import get_settings
+
+    settings = get_settings()
+    original = settings.student_college_required
+    settings.student_college_required = False
+    try:
+        from fastapi.testclient import TestClient
+        from app.main import app
+        import secrets
+
+        plain_client = TestClient(app)
+        plain = plain_client.post(
+            "/api/v1/auth/register",
+            json={"full_name": "Plain Student", "email": f"plain-{secrets.token_hex(4)}@example.com", "password": "password123", "role": "student"},
+        ).json()["user"]
+        plain_client.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+    finally:
+        settings.student_college_required = original
+
+    roster = tclient.get(f"/api/v1/courses/{published_course['id']}/enrollments").json()
+    entry = next(r for r in roster if r["student_id"] == plain["id"])
+    assert entry["student_name"] == "Plain Student"
+    assert entry["student_email"] == plain["email"]
+    assert entry["branch"] is None and entry["section"] is None
+
+
+def test_only_the_owning_teacher_can_view_the_roster(teacher, published_course, student, make_user):
+    student_client, _ = student
+    student_client.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+
+    other_teacher, _ = make_user(role="teacher", prefix="other-roster")
+    assert other_teacher.get(f"/api/v1/courses/{published_course['id']}/enrollments").status_code == 403
+    assert student_client.get(f"/api/v1/courses/{published_course['id']}/enrollments").status_code == 403
+
+    tclient, _ = teacher
+    assert tclient.get(f"/api/v1/courses/{published_course['id']}/enrollments").status_code == 200
+
+
+def test_enrollment_persists_across_a_fresh_session_and_db_read(teacher, published_course, student, db_session):
+    """Simulates logout/login/restart: a brand-new client logs in fresh, and a fresh DB query
+    (nothing cached) both see the same enrollment."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.db.models.course import CourseEnrollment
+    from sqlalchemy import select
+
+    sclient, user = student
+    sclient.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={})
+
+    fresh = TestClient(app)
+    login = fresh.post("/api/v1/auth/login", json={"email": user["email"], "password": "password123"})
+    assert login.status_code == 200
+    assert any(c["id"] == published_course["id"] for c in fresh.get("/api/v1/courses").json())
+
+    db_session.expire_all()
+    row = db_session.execute(
+        select(CourseEnrollment).where(CourseEnrollment.course_id == published_course["id"], CourseEnrollment.student_id == user["id"])
+    ).scalar_one_or_none()
+    assert row is not None and row.status.value == "active"

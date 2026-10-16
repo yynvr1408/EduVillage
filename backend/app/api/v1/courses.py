@@ -126,7 +126,9 @@ def update_lesson(
 def list_enrollments(course_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     course = course_service.get_course_or_404(db, course_id)
     course_service.assert_owns_course(db, user, course)
-    return [EnrollmentOut.model_validate(e) for e in course_service.list_enrollments(db, course_id)]
+    enrollments = course_service.list_enrollments(db, course_id)
+    info = course_service.roster_student_info(db, [e.student_id for e in enrollments])
+    return [EnrollmentOut.model_validate(e).model_copy(update=info.get(e.student_id, {})) for e in enrollments]
 
 
 @router.post("/courses/{course_id}/enrollments", response_model=EnrollmentOut, status_code=201)

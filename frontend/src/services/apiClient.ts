@@ -12,6 +12,7 @@ import type {
   ClassRoom,
   ClassStatus,
   Course,
+  CourseEnrollment,
   JoinTokenResponse,
   Lesson,
   Material,
@@ -343,6 +344,8 @@ export const api = {
   getCourseCatalog: async () => (await apiRequest<Raw[]>('/courses/catalog?limit=200')).map((c) => mapCourse(c)),
   enroll: (courseId: string) =>
     apiRequest<Raw>(`/courses/${courseId}/enrollments`, { method: 'POST', body: JSON.stringify({}) }),
+  /** Teacher-only course roster: real backend data (name/email/branch/section), never hardcoded. */
+  getEnrollments: (courseId: string) => apiRequest<CourseEnrollment[]>(`/courses/${courseId}/enrollments`),
   getCourse: async (id: string) => {
     const [course, lessons] = await Promise.all([
       apiRequest<Raw>(`/courses/${id}`),

@@ -62,6 +62,18 @@ export interface Course {
   status: CourseStatus
 }
 
+export interface CourseEnrollment {
+  id: string
+  course_id: string
+  student_id: string
+  status: 'active' | 'removed'
+  enrolled_at: string
+  student_name: string | null
+  student_email: string | null
+  branch: { id: string; name: string } | null
+  section: { id: string; name: string } | null
+}
+
 export interface Section {
   id: string
   course_id: string

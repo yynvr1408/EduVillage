@@ -1,6 +1,6 @@
 import { api } from './apiClient'
 import { db } from '../db/db'
-import type { Course, Lesson, Material } from '../types'
+import type { Course, CourseEnrollment, Lesson, Material } from '../types'
 
 export const courseService = {
   async getCourses(): Promise<Course[]> {
@@ -13,6 +13,11 @@ export const courseService = {
 
   async enroll(courseId: string): Promise<void> {
     await api.enroll(courseId)
+  },
+
+  /** Teacher-only: the real course roster (name/email/branch/section from the backend). */
+  async getEnrollments(courseId: string): Promise<CourseEnrollment[]> {
+    return api.getEnrollments(courseId)
   },
 
   async getCourseById(courseId: string): Promise<Course> {
