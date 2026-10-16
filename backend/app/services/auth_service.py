@@ -1,10 +1,13 @@
+import hashlib
+import hmac
+import logging
+import secrets
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-import hmac
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationFailedError
 from app.core.security import (
@@ -16,24 +19,40 @@ from app.core.security import (
 from app.db.base import utcnow
 from app.db.models.college import UserBranchAssignment, UserCollegeSection
 from app.db.models.enums import UserRole, UserStatus
-from app.db.models.user import PasswordResetToken, User, UserSession
+from app.db.models.user import PasswordResetOtpChallenge, PasswordResetToken, User, UserSession
 from app.services import audit_service
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Login attempts are rate-limited in-process; swap for a Redis-backed limiter under real load.
+# Login/reset attempts are rate-limited in-process; swap for a Redis-backed limiter under real load.
 _login_attempts: dict[str, list] = {}
 _MAX_ATTEMPTS = 10
 _WINDOW = timedelta(minutes=15)
+# A per-IP budget for password-reset requests is deliberately looser than the per-email one:
+# EduVillage is explicitly used from shared community/school devices (see the "shared device"
+# login option), where one public IP legitimately serves many different students resetting
+# their own, different accounts — a tight per-IP limit would lock all of them out together.
+_RESET_IP_MAX_ATTEMPTS = 30
+_RESET_IP_WINDOW = timedelta(minutes=15)
 
 
-def _check_rate_limit(key: str) -> None:
+def _check_rate_limit(key: str, *, max_attempts: int | None = None, window: timedelta | None = None) -> None:
+    # Resolved from the module globals at call time (not as default-argument values), so tests
+    # can monkeypatch _MAX_ATTEMPTS / _WINDOW and have it actually take effect.
+    max_attempts = _MAX_ATTEMPTS if max_attempts is None else max_attempts
+    window = _WINDOW if window is None else window
     now = utcnow()
-    attempts = [t for t in _login_attempts.get(key, []) if now - t < _WINDOW]
-    if len(attempts) >= _MAX_ATTEMPTS:
+    attempts = [t for t in _login_attempts.get(key, []) if now - t < window]
+    if len(attempts) >= max_attempts:
         raise UnauthorizedError("Too many attempts. Please try again later.", code="RATE_LIMITED", status_code=429)
     attempts.append(now)
     _login_attempts[key] = attempts
+
+
+def reset_rate_limits() -> None:
+    """Test-only: clears every in-process rate-limit bucket (login + password-reset)."""
+    _login_attempts.clear()
 
 
 def _assert_may_register_as(role: UserRole, invite_code: str | None) -> None:
@@ -187,46 +206,208 @@ def revoke_all_sessions_except(db: Session, user: User, *, keep_token: str | Non
     return count
 
 
-def request_password_reset(db: Session, email: str) -> str | None:
-    """Returns the raw reset token only in non-production so the team can test the flow
-    without an email provider wired up yet. In production this must be emailed, never returned."""
+RESET_PURPOSE = "password_reset"
+
+
+def _generate_otp() -> str:
+    return "".join(secrets.choice("0123456789") for _ in range(6))
+
+
+def _hash_otp(otp: str) -> str:
+    """Keyed hash (HMAC, not a bare SHA-256): a six-digit code has only 1,000,000 possible
+    values, so an unkeyed hash would be offline-brute-forceable straight from a DB leak. Keying
+    it with session_secret means that leak alone isn't enough — reusing that existing secret
+    rather than introducing a dedicated one for a single-purpose, already-short-lived value."""
+    return hmac.new(settings.session_secret.encode("utf-8"), otp.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def request_password_reset(db: Session, email: str, *, ip: str | None = None) -> str | None:
+    """Returns the raw OTP only in non-production, so the flow is testable without EmailJS wired
+    up. In production the OTP is only ever emailed, never returned. The response is identical
+    whether the account exists, is ineligible, or is inside its resend cooldown — none of that is
+    ever revealed to the caller.
+    Rate-limited by both email and (when known) requester IP, same budget either way so an
+    enumeration attempt gains no timing signal from which one tripped first."""
+    from app.integrations import email as email_integration
+
     normalized_email = email.strip().lower()
-    _check_rate_limit(f"reset:{normalized_email}")
+    _check_rate_limit(f"reset-email:{normalized_email}")
+    if ip:
+        _check_rate_limit(f"reset-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
 
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
-    if not user or user.role == UserRole.admin:
-        # Do not reveal whether the email exists; the admin password is changed only via server configuration.
+    if not user or user.role == UserRole.admin or user.status != UserStatus.active:
+        # Do not reveal whether the email exists, or why it's ineligible (admin / suspended /
+        # pending): the response is identical to the success case either way.
         return None
 
-    token = generate_session_token()
+    now = utcnow()
+    latest = db.execute(
+        select(PasswordResetOtpChallenge)
+        .where(PasswordResetOtpChallenge.user_id == user.id, PasswordResetOtpChallenge.purpose == RESET_PURPOSE)
+        .order_by(PasswordResetOtpChallenge.created_at.desc())
+    ).scalars().first()
+    if latest and (now - latest.created_at) < timedelta(seconds=settings.otp_request_cooldown_seconds):
+        # Inside the resend cooldown: no new email, no new row — and still the same generic
+        # response, so this can't be used to probe account existence/activity either.
+        return None
+
+    # A fresh request supersedes any still-outstanding code already sent — only the newest works.
+    db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.user_id == user.id,
+            PasswordResetOtpChallenge.purpose == RESET_PURPOSE,
+            PasswordResetOtpChallenge.verified_at.is_(None),
+            PasswordResetOtpChallenge.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+
+    otp = _generate_otp()
+    ttl_minutes = settings.otp_ttl_minutes
+    challenge = PasswordResetOtpChallenge(
+        user_id=user.id,
+        otp_hash=_hash_otp(otp),
+        purpose=RESET_PURPOSE,
+        expires_at=now + timedelta(minutes=ttl_minutes),
+        max_attempts=settings.otp_max_attempts,
+    )
+    db.add(challenge)
+    db.commit()
+
+    sent = email_integration.send_otp_email(to=user.email, otp=otp, ttl_minutes=ttl_minutes)
+    if not sent:
+        # Sanitized: never the OTP or the recipient's address.
+        logger.warning("otp_email_not_sent user_id=%s", user.id)
+    return None if settings.is_production else otp
+
+
+def verify_reset_otp(db: Session, *, email: str, otp: str, ip: str | None = None) -> str:
+    """Verifies the OTP and, only on success, issues a short-lived single-use reset
+    AUTHORIZATION (an opaque token, stored the same way the old reset-link token was) that
+    `reset_password` requires. Never starts a session and never returns user details."""
+    normalized_email = email.strip().lower()
+    _check_rate_limit(f"reset-otp-email:{normalized_email}")
+    if ip:
+        _check_rate_limit(f"reset-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+
+    now = utcnow()
+    user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
+    generic_error = UnauthorizedError("That code is incorrect or has expired.", code="INVALID_OTP")
+    if not user:
+        raise generic_error
+
+    challenge = db.execute(
+        select(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.user_id == user.id,
+            PasswordResetOtpChallenge.purpose == RESET_PURPOSE,
+            PasswordResetOtpChallenge.verified_at.is_(None),
+            PasswordResetOtpChallenge.revoked_at.is_(None),
+            PasswordResetOtpChallenge.expires_at > now,
+        )
+        .order_by(PasswordResetOtpChallenge.created_at.desc())
+    ).scalars().first()
+    if not challenge:
+        raise generic_error
+
+    # Atomic attempt claim: the row lock serializes concurrent guesses against the same
+    # challenge, so the attempt cap can never be bypassed by racing requests.
+    claimed = db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.id == challenge.id,
+            PasswordResetOtpChallenge.attempts < PasswordResetOtpChallenge.max_attempts,
+            PasswordResetOtpChallenge.verified_at.is_(None),
+            PasswordResetOtpChallenge.revoked_at.is_(None),
+            PasswordResetOtpChallenge.expires_at > now,
+        )
+        .values(attempts=PasswordResetOtpChallenge.attempts + 1)
+    )
+    db.commit()
+    if claimed.rowcount != 1:
+        raise generic_error
+
+    db.refresh(challenge)
+    if not hmac.compare_digest(challenge.otp_hash, _hash_otp(otp)):
+        raise generic_error
+
+    # Atomic verified-claim: of several concurrent requests submitting the same correct OTP,
+    # only the one that actually flips verified_at here goes on to mint a reset authorization.
+    verified_claim = db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(PasswordResetOtpChallenge.id == challenge.id, PasswordResetOtpChallenge.verified_at.is_(None))
+        .values(verified_at=now)
+    )
+    db.commit()
+    if verified_claim.rowcount != 1:
+        raise generic_error
+
+    reset_token = generate_session_token()
     reset = PasswordResetToken(
         user_id=user.id,
-        token_hash=hash_token(token),
-        expires_at=utcnow() + timedelta(hours=1),
+        token_hash=hash_token(reset_token),
+        expires_at=now + timedelta(minutes=settings.reset_token_ttl_minutes),
     )
     db.add(reset)
     db.commit()
-    return None if settings.is_production else token
+    return reset_token
 
 
-def reset_password(db: Session, *, token: str, new_password: str) -> None:
-    token_hash = hash_token(token)
-    reset = db.execute(
-        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
-    ).scalar_one_or_none()
-    if not reset or reset.used_at is not None or reset.expires_at < utcnow():
-        raise UnauthorizedError("This reset link is invalid or has expired.", code="INVALID_RESET_TOKEN")
+def reset_password(db: Session, *, reset_token: str, new_password: str) -> None:
+    token_hash = hash_token(reset_token)
+    now = utcnow()
+    # Atomic claim: the WHERE clause re-checks every condition at UPDATE time under the row's own
+    # lock, so of two concurrent requests for the same authorization, only one can ever flip
+    # used_at here — the loser's rowcount is 0 and it is rejected, never a second successful reset.
+    claimed = db.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.token_hash == token_hash,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.revoked_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+        .values(used_at=now)
+    )
+    db.commit()
+    if claimed.rowcount != 1:
+        raise UnauthorizedError("This reset authorization is invalid or has expired.", code="INVALID_RESET_TOKEN")
 
+    reset = db.execute(select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)).scalar_one()
     user = db.get(User, reset.user_id)
     if not user:
-        raise UnauthorizedError("This reset link is invalid or has expired.", code="INVALID_RESET_TOKEN")
+        raise UnauthorizedError("This reset authorization is invalid or has expired.", code="INVALID_RESET_TOKEN")
 
     user.password_hash = hash_password(new_password)
-    reset.used_at = utcnow()
-    # A reset usually means the old credential (or a shared-device login) is suspect: end every session.
-    for session in db.execute(
-        select(UserSession).where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
-    ).scalars():
-        session.revoked_at = utcnow()
+    # Any other still-outstanding authorization for this account dies with this one.
+    db.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.id != reset.id,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+    # The OTP challenge(s) that led here are fully spent now too.
+    db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.user_id == user.id,
+            PasswordResetOtpChallenge.purpose == RESET_PURPOSE,
+            PasswordResetOtpChallenge.consumed_at.is_(None),
+        )
+        .values(consumed_at=now)
+    )
+    # A reset usually means the old credential (or a shared-device login) is suspect: end every
+    # session. Resetting the password never itself starts a new one — the user must log in again.
+    db.execute(
+        update(UserSession)
+        .where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
     db.commit()
     audit_service.record(db, actor_id=user.id, action="password_reset", resource_type="user", resource_id=user.id)

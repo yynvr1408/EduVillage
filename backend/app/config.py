@@ -81,6 +81,24 @@ class Settings(BaseSettings):
     # https://api.groq.com/openai/v1 with model whisper-large-v3-turbo.
     speech_to_text_base_url: str | None = None
 
+    # Transactional email: EmailJS's REST API (https://api.emailjs.com/api/v1.0/email/send),
+    # called server-side via httpx — never the browser-side emailjs-com SDK. That's deliberate:
+    # the OTP must be generated and verified only by the backend, so the backend is also the only
+    # thing that ever sends it. EMAILJS_PRIVATE_KEY is the dashboard's "Private Key" (Account ->
+    # Security), sent as `accessToken` — required for server-side calls once an account has
+    # "Allow API calls from non-browser applications" restricted (the EmailJS default for new
+    # accounts); never put it in frontend code. Unset in development: the OTP flow still works,
+    # returning the raw OTP in the API response instead of emailing it.
+    emailjs_service_id: str | None = None
+    emailjs_template_id: str | None = None
+    emailjs_public_key: str | None = None
+    emailjs_private_key: str | None = None
+    otp_ttl_minutes: int = 5
+    otp_max_attempts: int = 5
+    otp_request_cooldown_seconds: int = 60
+    # The reset AUTHORIZATION issued after a correct OTP (not the OTP itself, which uses otp_ttl_minutes).
+    reset_token_ttl_minutes: int = 10
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
@@ -92,6 +110,10 @@ class Settings(BaseSettings):
     @property
     def llm_configured(self) -> bool:
         return bool(self.llm_api_key)
+
+    @property
+    def emailjs_configured(self) -> bool:
+        return bool(self.emailjs_service_id and self.emailjs_template_id and self.emailjs_public_key)
 
 
 @lru_cache

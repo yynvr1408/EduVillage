@@ -62,6 +62,14 @@ services:
         value: whisper-large-v3-turbo
       - key: SPEECH_TO_TEXT_BASE_URL
         value: https://api.groq.com/openai/v1
+      - key: EMAILJS_SERVICE_ID
+        sync: false
+      - key: EMAILJS_TEMPLATE_ID
+        sync: false
+      - key: EMAILJS_PUBLIC_KEY
+        sync: false
+      - key: EMAILJS_PRIVATE_KEY
+        sync: false # EmailJS dashboard: Account -> Security -> "Private Key"
 
 # No separate worker service: Render's free tier has no free Background Worker plan.
 # The API itself kicks off summary/transcription jobs via FastAPI BackgroundTasks on request,

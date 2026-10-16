@@ -64,6 +64,30 @@ export const authService = {
     return api.getCurrentUser(timeoutMs) // short: offline startup must not hang on a dead connection
   },
 
+  /** Always resolves with the same generic message, whether or not the account exists. */
+  async requestPasswordResetOtp(email: string): Promise<{ message: string }> {
+    return apiRequest<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  },
+
+  /** On success, returns a short-lived reset authorization — never store it outside this flow's
+   * own in-memory navigation state (never localStorage/sessionStorage). */
+  async verifyResetOtp(email: string, otp: string): Promise<{ reset_token: string; expires_in_minutes: number }> {
+    return apiRequest<{ reset_token: string; expires_in_minutes: number }>('/auth/verify-reset-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    })
+  },
+
+  async resetPassword(resetToken: string, newPassword: string): Promise<void> {
+    await apiRequest<void>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ reset_token: resetToken, new_password: newPassword }),
+    })
+  },
+
   /** Revokes the session on the server (so a stale cookie on a shared machine is useless), then forgets the local cache. */
   async logout(): Promise<void> {
     try {

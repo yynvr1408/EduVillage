@@ -52,9 +52,10 @@ def test_expired_session_is_rejected(make_user, db_session):
 
 def test_password_reset_does_not_leave_old_sessions_usable(make_user, client):
     c, user = make_user(role="student", prefix="reset")
-    token = client.post("/api/v1/auth/forgot-password", json={"email": user["email"]}).json().get("reset_token")
-    assert token
-    assert client.post("/api/v1/auth/reset-password", json={"token": token, "new_password": "brandnewpass1"}).status_code == 204
+    otp = client.post("/api/v1/auth/forgot-password", json={"email": user["email"]}).json().get("dev_otp")
+    assert otp
+    reset_token = client.post("/api/v1/auth/verify-reset-otp", json={"email": user["email"], "otp": otp}).json()["reset_token"]
+    assert client.post("/api/v1/auth/reset-password", json={"reset_token": reset_token, "new_password": "brandnewpass1"}).status_code == 204
     # Resetting a password (e.g. after a lost shared-device login) must revoke existing sessions.
     assert c.get("/api/v1/users/me").status_code == 401
     assert _login(user["email"], "brandnewpass1").get("/api/v1/users/me").status_code == 200

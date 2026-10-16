@@ -34,9 +34,23 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 
+class VerifyResetOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
 class ResetPasswordRequest(BaseModel):
-    token: str
+    reset_token: str
     new_password: str = Field(min_length=8, max_length=256)
+    # Accepted but not required: if sent, it must match new_password. The frontend already
+    # enforces this before submitting (see Phase 7's allowance for frontend-only confirmation);
+    # this is just a courtesy check for a caller that does send it.
+    confirm_password: str | None = Field(default=None, min_length=8, max_length=256)
+
+
+class ResetAuthorizationOut(BaseModel):
+    reset_token: str
+    expires_in_minutes: int
 
 
 class SessionOut(BaseModel):

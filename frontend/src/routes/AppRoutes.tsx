@@ -11,6 +11,8 @@ import { LoginChoicePage } from '../pages/auth/LoginChoicePage'
 import { RegisterPage } from '../pages/auth/RegisterPage'
 import { RegisterChoicePage } from '../pages/auth/RegisterChoicePage'
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage'
+import { VerifyOtpPage } from '../pages/auth/VerifyOtpPage'
+import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage'
 
 // Student Pages
 import { StudentDashboard } from '../pages/student/StudentDashboard'
@@ -68,6 +70,8 @@ export const AppRoutes: React.FC = () => {
       <Route path="/register/student" element={<RegisterPage portal="student" />} />
       <Route path="/register/teacher" element={<RegisterPage portal="teacher" />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/verify-otp" element={<VerifyOtpPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Real-time Classroom Route (Shared, Role-Scoped) */}
       <Route

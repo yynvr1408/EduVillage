@@ -9,7 +9,9 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    ResetAuthorizationOut,
     ResetPasswordRequest,
+    VerifyResetOtpRequest,
 )
 from app.schemas.user import UserOut
 from app.services import auth_service
@@ -80,17 +82,38 @@ def logout(
 @router.post("/forgot-password", status_code=202)
 def forgot_password(
     payload: ForgotPasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
-    token = auth_service.request_password_reset(db, payload.email)
-    # Always 202 regardless of whether the email exists, to avoid leaking account existence.
-    if settings.is_production:
-        return {"status": "if_exists_email_sent"}
-    return {"status": "dev_mode_token_returned", "reset_token": token}
+    otp = auth_service.request_password_reset(db, payload.email, ip=request.client.host if request.client else None)
+    # Always the same message and status regardless of whether the email exists, is eligible, or
+    # is inside its resend cooldown — none of that is ever revealed. The raw OTP is never
+    # included in production — only emailed.
+    body = {"message": "If an account exists with that email address, a verification code will be sent."}
+    if not settings.is_production:
+        body["dev_otp"] = otp
+    return body
+
+
+@router.post("/verify-reset-otp", response_model=ResetAuthorizationOut)
+def verify_reset_otp(
+    payload: VerifyResetOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    reset_token = auth_service.verify_reset_otp(
+        db, email=payload.email, otp=payload.otp, ip=request.client.host if request.client else None
+    )
+    return ResetAuthorizationOut(reset_token=reset_token, expires_in_minutes=settings.reset_token_ttl_minutes)
 
 
 @router.post("/reset-password", status_code=204)
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
-    auth_service.reset_password(db, token=payload.token, new_password=payload.new_password)
+    if payload.confirm_password is not None and payload.confirm_password != payload.new_password:
+        from app.core.exceptions import ValidationFailedError
+
+        raise ValidationFailedError("Passwords do not match.", code="PASSWORD_MISMATCH")
+    auth_service.reset_password(db, reset_token=payload.reset_token, new_password=payload.new_password)
     return None

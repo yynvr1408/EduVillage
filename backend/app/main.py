@@ -29,6 +29,8 @@ async def lifespan(_app: FastAPI):
         logger.warning("LiveKit is not configured — classroom start/join endpoints will return 503.")
     if not settings.llm_configured:
         logger.warning("No LLM provider configured — lecture summaries will use the labeled stub provider.")
+    if not settings.emailjs_configured:
+        logger.warning("EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY not configured — OTP emails will not be sent.")
     from app.db.session import SessionLocal
     from app.services import admin_service
 
