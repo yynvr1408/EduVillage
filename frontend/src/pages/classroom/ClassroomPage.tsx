@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   LiveKitRoom,
@@ -136,7 +136,12 @@ const ClassroomStage: React.FC<{
   isTeacher: boolean
   onLeave: () => void
   summary: Summary | null
-}> = ({ classroom, isTeacher, onLeave, summary }) => {
+  /** Fetches a fresh join-token and hands it to LiveKitRoom, so a sustained outage caused by a
+   * genuinely rejected/expired token (not just a brief network blip, which LiveKit's own
+   * reconnect already handles) can actually recover instead of retrying with the same bad token
+   * forever. */
+  onNeedFreshToken: () => void
+}> = ({ classroom, isTeacher, onLeave, summary, onNeedFreshToken }) => {
   const room = useRoomContext()
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant()
   const remoteParticipants = useRemoteParticipants()
@@ -334,6 +339,17 @@ const ClassroomStage: React.FC<{
 
   // A sustained outage offers the offline recovery screen (Downloads stay usable without any server)
   const { recoveryRequired, dismiss } = useConnectionRecovery(connectionStateStr)
+
+  // A brief network blip is handled entirely by LiveKit's own reconnect using the same token.
+  // But once it's sustained enough to show the recovery screen, that token may be the actual
+  // problem (expired, revoked, rejected) — LiveKit will then retry forever with the same bad
+  // credential. Fetching a fresh join-token and handing it to LiveKitRoom (as a new `token` prop)
+  // makes it attempt a real reconnect with fresh credentials instead. Fires once per outage: the
+  // effect only re-runs when `recoveryRequired` flips, not on every render.
+  useEffect(() => {
+    if (recoveryRequired) onNeedFreshToken()
+  }, [recoveryRequired, onNeedFreshToken])
+
   // Three separate signals: the device, the EduVillage API, and the live media connection.
   const { isBrowserOnline, isServerReachable } = useNetworkStatus()
   const diagnosis = diagnoseConnectivity({ browserOnline: isBrowserOnline, apiReachable: isServerReachable, liveKitState: connectionStateStr })
@@ -919,6 +935,20 @@ export const ClassroomPage: React.FC = () => {
     navigate(isTeacher ? '/teacher/classes' : '/student/classes')
   }
 
+  // Passed down to ClassroomStage: fetches a fresh LiveKit join-token and replaces `joinData`,
+  // which flows into LiveKitRoom's `token` prop and makes it reconnect with fresh credentials
+  // instead of retrying forever with one that may have been the actual cause of the outage.
+  const refreshJoinToken = useCallback(async () => {
+    if (!classId) return
+    try {
+      const fresh = await classService.getJoinToken(classId)
+      setJoinData(fresh)
+    } catch {
+      // Transient (e.g. API also unreachable right now, or the class ended): the recovery
+      // screen stays up and the next sustained outage, or a manual reload, tries again.
+    }
+  }, [classId])
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#121A19] flex items-center justify-center text-white">
@@ -967,6 +997,7 @@ export const ClassroomPage: React.FC = () => {
           isTeacher={Boolean(isTeacher)}
           onLeave={handleLeave}
           summary={summary}
+          onNeedFreshToken={refreshJoinToken}
         />
       </LiveKitRoom>
     </div>
