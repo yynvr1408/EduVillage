@@ -53,6 +53,8 @@ class ParticipantOut(BaseModel):
     joined_at: UtcDatetime | None
     left_at: UtcDatetime | None
     participation_status: ParticipationStatus
+    speak_requested_at: UtcDatetime | None = None
+    mic_granted: bool = False
 
 
 class RecordingOut(BaseModel):

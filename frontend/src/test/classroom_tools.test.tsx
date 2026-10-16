@@ -141,6 +141,7 @@ describe('FloatingVideo', () => {
 describe('ClassroomControls teacher tools', () => {
   const base = {
     isMicEnabled: true, onToggleMic: () => {}, isCameraEnabled: true, onToggleCamera: () => {}, canPublishVideo: true,
+    canPublishAudio: true,
     isAudioOnly: false, onToggleAudioOnly: () => {}, isAdaptiveActive: false, onToggleSummary: () => {}, isSummaryOpen: false,
     onLeave: () => {}, connectionState: 'connected',
   }
@@ -167,5 +168,26 @@ describe('ClassroomControls teacher tools', () => {
     rerender(<ClassroomControls {...base} teacherTools={{ ...t, canShareScreen: false, blurSupported: false }} />)
     expect(screen.getByRole('button', { name: 'Share screen' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Blur background' })).toBeDisabled()
+  })
+
+  it('a student without mic permission sees "Request to Speak" instead of a mic toggle, which disables once sent', () => {
+    const onRequest = vi.fn()
+    const { rerender } = render(
+      <ClassroomControls {...base} canPublishVideo={false} canPublishAudio={false} speakToTeacher={{ status: 'idle', onRequest }} />
+    )
+    expect(screen.queryByRole('button', { name: /mute microphone|unmute microphone/i })).not.toBeInTheDocument()
+    const requestButton = screen.getByRole('button', { name: 'Request to speak' })
+    fireEvent.click(requestButton)
+    expect(onRequest).toHaveBeenCalled()
+
+    rerender(<ClassroomControls {...base} canPublishVideo={false} canPublishAudio={false} speakToTeacher={{ status: 'requested', onRequest }} />)
+    expect(screen.getByRole('button', { name: 'Request to speak' })).toBeDisabled()
+    expect(screen.getByText('Request Sent')).toBeInTheDocument()
+  })
+
+  it('a student granted mic permission gets the real mic toggle, not the request button', () => {
+    render(<ClassroomControls {...base} canPublishVideo={false} canPublishAudio={true} speakToTeacher={{ status: 'idle', onRequest: vi.fn() }} />)
+    expect(screen.getByRole('button', { name: /mute microphone|unmute microphone/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Request to speak' })).not.toBeInTheDocument()
   })
 })

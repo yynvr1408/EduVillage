@@ -243,6 +243,8 @@ function mapParticipant(p: Raw): ClassParticipant {
     joined_at: p.joined_at ?? null,
     left_at: p.left_at ?? null,
     status: PARTICIPATION_STATUS[p.participation_status] ?? 'JOINED',
+    speak_requested_at: p.speak_requested_at ?? null,
+    mic_granted: Boolean(p.mic_granted),
   }
 }
 
@@ -496,6 +498,15 @@ export const api = {
   },
   removeParticipant: async (classId: string, studentId: string): Promise<void> => {
     await apiRequest<void>(`/classes/${classId}/participants/${studentId}/remove`, { method: 'POST' })
+  },
+  requestToSpeak: async (classId: string): Promise<void> => {
+    await apiRequest<void>(`/classes/${classId}/speak-requests`, { method: 'POST' })
+  },
+  grantMic: async (classId: string, studentId: string): Promise<void> => {
+    await apiRequest<void>(`/classes/${classId}/participants/${studentId}/grant-mic`, { method: 'POST' })
+  },
+  revokeMic: async (classId: string, studentId: string): Promise<void> => {
+    await apiRequest<void>(`/classes/${classId}/participants/${studentId}/revoke-mic`, { method: 'POST' })
   },
   getJoinToken: async (classId: string): Promise<JoinTokenResponse> => {
     const t = await apiRequest<Raw>(`/classes/${classId}/join-token`, { method: 'POST' })

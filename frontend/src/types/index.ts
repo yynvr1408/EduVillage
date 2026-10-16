@@ -155,6 +155,8 @@ export interface ClassParticipant {
   joined_at: string | null
   left_at: string | null
   status: ParticipationStatus
+  speak_requested_at: string | null
+  mic_granted: boolean
 }
 
 export interface SubmissionAttachment {

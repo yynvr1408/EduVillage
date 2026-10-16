@@ -10,7 +10,7 @@ import {
   useRoomContext,
   ConnectionStateToast,
 } from '@livekit/components-react'
-import { Track, ConnectionState, ConnectionQuality } from 'livekit-client'
+import { Track, ConnectionState, ConnectionQuality, RoomEvent } from 'livekit-client'
 import {
   Video,
   VideoOff,
@@ -32,6 +32,7 @@ import {
   LayoutGrid,
   PencilLine,
   Monitor,
+  Hand,
 } from 'lucide-react'
 import { api } from '../../services/apiClient'
 import { useConnectionRecovery } from '../../hooks/useConnectionRecovery'
@@ -61,9 +62,12 @@ export const ParticipantsPanel: React.FC<{
   participants: ClassParticipant[]
   isLoading: boolean
   removingUserId: string | null
+  micActionUserId: string | null
   errorMessage: string | null
   onRemove: (p: ClassParticipant) => void
-}> = ({ participants, isLoading, removingUserId, errorMessage, onRemove }) => {
+  onGrantMic: (p: ClassParticipant) => void
+  onRevokeMic: (p: ClassParticipant) => void
+}> = ({ participants, isLoading, removingUserId, micActionUserId, errorMessage, onRemove, onGrantMic, onRevokeMic }) => {
   if (isLoading && participants.length === 0) {
     return <div className="text-center py-12 text-[#687775] text-xs">Loading participants...</div>
   }
@@ -81,11 +85,30 @@ export const ParticipantsPanel: React.FC<{
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[#202B2A] truncate">{p.full_name}</p>
             <p className="text-xs text-[#687775] truncate">{p.email}</p>
+            {p.status === 'JOINED' && p.speak_requested_at && !p.mic_granted && (
+              <p className="text-xs text-[#2364AA] font-semibold flex items-center gap-1 mt-0.5">
+                <Hand className="w-3 h-3" /> Wants to speak
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Badge variant={p.status === 'JOINED' ? 'success' : p.status === 'REMOVED' ? 'error' : 'secondary'} size="sm">
               {p.status}
             </Badge>
+            {p.status === 'JOINED' && (
+              <button
+                type="button"
+                onClick={() => (p.mic_granted ? onRevokeMic(p) : onGrantMic(p))}
+                disabled={micActionUserId === p.user_id}
+                className={`p-1.5 rounded-md disabled:opacity-50 cursor-pointer ${
+                  p.mic_granted ? 'text-[#0F5B57] hover:bg-[#E3F2EF]' : 'text-[#687775] hover:bg-[#E1E8E4]'
+                }`}
+                aria-label={p.mic_granted ? `Mute ${p.full_name}` : `Allow ${p.full_name} to speak`}
+                title={p.mic_granted ? 'Revoke microphone permission' : 'Allow this student to speak'}
+              >
+                {p.mic_granted ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              </button>
+            )}
             {p.status === 'JOINED' && (
               <button
                 type="button"
@@ -131,6 +154,17 @@ const ClassroomStage: React.FC<{
   const [participantsLoading, setParticipantsLoading] = useState(false)
   const [removingUserId, setRemovingUserId] = useState<string | null>(null)
   const [participantsError, setParticipantsError] = useState<string | null>(null)
+  const [micActionUserId, setMicActionUserId] = useState<string | null>(null)
+
+  // "Request to speak": a student's raise-hand request reaches the teacher instantly over the
+  // LiveKit data channel (students can't publish data themselves, so the server relays it) and
+  // shows up as a dismissable banner even if the teacher hasn't opened the participants panel.
+  const [speakRequests, setSpeakRequests] = useState<{ studentId: string; studentName: string }[]>([])
+  const [mySpeakRequestStatus, setMySpeakRequestStatus] = useState<'idle' | 'requested'>('idle')
+  // The local participant's own live mic-publish grant (teacher: always; student: only once
+  // granted) — tracked via LiveKit's ParticipantPermissionsChanged event, the canonical signal
+  // for a server-side permission update, not a custom message that could drift out of sync.
+  const [canPublishAudio, setCanPublishAudio] = useState(() => isTeacher || Boolean(localParticipant?.permissions?.canPublish))
 
   const loadParticipants = async () => {
     if (!isTeacher) return
@@ -170,6 +204,88 @@ const ClassroomStage: React.FC<{
       setRemovingUserId(null)
     }
   }
+
+  const handleGrantMic = async (p: ClassParticipant) => {
+    setParticipantsError(null)
+    setMicActionUserId(p.user_id)
+    try {
+      await classService.grantMic(classroom.id, p.user_id)
+      setSpeakRequests((prev) => prev.filter((r) => r.studentId !== p.user_id))
+      await loadParticipants()
+    } catch (err: any) {
+      setParticipantsError(err.message || 'Could not allow this student to speak.')
+    } finally {
+      setMicActionUserId(null)
+    }
+  }
+
+  const handleRevokeMic = async (p: ClassParticipant) => {
+    setParticipantsError(null)
+    setMicActionUserId(p.user_id)
+    try {
+      await classService.revokeMic(classroom.id, p.user_id)
+      await loadParticipants()
+    } catch (err: any) {
+      setParticipantsError(err.message || 'Could not mute this student.')
+    } finally {
+      setMicActionUserId(null)
+    }
+  }
+
+  const dismissSpeakRequest = (studentId: string) => {
+    setSpeakRequests((prev) => prev.filter((r) => r.studentId !== studentId))
+  }
+
+  const handleRequestToSpeak = async () => {
+    setMySpeakRequestStatus('requested')
+    try {
+      await classService.requestToSpeak(classroom.id)
+    } catch {
+      setMySpeakRequestStatus('idle') // let the student try again
+    }
+  }
+
+  // Teacher: listen for a student's raise-hand request, pushed server-side over the data
+  // channel the instant it happens (students can't publish data themselves).
+  useEffect(() => {
+    if (!room || !isTeacher) return
+    const onData = (payload: Uint8Array, _participant?: unknown, _kind?: unknown, topic?: string) => {
+      if (topic !== 'speak-request') return
+      let msg: any
+      try {
+        msg = JSON.parse(new TextDecoder().decode(payload))
+      } catch {
+        return
+      }
+      if (msg?.type === 'speak_request' && typeof msg.student_id === 'string') {
+        const studentId = msg.student_id
+        const studentName = typeof msg.student_name === 'string' ? msg.student_name : 'A student'
+        setSpeakRequests((prev) => (prev.some((r) => r.studentId === studentId) ? prev : [...prev, { studentId, studentName }]))
+        loadParticipants()
+      }
+    }
+    room.on(RoomEvent.DataReceived, onData as any)
+    return () => {
+      room.off(RoomEvent.DataReceived, onData as any)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room, isTeacher])
+
+  // Student: the server-side permission update is the source of truth for whether the mic
+  // toggle can actually work — not the request's own "sent" state, which never implies a grant.
+  useEffect(() => {
+    if (!room || isTeacher) return
+    const onPermissions = (_prev: unknown, participant: { identity: string }) => {
+      if (participant.identity !== room.localParticipant.identity) return
+      const granted = Boolean(room.localParticipant.permissions?.canPublish)
+      setCanPublishAudio(granted)
+      if (!granted) setMySpeakRequestStatus('idle') // revoked: let them ask again
+    }
+    room.on(RoomEvent.ParticipantPermissionsChanged, onPermissions as any)
+    return () => {
+      room.off(RoomEvent.ParticipantPermissionsChanged, onPermissions as any)
+    }
+  }, [room, isTeacher])
 
   // Adaptive Audio-Only controller hook (manages WebRTC video track subscriptions)
   const {
@@ -312,6 +428,43 @@ const ClassroomStage: React.FC<{
         </div>
       </div>
 
+      {/* Pending "request to speak" notifications (teacher only) */}
+      {isTeacher && speakRequests.length > 0 && (
+        <div className="bg-[#E8F3FC] border-b border-[#CBD7D1] px-4 py-2 flex flex-col gap-1.5 text-xs text-[#2364AA]">
+          {speakRequests.map((r) => (
+            <div key={r.studentId} className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 min-w-0">
+                <Hand className="w-4 h-4 shrink-0" />
+                <span className="truncate">
+                  <strong>{r.studentName}</strong> is requesting to speak
+                </span>
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = participants.find((pp) => pp.user_id === r.studentId)
+                    if (p) handleGrantMic(p)
+                    else handleGrantMic({ user_id: r.studentId, full_name: r.studentName } as ClassParticipant)
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-[#2364AA] text-[#FFFFFF] font-semibold cursor-pointer hover:bg-[#1A4D80]"
+                >
+                  Allow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dismissSpeakRequest(r.studentId)}
+                  className="p-1 rounded-full text-[#2364AA] hover:bg-[#CBD7D1]/50 cursor-pointer"
+                  aria-label={`Dismiss request from ${r.studentName}`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Severe degradation: even audio-only is unreliable, fall back to text */}
       {severeDegradation && !isTeacher && (
         <div className="bg-[#FDE8E7] border-b border-[#B42318]/30 px-4 py-2 flex items-center gap-2 text-xs text-[#B42318]">
@@ -353,7 +506,7 @@ const ClassroomStage: React.FC<{
                 <TextFallbackPanel classId={classroom.id} />
               </div>
             ) : hasContent ? (
-              <div className="w-full max-w-5xl flex flex-col gap-3">
+              <div className={`w-full flex flex-col gap-3 ${currentKey === 'board' ? '' : 'max-w-5xl'}`}>
                 {views.length > 1 && (
                   <div className="flex flex-wrap gap-2" role="tablist" aria-label="Shared content">
                     {views.map((v) => (
@@ -538,8 +691,11 @@ const ClassroomStage: React.FC<{
                 participants={participants}
                 isLoading={participantsLoading}
                 removingUserId={removingUserId}
+                micActionUserId={micActionUserId}
                 errorMessage={participantsError}
                 onRemove={handleRemoveParticipant}
+                onGrantMic={handleGrantMic}
+                onRevokeMic={handleRevokeMic}
               />
             </div>
           </aside>
@@ -578,8 +734,11 @@ const ClassroomStage: React.FC<{
               participants={participants}
               isLoading={participantsLoading}
               removingUserId={removingUserId}
+              micActionUserId={micActionUserId}
               errorMessage={participantsError}
               onRemove={handleRemoveParticipant}
+              onGrantMic={handleGrantMic}
+              onRevokeMic={handleRevokeMic}
             />
           </div>
         </Sheet>
@@ -592,6 +751,8 @@ const ClassroomStage: React.FC<{
         isCameraEnabled={Boolean(isCameraEnabled)}
         onToggleCamera={handleToggleCamera}
         canPublishVideo={isTeacher}
+        canPublishAudio={isTeacher || canPublishAudio}
+        speakToTeacher={!isTeacher ? { status: mySpeakRequestStatus, onRequest: handleRequestToSpeak } : undefined}
         isAudioOnly={isAudioOnly}
         onToggleAudioOnly={() => toggleAudioOnly()}
         isAdaptiveActive={isAdaptiveActive}
@@ -784,17 +945,20 @@ export const ClassroomPage: React.FC = () => {
   return (
     <div className="h-screen w-screen flex flex-col bg-[#000000] overflow-hidden select-none">
       <RecordingBar classId={classroom.id} isTeacher={Boolean(isTeacher)} initiallyRecording={joinData.recording_active} />
-      {/* video/audio auto-publish only for participants actually allowed to publish (teachers).
-          Students are subscribe-only (can_publish=False on their token); leaving `audio` always
-          true made every student attempt a real mic publish that the server then rejected on
-          every single join (a real, logged PublishTrackError) for no reason — this prop only
+      {/* video/audio auto-publish only for participants actually allowed to publish. Camera is
+          teacher-only even for a student granted mic permission, since that grant is restricted
+          to the microphone source (see livekit.set_mic_permission) — attempting a camera publish
+          for them would be rejected by the server (a real, logged PublishTrackError) for no
+          reason. `audio` covers both the teacher and a mic-granted student. Leaving `audio` true
+          for an ungranted student made every one of them attempt a real mic publish that the
+          server then rejected on every single join, for the same reason — this prop only
           controls local publishing, never remote audio playback/reception, which
           RoomAudioRenderer below handles independently of it. */}
       <LiveKitRoom
         serverUrl={joinData.url}
         token={joinData.token}
         connect={true}
-        video={joinData.is_publisher}
+        video={isTeacher}
         audio={joinData.is_publisher}
         className="flex-1 flex flex-col h-full overflow-hidden"
       >

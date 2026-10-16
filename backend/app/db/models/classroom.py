@@ -50,6 +50,11 @@ class ClassParticipant(UUIDPrimaryKeyMixin, Base):
     participation_status: Mapped[ParticipationStatus] = mapped_column(
         Enum(ParticipationStatus, native_enum=False), nullable=False, default=ParticipationStatus.joined
     )
+    # A student's "raise hand" request to speak; cleared once the teacher grants or denies it.
+    speak_requested_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Live, teacher-granted mic permission — separate from the role-based publish grant a
+    # teacher always has. Persisted so a page refresh/reconnect doesn't lose the grant.
+    mic_granted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     user: Mapped["User"] = relationship(lazy="selectin")
 

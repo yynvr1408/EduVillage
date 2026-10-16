@@ -13,6 +13,7 @@ import {
   MonitorUp,
   PencilLine,
   Droplet,
+  Hand,
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -23,6 +24,14 @@ export interface ClassroomControlsProps {
   isCameraEnabled: boolean
   onToggleCamera: () => void
   canPublishVideo: boolean
+  /** Whether the local participant currently has a real publish grant for mic audio
+   * (always true for the teacher; true for a student only once the teacher grants it). */
+  canPublishAudio: boolean
+  /** Student only: the "raise hand" control shown in place of the mic toggle until granted. */
+  speakToTeacher?: {
+    status: 'idle' | 'requested'
+    onRequest: () => void
+  }
   isAudioOnly: boolean
   onToggleAudioOnly: () => void
   isAdaptiveActive: boolean
@@ -50,6 +59,8 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
   isCameraEnabled,
   onToggleCamera,
   canPublishVideo,
+  canPublishAudio,
+  speakToTeacher,
   isAudioOnly,
   onToggleAudioOnly,
   isAdaptiveActive,
@@ -86,20 +97,40 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
 
       {/* Center: Core Controls (Mic, Camera, Audio-Only, Summary) */}
       <div className="flex items-center gap-2 sm:gap-3 mx-auto">
-        {/* Mic Control */}
-        <button
-          type="button"
-          onClick={onToggleMic}
-          className={`p-3 rounded-full transition-colors touch-target flex items-center justify-center cursor-pointer ${
-            isMicEnabled
-              ? 'bg-[#202B2A] hover:bg-[#374947] text-[#FFFFFF]'
-              : 'bg-[#B42318] text-[#FFFFFF] hover:bg-[#911C13]'
-          }`}
-          title={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
-          aria-label={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
-        >
-          {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-        </button>
+        {/* Mic Control (only rendered when there is a real publish grant to back it) */}
+        {canPublishAudio ? (
+          <button
+            type="button"
+            onClick={onToggleMic}
+            className={`p-3 rounded-full transition-colors touch-target flex items-center justify-center cursor-pointer ${
+              isMicEnabled
+                ? 'bg-[#202B2A] hover:bg-[#374947] text-[#FFFFFF]'
+                : 'bg-[#B42318] text-[#FFFFFF] hover:bg-[#911C13]'
+            }`}
+            title={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
+            aria-label={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
+          >
+            {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+          </button>
+        ) : (
+          speakToTeacher && (
+            <button
+              type="button"
+              onClick={speakToTeacher.onRequest}
+              disabled={speakToTeacher.status === 'requested'}
+              className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors border ${
+                speakToTeacher.status === 'requested'
+                  ? 'bg-[#2364AA] text-[#FFFFFF] border-[#2364AA] cursor-default opacity-80'
+                  : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947] cursor-pointer'
+              }`}
+              title={speakToTeacher.status === 'requested' ? 'Your teacher has been notified' : 'Ask your teacher for permission to speak'}
+              aria-label="Request to speak"
+            >
+              <Hand className="w-4 h-4" />
+              <span className="hidden sm:inline">{speakToTeacher.status === 'requested' ? 'Request Sent' : 'Request to Speak'}</span>
+            </button>
+          )
+        )}
 
         {/* Camera Control (Publisher only) */}
         {canPublishVideo && (

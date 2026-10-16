@@ -198,8 +198,12 @@ def issue_join_token(db: Session, user: User, cls: Class) -> dict:
     if not is_teacher and participant is not None and participant.participation_status == ParticipationStatus.removed:
         raise ForbiddenError("You have been removed from this class by the teacher.", code="REMOVED_FROM_CLASS")
 
+    # A student previously granted mic permission keeps it across a reconnect; a teacher always publishes.
+    mic_granted = bool(participant and participant.mic_granted)
+    can_publish = is_teacher or mic_granted
     token = livekit.generate_access_token(
-        identity=user.id, name=user.full_name, room_name=room_name, can_publish=is_teacher, can_subscribe=True
+        identity=user.id, name=user.full_name, room_name=room_name, can_publish=can_publish, can_subscribe=True,
+        mic_only=not is_teacher,
     )
 
     if participant is None:
@@ -216,7 +220,7 @@ def issue_join_token(db: Session, user: User, cls: Class) -> dict:
         "livekit_url": settings.livekit_url,
         "token": token,
         "room_name": room_name,
-        "can_publish": is_teacher,
+        "can_publish": can_publish,
         # Participants must be told when a session is being recorded.
         "recording_active": recording_service.is_recording(db, cls),
     }
@@ -248,3 +252,55 @@ async def remove_participant(db: Session, teacher: User, cls: Class, student_id:
     participant.left_at = utcnow()
     db.commit()
     audit_service.record(db, actor_id=teacher.id, action="participant_removed", resource_type="class", resource_id=cls.id)
+
+
+async def request_to_speak(db: Session, student: User, cls: Class) -> None:
+    """A student raises their hand. Persisted (so the teacher's roster shows it even if they
+    weren't looking at that moment) and pushed instantly over the room's data channel."""
+    assert_enrolled_in_class(db, student, cls)
+    if cls.status != ClassStatus.live:
+        raise ConflictError("This class is not currently live.")
+
+    participant = db.execute(
+        select(ClassParticipant).where(ClassParticipant.class_id == cls.id, ClassParticipant.user_id == student.id)
+    ).scalar_one_or_none()
+    if participant is None:
+        raise ForbiddenError("You have not joined this class.")
+
+    participant.speak_requested_at = utcnow()
+    db.commit()
+
+    room_name = cls.livekit_room_name or _room_name_for(cls.id)
+    await livekit.notify_room(
+        room_name, {"type": "speak_request", "student_id": student.id, "student_name": student.full_name}
+    )
+
+
+async def set_mic_permission(db: Session, teacher: User, cls: Class, student_id: str, *, granted: bool) -> None:
+    """Grants or revokes a student's live permission to publish microphone audio. Only ever
+    the microphone track — never camera, screen-share or data-channel (whiteboard) access."""
+    assert_teaches_class(db, teacher, cls)
+
+    participant = db.execute(
+        select(ClassParticipant).where(ClassParticipant.class_id == cls.id, ClassParticipant.user_id == student_id)
+    ).scalar_one_or_none()
+    if participant is None:
+        raise NotFoundError("This student has not joined this class.")
+    if participant.user.role != UserRole.student:
+        raise ForbiddenError("Only a student's microphone permission can be managed this way.")
+
+    participant.mic_granted = granted
+    participant.speak_requested_at = None
+    db.commit()
+
+    if cls.status == ClassStatus.live:
+        room_name = cls.livekit_room_name or _room_name_for(cls.id)
+        await livekit.set_mic_permission(room_name, student_id, granted=granted)
+
+    audit_service.record(
+        db,
+        actor_id=teacher.id,
+        action="participant_mic_granted" if granted else "participant_mic_revoked",
+        resource_type="class",
+        resource_id=cls.id,
+    )

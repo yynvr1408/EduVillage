@@ -15,7 +15,7 @@ def mock_livekit(monkeypatch):
     async def fake_ensure_room(room_name: str) -> None:
         return None
 
-    def fake_generate_access_token(*, identity, name, room_name, can_publish, can_subscribe=True):
+    def fake_generate_access_token(*, identity, name, room_name, can_publish, can_subscribe=True, mic_only=False):
         return f"fake-jwt-for-{identity}-in-{room_name}-publish={can_publish}"
 
     monkeypatch.setattr(livekit, "ensure_room", fake_ensure_room)

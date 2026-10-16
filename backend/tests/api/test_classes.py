@@ -10,15 +10,23 @@ def mock_livekit(monkeypatch):
     async def fake_ensure_room(room_name: str) -> None:
         return None
 
-    def fake_generate_access_token(*, identity, name, room_name, can_publish, can_subscribe=True):
+    def fake_generate_access_token(*, identity, name, room_name, can_publish, can_subscribe=True, mic_only=False):
         return f"fake-jwt-for-{identity}-in-{room_name}-publish={can_publish}"
 
     async def fake_remove_participant(room_name: str, identity: str) -> None:
         return None
 
+    async def fake_set_mic_permission(room_name: str, identity: str, *, granted: bool) -> None:
+        return None
+
+    async def fake_notify_room(room_name: str, payload: dict) -> None:
+        return None
+
     monkeypatch.setattr(livekit, "ensure_room", fake_ensure_room)
     monkeypatch.setattr(livekit, "generate_access_token", fake_generate_access_token)
     monkeypatch.setattr(livekit, "remove_participant", fake_remove_participant)
+    monkeypatch.setattr(livekit, "set_mic_permission", fake_set_mic_permission)
+    monkeypatch.setattr(livekit, "notify_room", fake_notify_room)
     monkeypatch.setattr(livekit.settings, "livekit_url", "wss://fake.livekit.test")
     monkeypatch.setattr(livekit.settings, "livekit_api_key", "fake-key")
     monkeypatch.setattr(livekit.settings, "livekit_api_secret", "fake-secret")
@@ -217,3 +225,65 @@ def test_removing_a_participant_who_never_joined_is_not_found(mock_livekit, teac
     _sclient, suser = enrolled_student
     resp = tclient.post(f"/api/v1/classes/{cls['id']}/participants/{suser['id']}/remove")
     assert resp.status_code == 404
+
+
+def test_student_can_request_to_speak_and_teacher_can_grant_and_revoke_mic(
+    mock_livekit, teacher, enrolled_student, published_course
+):
+    tclient, _ = teacher
+    cls = _create_class(tclient, published_course["id"])
+    tclient.post(f"/api/v1/classes/{cls['id']}/start")
+
+    sclient, suser = enrolled_student
+    sclient.post(f"/api/v1/classes/{cls['id']}/join-token")
+
+    request = sclient.post(f"/api/v1/classes/{cls['id']}/speak-requests")
+    assert request.status_code == 204
+
+    participants = tclient.get(f"/api/v1/classes/{cls['id']}/participants").json()
+    by_id = {p["user_id"]: p for p in participants}
+    assert by_id[suser["id"]]["speak_requested_at"] is not None
+    assert by_id[suser["id"]]["mic_granted"] is False
+
+    grant = tclient.post(f"/api/v1/classes/{cls['id']}/participants/{suser['id']}/grant-mic")
+    assert grant.status_code == 204
+
+    participants = tclient.get(f"/api/v1/classes/{cls['id']}/participants").json()
+    by_id = {p["user_id"]: p for p in participants}
+    assert by_id[suser["id"]]["mic_granted"] is True
+    assert by_id[suser["id"]]["speak_requested_at"] is None  # granting clears the pending request
+
+    # A granted student's next join-token reflects the live permission, mic-only.
+    rejoin = sclient.post(f"/api/v1/classes/{cls['id']}/join-token")
+    assert rejoin.json()["can_publish"] is True
+
+    revoke = tclient.post(f"/api/v1/classes/{cls['id']}/participants/{suser['id']}/revoke-mic")
+    assert revoke.status_code == 204
+
+    participants = tclient.get(f"/api/v1/classes/{cls['id']}/participants").json()
+    by_id = {p["user_id"]: p for p in participants}
+    assert by_id[suser["id"]]["mic_granted"] is False
+
+    rejoin_again = sclient.post(f"/api/v1/classes/{cls['id']}/join-token")
+    assert rejoin_again.json()["can_publish"] is False
+
+
+def test_only_teacher_can_grant_mic(mock_livekit, teacher, enrolled_student, published_course):
+    tclient, _ = teacher
+    cls = _create_class(tclient, published_course["id"])
+    tclient.post(f"/api/v1/classes/{cls['id']}/start")
+
+    sclient, suser = enrolled_student
+    sclient.post(f"/api/v1/classes/{cls['id']}/join-token")
+
+    resp = sclient.post(f"/api/v1/classes/{cls['id']}/participants/{suser['id']}/grant-mic")
+    assert resp.status_code == 403
+
+
+def test_requesting_to_speak_in_a_non_live_class_is_a_conflict(mock_livekit, teacher, enrolled_student, published_course):
+    tclient, _ = teacher
+    cls = _create_class(tclient, published_course["id"])  # never started
+
+    sclient, _ = enrolled_student
+    resp = sclient.post(f"/api/v1/classes/{cls['id']}/speak-requests")
+    assert resp.status_code == 409

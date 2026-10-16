@@ -43,4 +43,16 @@ export const classService = {
   removeParticipant(classId: string, studentId: string): Promise<void> {
     return api.removeParticipant(classId, studentId)
   },
+
+  requestToSpeak(classId: string): Promise<void> {
+    return api.requestToSpeak(classId)
+  },
+
+  grantMic(classId: string, studentId: string): Promise<void> {
+    return api.grantMic(classId, studentId)
+  },
+
+  revokeMic(classId: string, studentId: string): Promise<void> {
+    return api.revokeMic(classId, studentId)
+  },
 }

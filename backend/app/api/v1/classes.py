@@ -91,6 +91,28 @@ async def remove_participant(
     await classroom_service.remove_participant(db, user, cls, student_id)
 
 
+@router.post("/{class_id}/speak-requests", status_code=204)
+async def request_to_speak(class_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    cls = classroom_service.get_class_or_404(db, class_id)
+    await classroom_service.request_to_speak(db, user, cls)
+
+
+@router.post("/{class_id}/participants/{student_id}/grant-mic", status_code=204)
+async def grant_mic(
+    class_id: str, student_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    cls = classroom_service.get_class_or_404(db, class_id)
+    await classroom_service.set_mic_permission(db, user, cls, student_id, granted=True)
+
+
+@router.post("/{class_id}/participants/{student_id}/revoke-mic", status_code=204)
+async def revoke_mic(
+    class_id: str, student_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    cls = classroom_service.get_class_or_404(db, class_id)
+    await classroom_service.set_mic_permission(db, user, cls, student_id, granted=False)
+
+
 @router.post("/{class_id}/recordings/start", response_model=RecordingOut, status_code=201)
 async def start_recording(class_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     cls = classroom_service.get_class_or_404(db, class_id)

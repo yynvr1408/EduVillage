@@ -13,27 +13,37 @@ function makeParticipant(overrides: Partial<ClassParticipant> = {}): ClassPartic
     joined_at: new Date().toISOString(),
     left_at: null,
     status: 'JOINED',
+    speak_requested_at: null,
+    mic_granted: false,
     ...overrides,
   }
 }
 
-describe('ParticipantsPanel (teacher roster: see who joined, remove a student)', () => {
+const baseProps = {
+  isLoading: false,
+  removingUserId: null,
+  micActionUserId: null,
+  errorMessage: null,
+  onRemove: vi.fn(),
+  onGrantMic: vi.fn(),
+  onRevokeMic: vi.fn(),
+}
+
+describe('ParticipantsPanel (teacher roster: see who joined, remove a student, manage mic access)', () => {
   it('shows a loading message while the first fetch is in flight', () => {
-    render(<ParticipantsPanel participants={[]} isLoading={true} removingUserId={null} errorMessage={null} onRemove={vi.fn()} />)
+    render(<ParticipantsPanel {...baseProps} participants={[]} isLoading={true} />)
     expect(screen.getByText(/loading participants/i)).toBeInTheDocument()
   })
 
   it('shows an empty state once loaded with nobody present', () => {
-    render(<ParticipantsPanel participants={[]} isLoading={false} removingUserId={null} errorMessage={null} onRemove={vi.fn()} />)
+    render(<ParticipantsPanel {...baseProps} participants={[]} />)
     expect(screen.getByText(/no one has joined yet/i)).toBeInTheDocument()
   })
 
   it("lists each participant's name and email, with a Remove action for a currently-joined student", () => {
     const onRemove = vi.fn()
     const participant = makeParticipant()
-    render(
-      <ParticipantsPanel participants={[participant]} isLoading={false} removingUserId={null} errorMessage={null} onRemove={onRemove} />
-    )
+    render(<ParticipantsPanel {...baseProps} participants={[participant]} onRemove={onRemove} />)
 
     expect(screen.getByText('Amara Okafor')).toBeInTheDocument()
     expect(screen.getByText('amara@example.com')).toBeInTheDocument()
@@ -46,9 +56,7 @@ describe('ParticipantsPanel (teacher roster: see who joined, remove a student)',
   it('does not offer a Remove action for a participant who already left or was removed', () => {
     const left = makeParticipant({ id: 'p-2', user_id: 'u-2', full_name: 'Left Student', status: 'LEFT' })
     const removed = makeParticipant({ id: 'p-3', user_id: 'u-3', full_name: 'Removed Student', status: 'REMOVED' })
-    render(
-      <ParticipantsPanel participants={[left, removed]} isLoading={false} removingUserId={null} errorMessage={null} onRemove={vi.fn()} />
-    )
+    render(<ParticipantsPanel {...baseProps} participants={[left, removed]} />)
 
     expect(screen.queryByRole('button', { name: /Remove Left Student/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Remove Removed Student/i })).not.toBeInTheDocument()
@@ -60,15 +68,34 @@ describe('ParticipantsPanel (teacher roster: see who joined, remove a student)',
     const participant = makeParticipant()
     render(
       <ParticipantsPanel
+        {...baseProps}
         participants={[participant]}
-        isLoading={false}
         removingUserId="u-1"
         errorMessage="Could not remove this student."
-        onRemove={vi.fn()}
       />
     )
 
     expect(screen.getByRole('button', { name: /Remove Amara Okafor/i })).toBeDisabled()
     expect(screen.getByText('Could not remove this student.')).toBeInTheDocument()
+  })
+
+  it('flags a pending "wants to speak" request and lets the teacher allow it', () => {
+    const onGrantMic = vi.fn()
+    const participant = makeParticipant({ speak_requested_at: new Date().toISOString() })
+    render(<ParticipantsPanel {...baseProps} participants={[participant]} onGrantMic={onGrantMic} />)
+
+    expect(screen.getByText(/wants to speak/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Allow Amara Okafor to speak/i }))
+    expect(onGrantMic).toHaveBeenCalledWith(participant)
+  })
+
+  it('once mic access is granted, shows a Mute action instead and clears the "wants to speak" flag', () => {
+    const onRevokeMic = vi.fn()
+    const participant = makeParticipant({ mic_granted: true, speak_requested_at: null })
+    render(<ParticipantsPanel {...baseProps} participants={[participant]} onRevokeMic={onRevokeMic} />)
+
+    expect(screen.queryByText(/wants to speak/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Mute Amara Okafor/i }))
+    expect(onRevokeMic).toHaveBeenCalledWith(participant)
   })
 })

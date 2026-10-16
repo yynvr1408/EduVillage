@@ -32,8 +32,11 @@ def _require_recording_configured() -> None:
 
 
 def generate_access_token(
-    *, identity: str, name: str, room_name: str, can_publish: bool, can_subscribe: bool = True
+    *, identity: str, name: str, room_name: str, can_publish: bool, can_subscribe: bool = True, mic_only: bool = False
 ) -> str:
+    """`mic_only` restricts publishing to the microphone track only (and withholds data-channel
+    publish, which rides the same grant) — used for a student granted permission to speak, who
+    must never gain camera/screen-share or whiteboard-forging access alongside it."""
     _require_configured()
     from livekit import api
 
@@ -43,7 +46,8 @@ def generate_access_token(
         can_publish=can_publish,
         can_subscribe=can_subscribe,
         # Only the presenter may send data messages (the whiteboard rides on them): a student cannot forge it.
-        can_publish_data=can_publish,
+        can_publish_data=can_publish and not mic_only,
+        can_publish_sources=[api.TrackSource.MICROPHONE] if mic_only else [],
     )
     token = (
         api.AccessToken(settings.livekit_api_key, settings.livekit_api_secret)
@@ -83,6 +87,63 @@ async def remove_participant(room_name: str, identity: str) -> None:
         if "not found" in str(exc).lower():
             return
         raise ServiceUnavailableError(f"Could not remove participant: {exc}", code="LIVEKIT_UNREACHABLE") from exc
+    finally:
+        await client.aclose()
+
+
+async def set_mic_permission(room_name: str, identity: str, *, granted: bool) -> None:
+    """Flips a connected student's publish grant live via LiveKit's UpdateParticipant call, so
+    they can unmute the instant the teacher allows it — no reconnect or token refresh needed.
+    Restricted to the microphone source only; never grants camera, screen-share or data-channel
+    (whiteboard) access. Tolerates the student having already left."""
+    _require_configured()
+    from livekit import api
+
+    client = api.LiveKitAPI(settings.livekit_url, settings.livekit_api_key, settings.livekit_api_secret)
+    try:
+        await client.room.update_participant(
+            api.UpdateParticipantRequest(
+                room=room_name,
+                identity=identity,
+                permission=api.ParticipantPermission(
+                    can_subscribe=True,
+                    can_publish=granted,
+                    can_publish_data=False,
+                    can_publish_sources=[api.TrackSource.MICROPHONE] if granted else [],
+                ),
+            )
+        )
+    except Exception as exc:  # pragma: no cover - network-dependent
+        if "not found" in str(exc).lower():
+            return
+        raise ServiceUnavailableError(f"Could not update microphone permission: {exc}", code="LIVEKIT_UNREACHABLE") from exc
+    finally:
+        await client.aclose()
+
+
+async def notify_room(room_name: str, payload: dict) -> None:
+    """Pushes a small JSON event over LiveKit's reliable data channel from the server itself —
+    the only way to reach the teacher instantly for a 'request to speak', since a student's own
+    token never grants data-channel publish (see generate_access_token)."""
+    _require_configured()
+    import json
+
+    from livekit import api
+
+    client = api.LiveKitAPI(settings.livekit_url, settings.livekit_api_key, settings.livekit_api_secret)
+    try:
+        await client.room.send_data(
+            api.SendDataRequest(
+                room=room_name,
+                data=json.dumps(payload).encode("utf-8"),
+                kind=api.DataPacket.Kind.RELIABLE,
+                topic="speak-request",
+            )
+        )
+    except Exception as exc:  # pragma: no cover - network-dependent
+        if "not found" in str(exc).lower():
+            return  # room already ended; nobody left to notify
+        raise ServiceUnavailableError(f"Could not notify the room: {exc}", code="LIVEKIT_UNREACHABLE") from exc
     finally:
         await client.aclose()
 
