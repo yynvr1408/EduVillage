@@ -2,7 +2,7 @@
 
 Generated from the SQLAlchemy models by `backend/scripts/generate_docs.py`; do not edit by hand. Migrations live in `backend/alembic/versions/` (one linear chain; `alembic heads` shows one head). Production uses PostgreSQL (Neon); development and most tests use SQLite.
 
-33 tables. Primary keys are 36-character UUID strings. Timestamps are stored as naive UTC.
+34 tables. Primary keys are 36-character UUID strings. Timestamps are stored as naive UTC.
 
 ## `assignment_submissions`
 
@@ -336,6 +336,23 @@ Constraints: unique (recording_id, user_id).
 | `section_id` | VARCHAR(36) | no | primary key, -> `sections.id` |
 | `shared_by` | VARCHAR(36) | no | -> `users.id` |
 | `shared_at` | DATETIME | no |  |
+
+## `registration_otp_challenges`
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `email` | VARCHAR(320) | no | indexed |
+| `otp_hash` | VARCHAR(128) | no | indexed |
+| `expires_at` | DATETIME | no |  |
+| `attempts` | INTEGER | no |  |
+| `max_attempts` | INTEGER | no |  |
+| `verified_at` | DATETIME | yes |  |
+| `verification_token_hash` | VARCHAR(128) | yes | unique, indexed |
+| `token_expires_at` | DATETIME | yes |  |
+| `consumed_at` | DATETIME | yes |  |
+| `revoked_at` | DATETIME | yes |  |
+| `created_at` | DATETIME | no |  |
+| `id` | VARCHAR(36) | no | primary key |
 
 ## `resource_sections`
 

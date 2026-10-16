@@ -1,7 +1,7 @@
 """manual grading: assignment max_score, submission score/feedback
 
 Revision ID: a8c1ffee0007
-Revises: 4f9ab885870b
+Revises: c61c0bf2199b
 Create Date: 2026-10-16 18:00:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision: str = 'a8c1ffee0007'
-down_revision: Union[str, Sequence[str], None] = '4f9ab885870b'
+down_revision: Union[str, Sequence[str], None] = 'c61c0bf2199b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

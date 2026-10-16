@@ -2,7 +2,7 @@
 
 Generated from the running application by `backend/scripts/generate_docs.py`; do not edit by hand. Interactive documentation is served by the backend at `/docs` (Swagger) and `/openapi.json`.
 
-125 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
+127 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
 
 **Authentication.** Students and teachers authenticate with an httpOnly session cookie (`eduvillage_session`). The administrator uses a separate cookie (`eduvillage_admin_session`) and must send `X-EduVillage-Admin: 1` on every request that changes data. "public" means no session is required.
 
@@ -58,6 +58,8 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 | POST | `/api/v1/auth/login/verify-otp` | public | verify login otp |
 | POST | `/api/v1/auth/logout` | signed-in user | logout |
 | POST | `/api/v1/auth/register` | public | register |
+| POST | `/api/v1/auth/register/request-otp` | public | register request otp |
+| POST | `/api/v1/auth/register/verify-otp` | public | register verify otp |
 | POST | `/api/v1/auth/reset-password` | public | reset password |
 | POST | `/api/v1/auth/verify-reset-otp` | public | verify reset otp |
 
