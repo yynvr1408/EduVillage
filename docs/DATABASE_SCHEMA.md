@@ -74,6 +74,8 @@ Constraints: unique (assignment_id, student_id).
 | `joined_at` | DATETIME | yes |  |
 | `left_at` | DATETIME | yes |  |
 | `participation_status` | VARCHAR(7) | no |  |
+| `speak_requested_at` | DATETIME | yes |  |
+| `mic_granted` | BOOLEAN | no |  |
 | `id` | VARCHAR(36) | no | primary key |
 
 ## `class_recordings`
