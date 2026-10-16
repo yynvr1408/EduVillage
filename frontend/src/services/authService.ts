@@ -53,7 +53,7 @@ export const authService = {
         branch_id: college?.branchId || undefined,
         section_id: college?.allSections ? undefined : college?.sectionId || undefined,
         all_sections: role === 'teacher' && college?.allSections ? true : undefined,
-        college_code: role === 'teacher' ? college?.collegeCode || undefined : undefined,
+        college_code: college?.collegeCode || undefined,
       }),
     })
     this.cacheUser(data.user)

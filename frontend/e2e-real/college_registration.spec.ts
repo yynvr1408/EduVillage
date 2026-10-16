@@ -104,9 +104,9 @@ test.describe.serial('admin-managed colleges drive registration', () => {
     await page.waitForURL(/\/teacher\/dashboard/)
   })
 
-  test('student selects college and section, registers, and can sign in again', async ({ page }) => {
+  test('student selects college, code and section, registers, and can sign in again', async ({ page }) => {
     await page.goto('/register/student')
-    await expect(page.locator('#collegeCode')).toHaveCount(0)
+    await expect(page.locator('#collegeCode')).toHaveCount(1) // students need the admin-issued code too, same as teachers
     await page.fill('#fullName', 'Sam Student')
     await page.fill('#email', `student-${tag}@example.com`)
     await page.fill('#password', 'password123')
@@ -114,6 +114,7 @@ test.describe.serial('admin-managed colleges drive registration', () => {
     await label(page, /^College\s*\*?$/).selectOption({ label: COLLEGE_B })
     await label(page, /^Branch\s*\*?$/).selectOption({ label: 'Mechanical' })
     await label(page, /^Section\s*\*?$/).selectOption({ label: 'Section M' })
+    await page.fill('#collegeCode', state.codeB!)
     await page.click('button:has-text("Register")')
     await page.waitForURL(/\/student\/dashboard/)
 
@@ -134,6 +135,7 @@ test.describe.serial('admin-managed colleges drive registration', () => {
     await label(page, /^College\s*\*?$/).selectOption({ label: COLLEGE_B })
     await label(page, /^Branch\s*\*?$/).selectOption({ label: 'Mechanical' })
     await label(page, /^Section\s*\*?$/).selectOption({ label: 'Section M' })
+    await page.fill('#collegeCode', state.codeB!)
     await page.click('button:has-text("Register")')
     await expect(page.getByText('An account with this email already exists.')).toBeVisible()
   })

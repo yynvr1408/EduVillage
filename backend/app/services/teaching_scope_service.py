@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ConflictError, ForbiddenError, ValidationFailedError
 from app.db.models.college import CollegeBranch, CollegeSection, UserBranchAssignment, UserCollegeSection
 from app.db.models.course import Course
-from app.db.models.enums import CollegeStatus
+from app.db.models.enums import CollegeStatus, CourseStatus, UserRole, UserStatus
 from app.db.models.section import Section
 from app.db.models.user import User
 
@@ -126,6 +126,57 @@ def resolve_class_audience(
         if outside:
             raise ConflictError("Choose the section(s) you teach; this course also has sections outside your assignment.", code="SECTION_REQUIRED")
     return ids
+
+
+def list_teachers_for_student(db: Session, student: User) -> list[dict]:
+    """Teachers a student may discover in their own college: those assigned to the student's own
+    college section, or branch-wide ("All Sections") within the student's own branch. Discovery
+    only — never implies enrollment or course access; those still go through the existing
+    enrollment/section/publication rules."""
+    if not student.college_id:
+        return []
+    my_section_id = db.execute(
+        select(UserCollegeSection.college_section_id).where(UserCollegeSection.user_id == student.id)
+    ).scalars().first()
+    if not my_section_id:
+        return []
+    my_section = db.get(CollegeSection, my_section_id)
+    if my_section is None:
+        return []
+    branch = db.get(CollegeBranch, my_section.branch_id)
+
+    section_teacher_ids = select(UserCollegeSection.user_id).where(UserCollegeSection.college_section_id == my_section.id)
+    branch_teacher_ids = select(UserBranchAssignment.user_id).where(UserBranchAssignment.branch_id == my_section.branch_id)
+    teachers = db.execute(
+        select(User)
+        .where(
+            User.role == UserRole.teacher,
+            User.status == UserStatus.active,
+            User.college_id == student.college_id,
+            User.id.in_(section_teacher_ids) | User.id.in_(branch_teacher_ids),
+        )
+        .order_by(User.full_name)
+    ).scalars().all()
+
+    out = []
+    for teacher in teachers:
+        scope = get_scope(db, teacher)
+        courses = db.execute(
+            select(Course)
+            .where(Course.teacher_id == teacher.id, Course.status == CourseStatus.published)
+            .order_by(Course.created_at.desc())
+        ).scalars().all()
+        out.append(
+            {
+                "id": teacher.id,
+                "full_name": teacher.full_name,
+                "branch": {"id": branch.id, "name": branch.name} if branch else None,
+                "section": None if scope.kind == "branch" else {"id": my_section.id, "name": my_section.name},
+                "all_sections": scope.kind == "branch",
+                "courses": [{"id": c.id, "title": c.title} for c in courses],
+            }
+        )
+    return out
 
 
 def describe(db: Session, user: User) -> dict:

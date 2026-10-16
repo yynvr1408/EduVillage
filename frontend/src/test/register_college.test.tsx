@@ -195,6 +195,7 @@ describe('registration: college -> branch -> section', () => {
     await waitColleges()
     fillBasics()
     await pick('col-a', 'br-cse', 'sec-a')
+    type(/college code/i, 'EV-ALPHA-0001')
     fireEvent.click(screen.getByRole('button', { name: /register/i }))
     expect(await screen.findByText('An account with this email already exists.')).toBeInTheDocument()
     register.mockRejectedValueOnce(new ApiError('Network', 0, true))
@@ -202,16 +203,29 @@ describe('registration: college -> branch -> section', () => {
     expect(await screen.findByText(/Cannot reach the server/)).toBeInTheDocument()
   })
 
-  it('a student sends the hierarchy but no college code', async () => {
+  it('a student sends the hierarchy including a college code, same as a teacher', async () => {
     register.mockResolvedValue({ role: 'student' })
     renderPage('student')
     await waitColleges()
-    expect(screen.queryByLabelText(/college code/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/college code/i)).toBeInTheDocument()
+    fillBasics()
+    await pick('col-b', 'br-me', 'sec-m')
+    type(/college code/i, 'EV-BETA-0001')
+    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    await waitFor(() => expect(register).toHaveBeenCalled())
+    expect(register.mock.calls[0][5]).toEqual({
+      collegeId: 'col-b', branchId: 'br-me', sectionId: 'sec-m', allSections: false, collegeCode: 'EV-BETA-0001',
+    })
+  })
+
+  it('a student without a college code gets the same field-level error as a teacher', async () => {
+    renderPage('student')
+    await waitColleges()
     fillBasics()
     await pick('col-b', 'br-me', 'sec-m')
     fireEvent.click(screen.getByRole('button', { name: /register/i }))
-    await waitFor(() => expect(register).toHaveBeenCalled())
-    expect(register.mock.calls[0][5]).toEqual({ collegeId: 'col-b', branchId: 'br-me', sectionId: 'sec-m', allSections: false, collegeCode: '' })
+    expect(await screen.findByText(/Enter the college code/)).toBeInTheDocument()
+    expect(register).not.toHaveBeenCalled()
   })
 
   it('shows empty and error states for colleges, branches and sections', async () => {
@@ -252,6 +266,7 @@ describe('registration: college -> branch -> section', () => {
     await waitColleges()
     fillBasics()
     await pick('col-a', 'br-cse', 'sec-a')
+    type(/college code/i, 'EV-ALPHA-0001')
     const callsBefore = listBranches.mock.calls.length
     listBranches.mockResolvedValueOnce([BRANCHES['col-a'][1]])
     fireEvent.click(screen.getByRole('button', { name: /register/i }))
@@ -266,6 +281,7 @@ describe('registration: college -> branch -> section', () => {
     await waitColleges()
     fillBasics()
     await pick('col-a', 'br-cse', 'sec-a')
+    type(/college code/i, 'EV-ALPHA-0001')
     listColleges.mockResolvedValueOnce([COLLEGES[1]])
     fireEvent.click(screen.getByRole('button', { name: /register/i }))
     expect(await screen.findByText('This college is not accepting registrations.')).toBeInTheDocument()

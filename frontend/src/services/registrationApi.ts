@@ -25,8 +25,17 @@ export interface CollegeSelection {
   /** Exactly one of sectionId / allSections. "All sections" is a branch-wide teacher assignment, never a section. */
   sectionId?: string
   allSections?: boolean
-  /** Required for teachers; students never need it. */
+  /** Required for both teachers and students: the admin-issued code for the selected college. */
   collegeCode?: string
+}
+
+export interface CollegeTeacher {
+  id: string
+  full_name: string
+  branch: { id: string; name: string } | null
+  section: { id: string; name: string } | null
+  all_sections: boolean
+  courses: { id: string; title: string }[]
 }
 
 /** Public, read live from the administrator-managed records: nothing here is hardcoded. */
@@ -36,4 +45,7 @@ export const registrationApi = {
     apiRequest<RegistrationBranch[]>(`/registration/colleges/${encodeURIComponent(collegeId)}/branches`, { cache: 'no-store' }),
   listSections: (branchId: string) =>
     apiRequest<RegistrationSection[]>(`/registration/branches/${encodeURIComponent(branchId)}/sections`, { cache: 'no-store' }),
+  /** Authenticated, student-only: teachers in the signed-in student's own college/section (or
+   * branch-wide). Discovery only — never implies enrollment or course access. */
+  listMyCollegeTeachers: () => apiRequest<CollegeTeacher[]>('/users/me/college-teachers'),
 }

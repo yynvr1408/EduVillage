@@ -213,7 +213,6 @@ def test_inactive_branch_or_section_cannot_be_selected(admin, campus):
 def test_students_use_the_same_hierarchy_but_cannot_pick_all_sections(admin, campus, db_session):
     p = teacher_payload(campus["college"], campus["cse"], campus["cse_a"])
     p.update(role="student")
-    p.pop("college_code")
     c, r = sign_up(p)
     assert r.status_code == 201, r.text
     uid = r.json()["user"]["id"]
@@ -367,7 +366,6 @@ def test_branch_assignment_does_not_enroll_students_or_open_classes_to_them(admi
     klass = schedule(t, course, all_branch_sections=True).json()
     sp = teacher_payload(campus["college"], campus["cse"], campus["cse_a"])
     sp.update(role="student")
-    sp.pop("college_code")
     student_client, r = sign_up(sp)
     assert r.status_code == 201
     uid = r.json()["user"]["id"]

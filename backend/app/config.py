@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     teacher_invite_code: str | None = None
     # Teachers must register with a valid college, its admin-issued code and a section of that college.
     teacher_college_required: bool = True
+    # Students must do the same (same college-code system as teachers, just never "all sections").
+    student_college_required: bool = True
 
     # Recording policy: recording is always an explicit, per-class teacher action; this is the
     # institution-wide kill switch. Recordings stay private until a teacher publishes them.

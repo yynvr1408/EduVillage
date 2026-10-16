@@ -126,8 +126,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
   }
 
   const isTeacher = role === 'teacher'
-  // Students may still register where an administrator has not set up any college yet; teachers cannot.
-  const collegeOptional = !isTeacher && colleges.status === 'ready' && colleges.items.length === 0
+  // College, its code, branch and section are mandatory for both roles — an administrator must
+  // set up at least one college before anyone can register.
   const collegesUnavailable = colleges.status === 'error'
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -140,12 +140,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
     if (!password) errs.password = 'Enter a password.'
     else if (password.length < 8) errs.password = 'Password must be at least 8 characters long.'
     if (password && confirmPassword !== password) errs.confirmPassword = 'Passwords do not match.'
-    if (!collegeOptional) {
-      if (!collegeId) errs.college = 'Select your college.'
-      if (collegeId && !branchId) errs.branch = 'Select your branch.'
-      if (branchId && !sectionId) errs.section = isTeacher ? 'Select a section or All Sections.' : 'Select your section.'
-    }
-    if (isTeacher && !collegeCode.trim()) errs.collegeCode = 'Enter the college code given by your administrator.'
+    if (!collegeId) errs.college = 'Select your college.'
+    if (!collegeCode.trim()) errs.collegeCode = 'Enter the college code given by your administrator.'
+    if (collegeId && !branchId) errs.branch = 'Select your branch.'
+    if (branchId && !sectionId) errs.section = isTeacher ? 'Select a section or All Sections.' : 'Select your section.'
     setFieldErrors(errs)
     setError(null)
     if (Object.keys(errs).length > 0) return
@@ -309,7 +307,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
               />
             </FormField>
 
-            <FormField label="College" htmlFor="college" required={!collegeOptional} error={fieldErrors.college}>
+            <FormField label="College" htmlFor="college" required error={fieldErrors.college}>
               <Select
                 id="college"
                 value={collegeId}
@@ -329,36 +327,32 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
             )}
             {colleges.status === 'ready' && colleges.items.length === 0 && (
               <p className="text-xs text-[#687775] -mt-2" role="status">
-                {isTeacher
-                  ? 'No colleges are open for registration yet. Please contact your administrator.'
-                  : 'No colleges are available yet; you can still create your account.'}
+                No colleges are open for registration yet. Please contact your administrator.
               </p>
             )}
 
-            {isTeacher && (
-              <FormField
-                label="College Code"
-                htmlFor="collegeCode"
+            <FormField
+              label="College Code"
+              htmlFor="collegeCode"
+              required
+              hint="From your administrator"
+              error={fieldErrors.collegeCode}
+            >
+              <Input
+                id="collegeCode"
+                value={collegeCode}
+                onChange={(e) => {
+                  setCollegeCode(e.target.value)
+                  setFieldErrors((f) => ({ ...f, collegeCode: undefined }))
+                }}
+                autoComplete="off"
+                placeholder="EV-XXXX-XXXX"
+                isError={!!fieldErrors.collegeCode}
                 required
-                hint="From your administrator"
-                error={fieldErrors.collegeCode}
-              >
-                <Input
-                  id="collegeCode"
-                  value={collegeCode}
-                  onChange={(e) => {
-                    setCollegeCode(e.target.value)
-                    setFieldErrors((f) => ({ ...f, collegeCode: undefined }))
-                  }}
-                  autoComplete="off"
-                  placeholder="EV-XXXX-XXXX"
-                  isError={!!fieldErrors.collegeCode}
-                  required
-                />
-              </FormField>
-            )}
+              />
+            </FormField>
 
-            <FormField label="Branch" htmlFor="branch" required={!collegeOptional} error={fieldErrors.branch}>
+            <FormField label="Branch" htmlFor="branch" required error={fieldErrors.branch}>
               <Select
                 id="branch"
                 value={branchId}
@@ -382,7 +376,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
               </p>
             )}
 
-            <FormField label="Section" htmlFor="section" required={!collegeOptional} error={fieldErrors.section}>
+            <FormField label="Section" htmlFor="section" required error={fieldErrors.section}>
               <Select
                 id="section"
                 value={sectionId}

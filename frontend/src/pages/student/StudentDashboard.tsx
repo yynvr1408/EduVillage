@@ -15,6 +15,8 @@ import {
   HardDrive,
   Play,
   PlayCircle,
+  Users,
+  GraduationCap,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useNetworkStatus } from '../../context/NetworkContext'
@@ -24,6 +26,7 @@ import { classService } from '../../services/classService'
 import { assignmentService } from '../../services/assignmentService'
 import { downloadManager } from '../../services/downloadManager'
 import { syncManager } from '../../services/syncManager'
+import { registrationApi, type CollegeTeacher } from '../../services/registrationApi'
 import type { Course, ClassRoom, Assignment, DownloadedResource, AssignmentDraft, Recording } from '../../types'
 import { api } from '../../services/apiClient'
 import { PageContainer } from '../../components/layout/PageContainer'
@@ -48,6 +51,8 @@ export const StudentDashboard: React.FC = () => {
   const [downloads, setDownloads] = useState<DownloadedResource[]>([])
   const [drafts, setDrafts] = useState<Record<string, AssignmentDraft>>({})
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [collegeTeachers, setCollegeTeachers] = useState<CollegeTeacher[]>([])
+  const [teachersStatus, setTeachersStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
     let isMounted = true
@@ -55,12 +60,13 @@ export const StudentDashboard: React.FC = () => {
     async function loadDashboard() {
       setIsLoading(true)
       try {
-        const [coursesData, classesData, recordingsData, assignmentsData, downloadsData] = await Promise.allSettled([
+        const [coursesData, classesData, recordingsData, assignmentsData, downloadsData, teachersData] = await Promise.allSettled([
           courseService.getCourses(),
           classService.getClasses(),
           api.getRecordings(),
           assignmentService.getAssignments(),
           downloadManager.getAllDownloads(),
+          registrationApi.listMyCollegeTeachers(),
         ])
 
         if (!isMounted) return
@@ -70,6 +76,12 @@ export const StudentDashboard: React.FC = () => {
         if (recordingsData.status === 'fulfilled') setRecordings(recordingsData.value)
         if (assignmentsData.status === 'fulfilled') setAssignments(assignmentsData.value)
         if (downloadsData.status === 'fulfilled') setDownloads(downloadsData.value)
+        if (teachersData.status === 'fulfilled') {
+          setCollegeTeachers(teachersData.value)
+          setTeachersStatus('ready')
+        } else {
+          setTeachersStatus('error')
+        }
 
         // Load local drafts
         if (assignmentsData.status === 'fulfilled') {
@@ -361,6 +373,66 @@ export const StudentDashboard: React.FC = () => {
             <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               {pendingAssignments.map((a) => (
                 <AssignmentCard key={a.id} assignment={a} draft={drafts[a.id]} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Teachers in Your College */}
+        <section className="@container min-w-0 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-[#202B2A]">Teachers in Your College</h2>
+              <p className="text-xs text-[#687775]">Discover teachers assigned to your section or branch</p>
+            </div>
+          </div>
+
+          {teachersStatus === 'loading' ? (
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
+              <SkeletonCard />
+            </div>
+          ) : teachersStatus === 'error' ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 border border-[#E1E8E4] rounded-2xl bg-[#FFFFFF] text-center text-xs text-[#687775]">
+              Could not load teachers right now. Reload the page to try again.
+            </div>
+          ) : collegeTeachers.length === 0 ? (
+            <EmptyState
+              className="flex-1"
+              icon={<Users className="w-6 h-6" />}
+              title="No teachers found yet"
+              description="Once an administrator or teacher is assigned to your section, they'll appear here."
+            />
+          ) : (
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
+              {collegeTeachers.map((t) => (
+                <div
+                  key={t.id}
+                  className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl p-4 sm:p-5 flex flex-col gap-2.5 hover:border-[#CBD7D1] transition-all shadow-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#DDF3EA] border border-[#CBD7D1] flex items-center justify-center text-[#0F5B57] shrink-0">
+                      <GraduationCap className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-[#202B2A] truncate">{t.full_name}</p>
+                      <p className="text-xs text-[#687775] truncate">
+                        {t.branch?.name}
+                        {t.all_sections ? ' · All Sections' : t.section ? ` · ${t.section.name}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {t.courses.length === 0 ? (
+                      <span className="text-xs text-[#687775]">No published courses yet</span>
+                    ) : (
+                      t.courses.slice(0, 3).map((c) => (
+                        <Badge key={c.id} variant="default" size="sm">
+                          {c.title}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}

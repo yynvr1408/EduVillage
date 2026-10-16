@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.core.permissions import require_role
 from app.dependencies import get_current_user, get_db
+from app.db.models.enums import UserRole
 from app.db.models.user import User
+from app.schemas.admin import StudentVisibleTeacherOut
 from app.schemas.auth import RevokeAllResponse, SessionOut
 from app.schemas.user import UserOut, UserUpdate
 from app.services import auth_service, teaching_scope_service
@@ -20,6 +23,14 @@ def read_me(user: User = Depends(get_current_user)):
 def teaching_scope(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """The branch / college section this teacher is assigned to ("none" for legacy or student accounts)."""
     return teaching_scope_service.describe(db, user)
+
+
+@router.get("/me/college-teachers", response_model=list[StudentVisibleTeacherOut])
+def college_teachers(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Teachers in the student's own college, assigned to their college section or branch-wide.
+    Discovery only: does not enroll the student in any course or grant any additional access."""
+    require_role(user, UserRole.student)
+    return teaching_scope_service.list_teachers_for_student(db, user)
 
 
 @router.patch("/me", response_model=UserOut)
