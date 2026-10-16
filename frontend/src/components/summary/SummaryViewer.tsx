@@ -14,7 +14,7 @@ import type { Summary } from '../../types'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card, CardHeader, CardContent } from '../ui/Card'
-import { exportSummary, type SummaryExportFormat } from '../../utils/summaryExport'
+import { exportSummary } from '../../utils/summaryExport'
 
 export interface SummaryViewerProps {
   summary: Summary
@@ -33,21 +33,17 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
   const isPendingReview = summary.review_status === 'PENDING'
   const isRevisionRequested = summary.review_status === 'REVISION_REQUESTED'
 
-  const [exporting, setExporting] = React.useState<SummaryExportFormat | null>(null)
+  const [exporting, setExporting] = React.useState(false)
   const [exportError, setExportError] = React.useState<string | null>(null)
 
-  const handleDownload = async (format: SummaryExportFormat) => {
-    setExporting(format)
+  const handleDownload = async () => {
+    setExporting(true)
     setExportError(null)
-    const result = await exportSummary(summary, format)
+    const result = await exportSummary(summary)
     if (!result.ok) {
-      setExportError(
-        result.reason === 'UNSUPPORTED_SCRIPT'
-          ? 'This summary contains text a PDF cannot display here. Please download the DOC version instead.'
-          : 'Could not create the file. Please try again.'
-      )
+      setExportError('Could not create the file. Please try again.')
     }
-    setExporting(null)
+    setExporting(false)
   }
 
   return (
@@ -75,22 +71,12 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
           <Button
             size="sm"
             variant="outline"
-            isLoading={exporting === 'pdf'}
-            disabled={exporting !== null}
-            onClick={() => handleDownload('pdf')}
+            isLoading={exporting}
+            disabled={exporting}
+            onClick={handleDownload}
             icon={<Download className="w-3.5 h-3.5" />}
           >
-            PDF
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            isLoading={exporting === 'docx'}
-            disabled={exporting !== null}
-            onClick={() => handleDownload('docx')}
-            icon={<FileText className="w-3.5 h-3.5" />}
-          >
-            DOC
+            Download Notes
           </Button>
 
           {isTeacher && onReview && (

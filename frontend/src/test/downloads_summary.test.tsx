@@ -44,9 +44,9 @@ describe('Downloads & AI Lecture Summary Workflow', () => {
     expect(screen.getByText(/MPPT Sizing/i)).toBeInTheDocument()
     expect(screen.getByText(/What is the primary factor affecting solar panel efficiency/i)).toBeInTheDocument()
     expect(screen.getByText(/Teacher Approved/i)).toBeInTheDocument()
-    // notes are downloaded as PDF or Word (DOC), no longer as a Markdown file
-    expect(screen.getByRole('button', { name: /^PDF$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^DOC$/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Download Notes/i })).not.toBeInTheDocument()
+    // notes are downloaded as a single Word (DOCX) file - no PDF option, no format choice
+    expect(screen.getByRole('button', { name: /Download Notes/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^PDF$/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^DOC$/ })).not.toBeInTheDocument()
   })
 })

@@ -2,11 +2,9 @@ import type { Summary } from '../types'
 import { loadChunk } from './loadChunk'
 
 /**
- * Study-notes export for a lecture summary: PDF or DOCX (Word). Generated in the browser (so it also works
- * offline), and the heavy libraries are loaded only when a student actually downloads.
+ * Study-notes export for a lecture summary, as a DOCX (Word) file. Generated in the browser (so
+ * it also works offline), and the library is only loaded when a student actually downloads.
  */
-
-export type SummaryExportFormat = 'pdf' | 'docx'
 
 export interface ExportBlock {
   kind: 'title' | 'meta' | 'heading' | 'subheading' | 'paragraph' | 'bullet' | 'numbered'
@@ -14,7 +12,6 @@ export interface ExportBlock {
   n?: number
 }
 
-/** The document, independent of the file format, so both formats always carry the same content. */
 export function buildSummaryBlocks(summary: Summary, classTitle?: string): ExportBlock[] {
   const blocks: ExportBlock[] = [
     { kind: 'title', text: 'EduVillage Lecture Summary' },
@@ -37,47 +34,6 @@ export function buildSummaryBlocks(summary: Summary, classTitle?: string): Expor
     blocks.push({ kind: 'heading', text: 'Revision Questions' }, ...summary.revision_questions.map((t, i) => ({ kind: 'numbered' as const, text: t, n: i + 1 })))
   }
   return blocks
-}
-
-/** jsPDF's built-in fonts only cover Latin-1; text in other scripts would come out as garbage. */
-export function pdfCanRender(blocks: ExportBlock[]): boolean {
-  return blocks.every((b) => !/[^\u0000-ÿ‘’“”–—•…]/.test(b.text))
-}
-
-export async function buildPdf(blocks: ExportBlock[]): Promise<Blob> {
-  const { jsPDF } = await loadChunk(() => import('jspdf'))
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-  const margin = 56
-  const width = doc.internal.pageSize.getWidth() - margin * 2
-  const bottom = doc.internal.pageSize.getHeight() - margin
-  let y = margin
-  const write = (text: string, size: number, bold: boolean, indent = 0, gap = 6, color: [number, number, number] = [32, 43, 42]) => {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal')
-    doc.setFontSize(size)
-    doc.setTextColor(...color)
-    const lines = doc.splitTextToSize(text, width - indent) as string[]
-    for (const line of lines) {
-      if (y + size > bottom) {
-        doc.addPage()
-        y = margin
-      }
-      doc.text(line, margin + indent, y)
-      y += size * 1.35
-    }
-    y += gap
-  }
-  for (const b of blocks) {
-    if (b.kind === 'title') write(b.text, 20, true, 0, 4, [15, 91, 87])
-    else if (b.kind === 'meta') write(b.text, 10, false, 0, 2, [104, 119, 117])
-    else if (b.kind === 'heading') {
-      y += 8
-      write(b.text, 14, true, 0, 4, [15, 91, 87])
-    } else if (b.kind === 'subheading') write(b.text, 11, true, 0, 2)
-    else if (b.kind === 'paragraph') write(b.text, 11, false, 0, 8)
-    else if (b.kind === 'bullet') write(`•  ${b.text}`, 11, false, 10, 4)
-    else write(`${b.n}.  ${b.text}`, 11, false, 10, 4)
-  }
-  return doc.output('blob')
 }
 
 export async function buildDocx(blocks: ExportBlock[]): Promise<Blob> {
@@ -104,14 +60,13 @@ export async function buildDocx(blocks: ExportBlock[]): Promise<Blob> {
   return Packer.toBlob(doc)
 }
 
-export type ExportResult = { ok: true; filename: string } | { ok: false; reason: 'UNSUPPORTED_SCRIPT' | 'FAILED' }
+export type ExportResult = { ok: true; filename: string } | { ok: false; reason: 'FAILED' }
 
-export async function exportSummary(summary: Summary, format: SummaryExportFormat, classTitle?: string): Promise<ExportResult> {
+export async function exportSummary(summary: Summary, classTitle?: string): Promise<ExportResult> {
   const blocks = buildSummaryBlocks(summary, classTitle)
-  if (format === 'pdf' && !pdfCanRender(blocks)) return { ok: false, reason: 'UNSUPPORTED_SCRIPT' }
   try {
-    const blob = format === 'pdf' ? await buildPdf(blocks) : await buildDocx(blocks)
-    const filename = `eduvillage-summary-${summary.class_id}.${format}`
+    const blob = await buildDocx(blocks)
+    const filename = `eduvillage-summary-${summary.class_id}.docx`
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
