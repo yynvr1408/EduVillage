@@ -54,10 +54,11 @@ def get_current_admin(
     if not token:
         raise UnauthorizedError("Authentication required.")
 
-    from app.services.auth_service import get_user_from_session_token
+    from app.services.admin_service import get_admin_from_session_token
 
-    user = get_user_from_session_token(db, token)
-    # The role is checked on the server for every request; being logged in as anyone else is not enough.
-    if user is None or user.role != UserRole.admin or user.status != UserStatus.active:
+    # Admin-specific validation (not the generic get_user_from_session_token): also enforces the
+    # idle timeout that backs the single-active-admin-session login policy.
+    user = get_admin_from_session_token(db, token)
+    if user is None or user.status != UserStatus.active:
         raise UnauthorizedError("Authentication required.")
     return user

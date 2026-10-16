@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     admin_session_ttl_minutes: int = 120
     admin_cookie_name: str = "eduvillage_admin_session"
     admin_login_max_attempts: int = 5  # per client + username, per 15 minutes
+    # Single-active-admin-session policy: a new login is rejected while another admin session is
+    # still "fresh" (seen within this many seconds); an idle one is treated as dead and cleaned
+    # up, letting the new login through instead of permanently locking the admin out.
+    admin_idle_timeout_seconds: int = 120
 
     database_url: str = "sqlite:///./dev.db"
 

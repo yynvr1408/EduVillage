@@ -103,6 +103,71 @@ def test_login_requires_csrf_header(admin_creds):
     assert r.status_code == 403 and r.json()["error"]["code"] == "CSRF_REJECTED"
 
 
+# ---- single-active-admin-session policy ------------------------------------------------------
+
+def test_a_second_login_with_the_correct_password_is_rejected_while_a_session_is_fresh(admin_creds):
+    first = TestClient(app, headers=CSRF)
+    assert first.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]}).status_code == 200
+
+    second = TestClient(app, headers=CSRF)
+    r = second.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "ADMIN_SESSION_ACTIVE"
+
+    # The first session is completely unaffected by the blocked second attempt.
+    assert first.get(f"{BASE}/overview").status_code == 200
+    assert second.get(f"{BASE}/overview").status_code == 401  # never actually got a session
+
+
+def test_logging_out_immediately_frees_the_session_for_a_new_login(admin_creds):
+    first = TestClient(app, headers=CSRF)
+    first.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]})
+    first.post(f"{BASE}/auth/logout")
+
+    second = TestClient(app, headers=CSRF)
+    assert second.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]}).status_code == 200
+
+
+def test_an_idle_session_is_treated_as_dead_and_a_new_login_is_allowed_through(admin_creds, monkeypatch, db_session):
+    from datetime import timedelta as _td
+
+    monkeypatch.setattr(get_settings(), "admin_idle_timeout_seconds", 120)
+    first = TestClient(app, headers=CSRF)
+    first.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]})
+
+    # Simulate the first session having gone idle past the timeout.
+    for s in db_session.execute(select(UserSession).where(UserSession.revoked_at.is_(None))).scalars():
+        s.last_seen_at = utcnow() - _td(seconds=200)
+    db_session.commit()
+
+    second = TestClient(app, headers=CSRF)
+    assert second.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]}).status_code == 200
+
+    # The idle session is now dead for real, not just logically ignored.
+    assert first.get(f"{BASE}/overview").status_code == 401
+    assert second.get(f"{BASE}/overview").status_code == 200
+
+
+def test_an_idle_sessions_own_cookie_stops_working_even_without_anyone_else_logging_in(admin_client, monkeypatch, db_session):
+    monkeypatch.setattr(get_settings(), "admin_idle_timeout_seconds", 120)
+    assert admin_client.get(f"{BASE}/overview").status_code == 200
+
+    for s in db_session.execute(select(UserSession).where(UserSession.revoked_at.is_(None))).scalars():
+        s.last_seen_at = utcnow() - timedelta(seconds=200)
+    db_session.commit()
+
+    assert admin_client.get(f"{BASE}/overview").status_code == 401
+
+
+def test_making_requests_keeps_the_session_alive_past_what_a_single_idle_window_would_allow(admin_client, monkeypatch, db_session):
+    monkeypatch.setattr(get_settings(), "admin_idle_timeout_seconds", 120)
+    # Three "checks" spaced out, each comfortably inside the idle window, each touching last_seen_at.
+    for _ in range(3):
+        for s in db_session.execute(select(UserSession).where(UserSession.revoked_at.is_(None))).scalars():
+            s.last_seen_at = utcnow() - timedelta(seconds=90)
+        db_session.commit()
+        assert admin_client.get(f"{BASE}/overview").status_code == 200  # touches last_seen_at back to "now"
+
+
 def test_unauthenticated_requests_are_rejected(admin_creds):
     c = TestClient(app, headers=CSRF)
     assert c.get(f"{BASE}/overview").status_code == 401
@@ -180,6 +245,7 @@ def test_bootstrap_is_idempotent_and_reset_flag_changes_password(admin_creds, mo
     admin_service.bootstrap_admin(db_session)  # flag off: old password still works
     c = TestClient(app, headers=CSRF)
     assert c.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]}).status_code == 200
+    c.post(f"{BASE}/auth/logout")  # a fresh session from the line above would otherwise block the re-logins below
     monkeypatch.setattr(settings, "admin_reset_password_on_start", True)
     admin_service.bootstrap_admin(db_session)
     admin_service.reset_rate_limits()
@@ -231,13 +297,14 @@ def test_duplicate_name_and_location_rejected_case_insensitively(admin_client):
     assert _create(admin_client, name=name, location="Mumbai").status_code == 201
 
 
-def test_concurrent_creation_yields_unique_codes(admin_creds):
+def test_concurrent_creation_yields_unique_codes(admin_client):
+    # One session issuing concurrent requests (realistic: several browser tabs on the same
+    # login) — not 8 separate logins, which the single-active-admin-session policy would now
+    # reject past the first.
     results, errors = [], []
 
     def worker(i):
-        c = TestClient(app, headers=CSRF)
-        c.post(f"{BASE}/auth/login", json={"username": admin_creds[0], "password": admin_creds[1]})
-        r = _create(c, name=f"Concurrent {secrets.token_hex(4)} {i}")
+        r = _create(admin_client, name=f"Concurrent {secrets.token_hex(4)} {i}")
         (results if r.status_code == 201 else errors).append(r)
 
     threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]

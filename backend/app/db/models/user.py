@@ -36,6 +36,10 @@ class UserSession(UUIDPrimaryKeyMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
+    # Touched on every validated request. Only actually enforced as an idle timeout for admin
+    # sessions (see admin_service.get_admin_from_session_token) — regular student/teacher
+    # sessions deliberately stay valid across idle periods (shared/community-device use).
+    last_seen_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="sessions")
 
