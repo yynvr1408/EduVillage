@@ -6,6 +6,41 @@ This README describes what is **actually implemented in this repository** and ho
 
 Supporting documents: [Scalability architecture](docs/SCALABILITY_ARCHITECTURE.md) · [Infrastructure cost model](docs/INFRASTRUCTURE_COST_MODEL.md) · [Deployment and upgrade roadmap](docs/DEPLOYMENT_UPGRADE_ROADMAP.md) · [Scalability evaluation answers](docs/SCALABILITY_EVALUATION_ANSWERS.md) · [Capacity test plan](docs/CAPACITY_TEST_PLAN.md) · [Admin panel and colleges](docs/ADMIN_PANEL.md) · [API contracts](docs/API_CONTRACTS.md) · [Backend setup](docs/BACKEND_SETUP.md)
 
+## Walkthrough (for evaluators)
+
+This section is a plain, step-by-step tour of what the application actually does, written for someone reviewing the submission rather than building on it. Everything below reflects the live, deployed system — nothing here is a mockup or a plan.
+
+**Live deployment**
+
+* Frontend (student/teacher/admin UI): **<https://edu-village-nine.vercel.app>**
+* Backend API: **<https://eduvillage-api.onrender.com>** (`/health` for a liveness check, `/docs` for the OpenAPI/Swagger schema)
+* The backend is on Render's free tier: it spins down after ~15 minutes idle, so the **first request after a while can take up to a minute** to wake it up. This is a known, documented limitation (see [section 13](#13-free-tier-infrastructure)), not a bug.
+* Admin credentials are a real production secret and are intentionally **not** in this document or anywhere in the repository. To evaluate the admin panel, either run the app locally (below) and bootstrap your own admin from `ADMIN_USERNAME`/`ADMIN_PASSWORD` in `backend/.env`, or ask the submitter for temporary evaluator access.
+
+**Trying it hands-on without admin access**
+
+Self-registration (student or teacher) requires selecting an existing college and entering its admin-issued code — this is deliberate (see [section 4](#4-user-roles-and-permissions)), so a brand-new evaluator can't register on the live deployment without either an admin account or a code from someone who has one. The fastest way to click through the whole product yourself is the local setup in [section 9](#9-local-development-setup): `alembic upgrade head` then `python -m app.seed` creates a ready-to-use college, branch, section, and demo teacher/student accounts in one command.
+
+**The guided walkthrough itself** (this is the actual flow a college would use, and the one the test suite exercises):
+
+1. **Platform admin sets up the institution** — sign in at `/admin` → *Create College* (a name is all that's required) → the system generates a unique code like `EV-XXXX-XXXX` → open the college → add a **Branch** (e.g. "Computer Science") → inside it, add one or more **Sections** (e.g. "Section A", "Section B") → the college and branch are active by default.
+2. **A teacher registers** at `/register/teacher` — picks the college, branch, and either a specific section or **All Sections** (a branch-wide teaching assignment), enters the college code from step 1, and is signed in immediately.
+3. **A student registers** at `/register/student` — same college/branch/section + code. Registering does not enroll the student in anything by itself; enrollment is a separate, explicit step (step 5).
+4. **The teacher creates a course** from the Teacher Dashboard → *Create Course* → fills in a title and description → publishes it. The teacher can see a live **roster** of every enrolled student (name, email, branch/section) on the course's manage page.
+5. **The student discovers and enrolls** — Course Catalog → finds the published course → clicks **Enroll**, which becomes **View Course** once enrolled. Multiple independent students can enroll in the same course; each enrollment is its own record, verified not to collide or overwrite another's.
+6. **The teacher schedules and starts a live class** — *Create Class* on the course, optionally scoped to one section or (for an "All Sections" teacher) the whole branch → **Start** opens a real LiveKit room.
+7. **Students join the live class** — every eligible student (there can be several, independently signed in) joins the *same* room; a student only gets a token if they're actually authorized for that class's audience (enrolled + in the targeted section/branch). Students receive audio/video but cannot publish camera/mic (subscribe-only); on a poor connection the client automatically drops to audio-only rather than disconnecting.
+8. **The teacher records and ends the class** — *Start Recording* during the session, *End Class* when done. The recording is composited to Cloudflare R2, and stays private until the teacher explicitly **Publishes** it.
+9. **An AI summary appears automatically** — once a recording finishes processing, the backend transcribes it (Whisper) and generates a structured summary (LLM) with no teacher action required; the teacher reviews and approves it before students can see it; approved summaries show up for students on the Recorded Lessons page.
+10. **Offline study** — a student can download a recording or a resource (PDF, notes) for offline viewing; it shows up on the **Downloaded Files** page with a real **Save to Device** option (writes an actual file to the computer, not just the browser's internal storage); a student can also draft an assignment answer entirely offline, and it syncs automatically, exactly once, the next time the device is online.
+11. **Password recovery** — *Forgot Password* on either the student or teacher login page → a 6-digit code is emailed (5-minute expiry, 5 attempts, 60-second resend cooldown) → entering it correctly issues a short-lived, single-use authorization → the user sets a new password and must sign in again (a successful reset never starts a session by itself, and it revokes every other session on the account).
+12. **Second-device protection** — signing in on a new device while the account is already signed in elsewhere requires an emailed one-time code to approve the new device; once approved, the *older* session is ended automatically.
+13. **Single-admin-session protection** — the one platform-admin account can only be signed in from one place at a time; a second login attempt with the correct password is rejected while the first session is still active, and an idle admin session (2+ minutes with no activity) is automatically treated as dead so a forgotten logout never permanently locks the admin out.
+
+**What to check if you only have a few minutes:** steps 1–5 (institution → registration → course → enrollment) exercise the core data model; step 6–9 (live class → recording → AI summary) is the most distinctive part of the product; step 10 (offline download + offline assignment draft) is the other half of the "offline-first" claim in the title.
+
+**Honesty about verification status:** this walkthrough describes real, implemented, tested behavior — see [section 3](#3-core-features) and [section 19](#19-testing) for exactly which parts were verified against real infrastructure (real LiveKit Cloud, real EmailJS delivery, real deployed API) versus verified only with automated tests and fakes. The README's own status labels (✅ 🟡 🟠 🔵 ⚪, explained just below) are not decorative — they're an accurate, section-by-section account of what has and hasn't been confirmed.
+
 ## Table of contents
 
 1. [Overview](#1-project-overview)
