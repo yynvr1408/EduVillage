@@ -56,13 +56,32 @@ export const authService = {
     return data
   },
 
+  /** Starts registration email verification. Always resolves the same way whether or not the
+   * resend cooldown is still active (no new email is sent inside it). */
+  async requestRegistrationOtp(email: string): Promise<{ message: string; otp_ttl_minutes: number; resend_cooldown_seconds: number; dev_otp?: string }> {
+    return apiRequest('/auth/register/request-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  },
+
+  /** On success, returns a short-lived verification token register() requires — never store it
+   * outside this flow's own in-memory state (never localStorage/sessionStorage). */
+  async verifyRegistrationOtp(email: string, otp: string): Promise<{ verification_token: string; expires_in_minutes: number }> {
+    return apiRequest('/auth/register/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    })
+  },
+
   async register(
     email: string,
     fullName: string,
     password: string,
     role: 'student' | 'teacher',
     inviteCode?: string,
-    college?: CollegeSelection
+    college?: CollegeSelection,
+    verificationToken?: string
   ): Promise<AuthResponse> {
     const data = await apiRequest<AuthResponse>('/auth/register', {
       method: 'POST',
@@ -77,6 +96,7 @@ export const authService = {
         section_id: college?.allSections ? undefined : college?.sectionId || undefined,
         all_sections: role === 'teacher' && college?.allSections ? true : undefined,
         college_code: college?.collegeCode || undefined,
+        verification_token: verificationToken || undefined,
       }),
     })
     this.cacheUser(data.user)

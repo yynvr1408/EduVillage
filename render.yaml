@@ -69,6 +69,16 @@ services:
       - key: EMAILJS_LOGIN_TEMPLATE_ID
         sync: false # optional: a separate template for the new-device-login-approval OTP (falls
         # back to EMAILJS_TEMPLATE_ID if left unset)
+      - key: EMAILJS_REGISTRATION_TEMPLATE_ID
+        sync: false # optional: a separate template ("Verify Your EduVillage Email Address") for
+        # the registration email-verification OTP (falls back to EMAILJS_TEMPLATE_ID if unset)
+      - key: EMAILJS_REGISTRATION_SERVICE_ID
+        sync: false # optional: all three REGISTRATION_* vars together route registration OTP
+        # through a wholly separate EmailJS account (free-tier template-count workaround)
+      - key: EMAILJS_REGISTRATION_PUBLIC_KEY
+        sync: false
+      - key: EMAILJS_REGISTRATION_PRIVATE_KEY
+        sync: false
       - key: EMAILJS_PUBLIC_KEY
         sync: false
       - key: EMAILJS_PRIVATE_KEY

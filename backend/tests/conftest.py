@@ -26,6 +26,9 @@ os.environ["SESSION_COOKIE_NAME"] = "eduvillage_session"
 os.environ["CONCURRENT_LOGIN_OTP"] = "false"
 os.environ["TEACHER_COLLEGE_REQUIRED"] = "false"
 os.environ["STUDENT_COLLEGE_REQUIRED"] = "false"
+# Legacy fixtures (and most of the suite) register directly without the email-OTP dance; the
+# registration-OTP rule has its own dedicated tests that switch this back on.
+os.environ["REQUIRE_REGISTRATION_OTP"] = "false"
 # The suite is written against the local-disk storage backend and the labeled stub AI
 # providers; a developer's real .env (real S3/LiveKit/LLM credentials) must not leak into
 # tests, or they silently start hitting live third-party services instead of the fakes.
@@ -40,7 +43,9 @@ for _var in (
     "LLM_API_KEY", "LLM_BASE_URL",
     "SPEECH_TO_TEXT_API_KEY", "SPEECH_TO_TEXT_BASE_URL",
     "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
-    "EMAILJS_SERVICE_ID", "EMAILJS_TEMPLATE_ID", "EMAILJS_LOGIN_TEMPLATE_ID", "EMAILJS_PUBLIC_KEY", "EMAILJS_PRIVATE_KEY",
+    "EMAILJS_SERVICE_ID", "EMAILJS_TEMPLATE_ID", "EMAILJS_LOGIN_TEMPLATE_ID", "EMAILJS_REGISTRATION_TEMPLATE_ID",
+    "EMAILJS_PUBLIC_KEY", "EMAILJS_PRIVATE_KEY",
+    "EMAILJS_REGISTRATION_SERVICE_ID", "EMAILJS_REGISTRATION_PUBLIC_KEY", "EMAILJS_REGISTRATION_PRIVATE_KEY",
 ):
     os.environ[_var] = ""
 

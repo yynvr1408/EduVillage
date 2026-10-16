@@ -8,6 +8,15 @@ import { ApiError } from '../services/apiClient'
 const register = vi.fn()
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ register }) }))
 
+const requestRegistrationOtp = vi.fn()
+const verifyRegistrationOtp = vi.fn()
+vi.mock('../services/authService', () => ({
+  authService: {
+    requestRegistrationOtp: (...a: unknown[]) => requestRegistrationOtp(...a),
+    verifyRegistrationOtp: (...a: unknown[]) => verifyRegistrationOtp(...a),
+  },
+}))
+
 const listColleges = vi.fn()
 const listBranches = vi.fn()
 const listSections = vi.fn()
@@ -64,10 +73,21 @@ async function pick(college: string, branch: string, section: string) {
 
 beforeEach(() => {
   register.mockReset()
+  requestRegistrationOtp.mockReset().mockResolvedValue({ message: 'sent', otp_ttl_minutes: 5, resend_cooldown_seconds: 60 })
+  verifyRegistrationOtp.mockReset().mockResolvedValue({ verification_token: 'tok-abc', expires_in_minutes: 10 })
   listColleges.mockReset().mockResolvedValue(COLLEGES)
   listBranches.mockReset().mockImplementation(async (id: string) => BRANCHES[id] ?? [])
   listSections.mockReset().mockImplementation(async (id: string) => SECTIONS[id] ?? [])
 })
+
+/** Clicks "Send Verification Code", waits for the OTP step, enters a code and submits it —
+ * the real path to register() now being called, since registration is gated on email-OTP. */
+async function submitAndVerify() {
+  fireEvent.click(screen.getByRole('button', { name: /send verification code/i }))
+  const otpInput = await screen.findByLabelText(/verification code/i)
+  fireEvent.change(otpInput, { target: { value: '123456' } })
+  fireEvent.click(screen.getByRole('button', { name: /verify & create account/i }))
+}
 
 describe('registration: college -> branch -> section', () => {
   it('teacher form has the requested fields, no role question, and colleges come from the API', async () => {
@@ -121,7 +141,7 @@ describe('registration: college -> branch -> section', () => {
     type(/email address/i, 'asha@example.com')
     type(/^password/i, 'password123')
     type(/confirm password/i, 'different123')
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    fireEvent.click(screen.getByRole('button', { name: /send verification code/i }))
     expect(await screen.findByText('Passwords do not match.')).toBeInTheDocument()
     expect(screen.getByText('Select your college.')).toBeInTheDocument()
     expect(screen.getByText(/Enter the college code/)).toBeInTheDocument()
@@ -135,11 +155,11 @@ describe('registration: college -> branch -> section', () => {
     type(/college code/i, 'EV-AAAA-2222')
     fireEvent.change(screen.getByLabelText(COLLEGE), { target: { value: 'col-a' } })
     await waitFor(() => expect(optionTexts(BRANCH).length).toBeGreaterThan(1))
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    fireEvent.click(screen.getByRole('button', { name: /send verification code/i }))
     expect(await screen.findByText('Select your branch.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(BRANCH), { target: { value: 'br-cse' } })
     await waitFor(() => expect(optionTexts(SECTION).length).toBeGreaterThan(1))
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    fireEvent.click(screen.getByRole('button', { name: /send verification code/i }))
     expect(await screen.findByText('Select a section or All Sections.')).toBeInTheDocument()
     expect(register).not.toHaveBeenCalled()
   })
@@ -148,7 +168,7 @@ describe('registration: college -> branch -> section', () => {
     renderPage('student')
     await waitColleges()
     type(/^password/i, 'short1')
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    fireEvent.click(screen.getByRole('button', { name: /send verification code/i }))
     expect(await screen.findByText('Password must be at least 8 characters long.')).toBeInTheDocument()
   })
 
@@ -160,13 +180,16 @@ describe('registration: college -> branch -> section', () => {
     fillBasics()
     await pick('col-a', 'br-cse', 'sec-a')
     type(/college code/i, 'EV-WRONG-CODE')
-    const submit = screen.getByRole('button', { name: /register/i })
-    fireEvent.click(submit)
-    fireEvent.click(submit) // double click must not send twice
-    expect(register).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: /send verification code/i }))
+    const otpInput = await screen.findByLabelText(/verification code/i)
+    fireEvent.change(otpInput, { target: { value: '123456' } })
+    const verify = screen.getByRole('button', { name: /verify & create account/i })
+    fireEvent.click(verify)
+    fireEvent.click(verify) // double click must not send twice
+    await waitFor(() => expect(register).toHaveBeenCalledTimes(1))
     expect(register).toHaveBeenCalledWith('asha@example.com', 'Asha Rao', 'password123', 'teacher', undefined, {
       collegeId: 'col-a', branchId: 'br-cse', sectionId: 'sec-a', allSections: false, collegeCode: 'EV-WRONG-CODE',
-    })
+    }, 'tok-abc')
     reject(new ApiError('The college code is incorrect for the selected college.', 422, false, 'INVALID_COLLEGE_CODE'))
     expect(await screen.findByText('The college code is incorrect for the selected college.')).toBeInTheDocument()
     expect((screen.getByLabelText(/full name/i) as HTMLInputElement).value).toBe('Asha Rao')
@@ -182,7 +205,7 @@ describe('registration: college -> branch -> section', () => {
     fillBasics()
     await pick('col-a', 'br-cse', '__all_sections__')
     type(/college code/i, 'EV-AAAA-2222')
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    await submitAndVerify()
     await waitFor(() => expect(register).toHaveBeenCalled())
     expect(register.mock.calls[0][5]).toEqual({
       collegeId: 'col-a', branchId: 'br-cse', sectionId: undefined, allSections: true, collegeCode: 'EV-AAAA-2222',
@@ -196,10 +219,10 @@ describe('registration: college -> branch -> section', () => {
     fillBasics()
     await pick('col-a', 'br-cse', 'sec-a')
     type(/college code/i, 'EV-ALPHA-0001')
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    await submitAndVerify()
     expect(await screen.findByText('An account with this email already exists.')).toBeInTheDocument()
     register.mockRejectedValueOnce(new ApiError('Network', 0, true))
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    await submitAndVerify()
     expect(await screen.findByText(/Cannot reach the server/)).toBeInTheDocument()
   })
 
@@ -211,7 +234,7 @@ describe('registration: college -> branch -> section', () => {
     fillBasics()
     await pick('col-b', 'br-me', 'sec-m')
     type(/college code/i, 'EV-BETA-0001')
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    await submitAndVerify()
     await waitFor(() => expect(register).toHaveBeenCalled())
     expect(register.mock.calls[0][5]).toEqual({
       collegeId: 'col-b', branchId: 'br-me', sectionId: 'sec-m', allSections: false, collegeCode: 'EV-BETA-0001',
@@ -223,7 +246,7 @@ describe('registration: college -> branch -> section', () => {
     await waitColleges()
     fillBasics()
     await pick('col-b', 'br-me', 'sec-m')
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    fireEvent.click(screen.getByRole('button', { name: /send verification code/i }))
     expect(await screen.findByText(/Enter the college code/)).toBeInTheDocument()
     expect(register).not.toHaveBeenCalled()
   })
@@ -269,7 +292,7 @@ describe('registration: college -> branch -> section', () => {
     type(/college code/i, 'EV-ALPHA-0001')
     const callsBefore = listBranches.mock.calls.length
     listBranches.mockResolvedValueOnce([BRANCHES['col-a'][1]])
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    await submitAndVerify()
     expect(await screen.findByText('This branch is not available.')).toBeInTheDocument()
     await waitFor(() => expect(listBranches.mock.calls.length).toBe(callsBefore + 1))
     await waitFor(() => expect(optionTexts(BRANCH)).not.toContain('Computer Science (CSE)'))
@@ -283,7 +306,7 @@ describe('registration: college -> branch -> section', () => {
     await pick('col-a', 'br-cse', 'sec-a')
     type(/college code/i, 'EV-ALPHA-0001')
     listColleges.mockResolvedValueOnce([COLLEGES[1]])
-    fireEvent.click(screen.getByRole('button', { name: /register/i }))
+    await submitAndVerify()
     expect(await screen.findByText('This college is not accepting registrations.')).toBeInTheDocument()
     await waitFor(() => expect(optionTexts(COLLEGE)).not.toContain('Alpha College — Pune'))
   })

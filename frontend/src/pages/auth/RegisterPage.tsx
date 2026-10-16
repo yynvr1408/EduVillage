@@ -1,14 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertCircle, UserPlus } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Clock, ShieldCheck, UserPlus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import type { Role } from '../../types'
+import { authService } from '../../services/authService'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { FormField } from '../../components/ui/FormField'
 import { Select } from '../../components/ui/Select'
 import { Logo } from '../../components/ui/Logo'
 import { registrationApi, type RegistrationBranch, type RegistrationCollege, type RegistrationSection } from '../../services/registrationApi'
+
+const OTP_TTL_SECONDS = 5 * 60
+const RESEND_COOLDOWN_SECONDS = 60
+const formatMMSS = (totalSeconds: number) => {
+  const s = Math.max(0, totalSeconds)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
 
 export interface RegisterPageProps {
   /** Set by the /register/student and /register/teacher routes to fix the role and drop the
@@ -56,6 +64,29 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+
+  // Step 2: email verification. The form above is validated and held in state; nothing is
+  // registered until the OTP sent to `email` is verified (see auth_service.register_user).
+  const [step, setStep] = useState<'form' | 'otp'>('form')
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState<string | null>(null)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
+  const [isResendingOtp, setIsResendingOtp] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(OTP_TTL_SECONDS)
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS)
+  const otpInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (step !== 'otp') return
+    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [step])
+
+  useEffect(() => {
+    if (step !== 'otp' || resendCooldown <= 0) return
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [step, resendCooldown])
 
   const [colleges, setColleges] = useState<Load<RegistrationCollege>>({ status: 'loading', items: [] })
   const [branches, setBranches] = useState<Load<RegistrationBranch>>({ status: 'idle', items: [] })
@@ -150,29 +181,77 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
 
     setIsLoading(true)
     try {
-      const allSections = isTeacher && sectionId === ALL_SECTIONS
-      const selection = collegeId
-        ? { collegeId, branchId, sectionId: allSections ? undefined : sectionId, allSections, collegeCode: collegeCode.trim() }
-        : undefined
-      const user = await register(email, fullName, password, role, undefined, selection)
-      navigate(user.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', {
-        replace: true,
-      })
+      await authService.requestRegistrationOtp(email.trim())
+      setSecondsLeft(OTP_TTL_SECONDS)
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
+      setOtp('')
+      setOtpError(null)
+      setStep('otp')
     } catch (err: any) {
       const field = SERVER_FIELD[err?.code as string]
       if (field) {
         setFieldErrors({ [field]: err.message })
-        // The college may have been deactivated or the section removed since the page loaded.
-        if (field === 'college') void loadColleges()
-        if (field === 'branch' && collegeId) void loadBranches(collegeId)
-        if (field === 'section' && branchId) void loadSections(branchId)
       } else {
         setError(
-          err?.isNetworkError ? 'Cannot reach the server. Check your connection and try again.' : err?.message || 'Registration failed. Please check your information.'
+          err?.isNetworkError ? 'Cannot reach the server. Check your connection and try again.' : err?.message || 'Could not send a verification code. Please try again.'
         )
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleVerifyAndRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isVerifyingOtp) return
+    if (otp.length !== 6) {
+      setOtpError('Enter the full 6-digit code.')
+      return
+    }
+    setIsVerifyingOtp(true)
+    setOtpError(null)
+    try {
+      const { verification_token: verificationToken } = await authService.verifyRegistrationOtp(email.trim(), otp)
+      const allSections = isTeacher && sectionId === ALL_SECTIONS
+      const selection = collegeId
+        ? { collegeId, branchId, sectionId: allSections ? undefined : sectionId, allSections, collegeCode: collegeCode.trim() }
+        : undefined
+      const user = await register(email, fullName, password, role, undefined, selection, verificationToken)
+      navigate(user.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', { replace: true })
+    } catch (err: any) {
+      const field = SERVER_FIELD[err?.code as string]
+      if (field) {
+        // A registration-time rejection (e.g. the email got taken in the meantime): back to the form.
+        setStep('form')
+        setFieldErrors({ [field]: err.message })
+        if (field === 'college') void loadColleges()
+        if (field === 'branch' && collegeId) void loadBranches(collegeId)
+        if (field === 'section' && branchId) void loadSections(branchId)
+      } else {
+        setOtpError(
+          err?.isNetworkError ? 'Cannot reach the server. Check your connection and try again.' : err?.message || 'That code is incorrect or has expired.'
+        )
+        setOtp('')
+        otpInputRef.current?.focus()
+      }
+    } finally {
+      setIsVerifyingOtp(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || isResendingOtp) return
+    setIsResendingOtp(true)
+    setOtpError(null)
+    try {
+      await authService.requestRegistrationOtp(email.trim())
+      setSecondsLeft(OTP_TTL_SECONDS)
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
+      setOtp('')
+    } catch (err: any) {
+      setOtpError(err?.isNetworkError ? 'Cannot reach the server. Check your connection and try again.' : 'Could not resend the code. Please try again.')
+    } finally {
+      setIsResendingOtp(false)
     }
   }
 
@@ -196,6 +275,82 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
     // Teachers who teach every section of the branch; a branch-wide assignment, not a real section.
     ...(isTeacher && branchId && sections.status === 'ready' ? [{ value: ALL_SECTIONS, label: 'All Sections' }] : []),
   ]
+
+  if (step === 'otp') {
+    const expired = secondsLeft <= 0
+    return (
+      <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
+          <div className="flex flex-col items-center text-center mb-6">
+            <Logo size={48} className="mb-3" />
+            <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">Verify Your Email</h1>
+            <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
+              We sent a 6-digit code to <strong className="text-[#202B2A]">{email}</strong>.
+            </p>
+          </div>
+
+          <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs">
+            {otpError && (
+              <div className="mb-4 p-3 rounded-lg bg-[#FDE8E7] border border-[#B42318]/30 text-[#B42318] text-xs" role="alert">
+                {otpError}
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyAndRegister} className="flex flex-col gap-4" noValidate>
+              <FormField label="Verification Code" htmlFor="registerOtp" required>
+                <input
+                  ref={otpInputRef}
+                  id="registerOtp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => {
+                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                    setOtpError(null)
+                  }}
+                  maxLength={6}
+                  className="w-full text-center text-2xl font-mono tracking-[0.5em] pl-[0.5em] py-3 rounded-lg border border-[#CBD7D1] bg-[#FFFFFF] text-[#202B2A] focus:outline-none focus:ring-2 focus:ring-[#0F5B57] focus:border-[#0F5B57]"
+                  required
+                />
+              </FormField>
+
+              <div className="flex items-center justify-center gap-1.5 text-xs text-[#687775]" role="status">
+                <Clock className="w-3.5 h-3.5" />
+                {expired ? <span className="text-[#B42318] font-medium">This code has expired.</span> : <span>Expires in {formatMMSS(secondsLeft)}</span>}
+              </div>
+
+              <Button type="submit" fullWidth isLoading={isVerifyingOtp} disabled={otp.length !== 6} icon={<ShieldCheck className="w-4 h-4" />}>
+                Verify & Create Account
+              </Button>
+
+              <div className="flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendCooldown > 0 || isResendingOtp}
+                  className="text-xs font-semibold text-[#0F5B57] hover:underline disabled:text-[#687775] disabled:no-underline disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : isResendingOtp ? 'Sending...' : 'Resend code'}
+                </button>
+              </div>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep('form')}
+                  className="text-xs text-[#687775] hover:text-[#0F5B57] inline-flex items-center gap-1 font-semibold cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Edit registration details
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -410,7 +565,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
               icon={<UserPlus className="w-4 h-4" />}
               className="mt-3"
             >
-              Register & Begin Learning
+              Send Verification Code
             </Button>
           </form>
         </div>

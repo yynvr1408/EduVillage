@@ -33,19 +33,34 @@ def ensure_configured() -> None:
         logger.warning("EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY are not set — email is disabled.")
 
 
-def _send(*, to_email: str, template_id: str, template_params: dict) -> bool:
-    if not settings.emailjs_configured:
+def _send(
+    *,
+    to_email: str,
+    template_id: str,
+    template_params: dict,
+    service_id: str | None = None,
+    public_key: str | None = None,
+    private_key: str | None = None,
+) -> bool:
+    """service_id/public_key/private_key default to the main EmailJS account; pass all three to
+    send through a different account instead (e.g. registration using a separate account because
+    the free tier caps templates per account) — a template always belongs to one account's
+    service, so these three must come from the same account as template_id."""
+    service_id = service_id or settings.emailjs_service_id
+    public_key = public_key or settings.emailjs_public_key
+    private_key = private_key if private_key is not None else settings.emailjs_private_key
+    if not (service_id and template_id and public_key):
         return False
     payload = {
-        "service_id": settings.emailjs_service_id,
+        "service_id": service_id,
         "template_id": template_id,
-        "user_id": settings.emailjs_public_key,
+        "user_id": public_key,
         "template_params": {"to_email": to_email, **template_params},
     }
-    if settings.emailjs_private_key:
+    if private_key:
         # Required once an EmailJS account has "block non-browser requests" on (the default for
         # new accounts); harmless to send even when that restriction is off.
-        payload["accessToken"] = settings.emailjs_private_key
+        payload["accessToken"] = private_key
     try:
         response = httpx.post(EMAILJS_API_URL, json=payload, timeout=10.0)
     except httpx.HTTPError:
@@ -71,6 +86,24 @@ def send_login_approval_otp_email(*, to: str, otp: str, ttl_minutes: int) -> boo
     template when configured. Falls back to the password-reset template if the dedicated one
     hasn't been set up yet, so the flow still works (just with reset-flavored wording) either way."""
     template_id = settings.emailjs_login_template_id or settings.emailjs_template_id
+    return _send(to_email=to, template_id=template_id, template_params={"otp": otp, "ttl_minutes": ttl_minutes})
+
+
+def send_registration_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
+    """Registration email-ownership verification, sent before any account exists. Uses a fully
+    separate EmailJS account when one is configured (emailjs_registration_uses_separate_account —
+    the free tier's per-account template cap often forces this); otherwise its own template on
+    the shared account when configured; otherwise falls back to the password-reset template."""
+    if settings.emailjs_registration_uses_separate_account:
+        return _send(
+            to_email=to,
+            template_id=settings.emailjs_registration_template_id,
+            template_params={"otp": otp, "ttl_minutes": ttl_minutes},
+            service_id=settings.emailjs_registration_service_id,
+            public_key=settings.emailjs_registration_public_key,
+            private_key=settings.emailjs_registration_private_key,
+        )
+    template_id = settings.emailjs_registration_template_id or settings.emailjs_template_id
     return _send(to_email=to, template_id=template_id, template_params={"otp": otp, "ttl_minutes": ttl_minutes})
 
 

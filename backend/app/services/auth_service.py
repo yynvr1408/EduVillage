@@ -19,7 +19,7 @@ from app.core.security import (
 from app.db.base import utcnow
 from app.db.models.college import UserBranchAssignment, UserCollegeSection
 from app.db.models.enums import UserRole, UserStatus
-from app.db.models.user import PasswordResetOtpChallenge, PasswordResetToken, User, UserSession
+from app.db.models.user import PasswordResetOtpChallenge, PasswordResetToken, RegistrationOtpChallenge, User, UserSession
 from app.services import audit_service
 
 logger = logging.getLogger(__name__)
@@ -70,13 +70,17 @@ def _assert_may_register_as(role: UserRole, invite_code: str | None) -> None:
 def register_user(
     db: Session, *, full_name: str, email: str, password: str, role: UserRole, invite_code: str | None = None,
     college_id: str | None = None, college_code: str | None = None, section_id: str | None = None,
-    branch_id: str | None = None, all_sections: bool = False,
+    branch_id: str | None = None, all_sections: bool = False, verification_token: str | None = None,
 ) -> User:
     if role == UserRole.admin:
         raise ForbiddenError("This role cannot be self-registered.", code="ROLE_NOT_ALLOWED")
     normalized_email = email.strip().lower()
     if normalized_email in settings.blocked_registration_emails:
         raise ForbiddenError("This email address cannot be used to register an account.", code="EMAIL_NOT_ALLOWED")
+    if settings.require_registration_otp:
+        if not verification_token:
+            raise ForbiddenError("Verify your email address before registering.", code="EMAIL_NOT_VERIFIED")
+        consume_registration_verification(db, email=normalized_email, verification_token=verification_token)
     from app.services import college_service
 
     # Everything is validated before the first row is written, so a rejection leaves no partial account.
@@ -532,3 +536,153 @@ def verify_login_otp(db: Session, *, email: str, otp: str, ip: str | None = None
     if ended:
         logger.info("login_otp_handover user_id=%s ended_sessions=%s", user.id, ended)
     return user
+
+
+# ---- registration email verification ---------------------------------------------------------
+# Separate from the two OTP flows above: those prove control of an EXISTING account's mailbox
+# (user_id FK). This proves control of a mailbox for an account that doesn't exist YET, so the
+# challenge is keyed by email instead, in its own table (RegistrationOtpChallenge) — see that
+# model's docstring. Combines OTP + the resulting short-lived authorization in one row.
+
+
+def request_registration_otp(db: Session, email: str, *, ip: str | None = None) -> tuple[bool, str | None]:
+    """Emails a registration email-verification code. Rejects up front (not silently, unlike
+    password-reset) if the email is blocklisted or already registered — there is no existing
+    account to protect from enumeration here; the caller is about to try to register anyway, and
+    /auth/register would reject the same email with the same codes regardless."""
+    from app.core.exceptions import ServiceUnavailableError
+    from app.integrations import email as email_integration
+
+    normalized_email = email.strip().lower()
+    if normalized_email in settings.blocked_registration_emails:
+        raise ForbiddenError("This email address cannot be used to register an account.", code="EMAIL_NOT_ALLOWED")
+    _check_rate_limit(f"register-otp-req-email:{normalized_email}")
+    if ip:
+        _check_rate_limit(f"register-otp-req-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+
+    existing = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
+    if existing:
+        raise ConflictError("An account with this email already exists.", code="EMAIL_TAKEN")
+
+    now = utcnow()
+    latest = db.execute(
+        select(RegistrationOtpChallenge)
+        .where(RegistrationOtpChallenge.email == normalized_email)
+        .order_by(RegistrationOtpChallenge.created_at.desc())
+    ).scalars().first()
+    if (
+        latest
+        and latest.revoked_at is None
+        and latest.consumed_at is None
+        and (now - latest.created_at) < timedelta(seconds=settings.otp_request_cooldown_seconds)
+    ):
+        return False, None  # the code already sent is still valid; do not email again inside the cooldown
+
+    db.execute(
+        update(RegistrationOtpChallenge)
+        .where(
+            RegistrationOtpChallenge.email == normalized_email,
+            RegistrationOtpChallenge.verified_at.is_(None),
+            RegistrationOtpChallenge.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+    otp = _generate_otp()
+    challenge = RegistrationOtpChallenge(
+        email=normalized_email,
+        otp_hash=_hash_otp(otp),
+        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        max_attempts=settings.otp_max_attempts,
+    )
+    db.add(challenge)
+    db.commit()
+
+    sent = email_integration.send_registration_otp_email(to=normalized_email, otp=otp, ttl_minutes=settings.otp_ttl_minutes)
+    if not sent and settings.emailjs_configured:
+        challenge.revoked_at = utcnow()
+        db.commit()
+        logger.warning("registration_otp_email_not_sent")
+        raise ServiceUnavailableError("We could not send the verification code. Please try again shortly.", code="OTP_SEND_FAILED")
+    return sent, (None if settings.is_production or settings.emailjs_configured else otp)
+
+
+def verify_registration_otp(db: Session, *, email: str, otp: str, ip: str | None = None) -> str:
+    """Verifies the OTP and, only on success, issues a short-lived single-use registration
+    verification token that register_user() requires. Atomic attempt-claim and verified-claim,
+    same pattern as _claim_otp, just against RegistrationOtpChallenge (email-keyed, not user-keyed)."""
+    normalized_email = email.strip().lower()
+    _check_rate_limit(f"register-otp-email:{normalized_email}")
+    if ip:
+        _check_rate_limit(f"register-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+
+    now = utcnow()
+    challenge = db.execute(
+        select(RegistrationOtpChallenge)
+        .where(
+            RegistrationOtpChallenge.email == normalized_email,
+            RegistrationOtpChallenge.verified_at.is_(None),
+            RegistrationOtpChallenge.revoked_at.is_(None),
+            RegistrationOtpChallenge.expires_at > now,
+        )
+        .order_by(RegistrationOtpChallenge.created_at.desc())
+    ).scalars().first()
+    if not challenge:
+        raise _GENERIC_OTP_ERROR()
+
+    claimed = db.execute(
+        update(RegistrationOtpChallenge)
+        .where(
+            RegistrationOtpChallenge.id == challenge.id,
+            RegistrationOtpChallenge.attempts < RegistrationOtpChallenge.max_attempts,
+            RegistrationOtpChallenge.verified_at.is_(None),
+            RegistrationOtpChallenge.revoked_at.is_(None),
+            RegistrationOtpChallenge.expires_at > now,
+        )
+        .values(attempts=RegistrationOtpChallenge.attempts + 1)
+    )
+    db.commit()
+    if claimed.rowcount != 1:
+        raise _GENERIC_OTP_ERROR()
+
+    db.refresh(challenge)
+    if not hmac.compare_digest(challenge.otp_hash, _hash_otp(otp)):
+        raise _GENERIC_OTP_ERROR()
+
+    verification_token = generate_session_token()
+    verified_claim = db.execute(
+        update(RegistrationOtpChallenge)
+        .where(RegistrationOtpChallenge.id == challenge.id, RegistrationOtpChallenge.verified_at.is_(None))
+        .values(
+            verified_at=now,
+            verification_token_hash=hash_token(verification_token),
+            token_expires_at=now + timedelta(minutes=settings.reset_token_ttl_minutes),
+        )
+    )
+    db.commit()
+    if verified_claim.rowcount != 1:
+        raise _GENERIC_OTP_ERROR()
+    return verification_token
+
+
+def consume_registration_verification(db: Session, *, email: str, verification_token: str) -> None:
+    """Redeems the token from verify_registration_otp. Raises ForbiddenError (never reveals why
+    beyond a generic message) if it's missing, expired, already used, or for a different email
+    than the one actually being registered — register_user calls this before creating the account,
+    so an unverified or mismatched email can never result in an active account."""
+    now = utcnow()
+    token_hash = hash_token(verification_token)
+    normalized_email = email.strip().lower()
+    claimed = db.execute(
+        update(RegistrationOtpChallenge)
+        .where(
+            RegistrationOtpChallenge.verification_token_hash == token_hash,
+            RegistrationOtpChallenge.email == normalized_email,
+            RegistrationOtpChallenge.token_expires_at > now,
+            RegistrationOtpChallenge.consumed_at.is_(None),
+            RegistrationOtpChallenge.revoked_at.is_(None),
+        )
+        .values(consumed_at=now)
+    )
+    db.commit()
+    if claimed.rowcount != 1:
+        raise ForbiddenError("Email verification is required and must match the email you're registering with.", code="EMAIL_NOT_VERIFIED")

@@ -84,3 +84,27 @@ class PasswordResetToken(UUIDPrimaryKeyMixin, Base):
     # never when this exact token is itself redeemed (that's used_at).
     revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
+
+
+class RegistrationOtpChallenge(UUIDPrimaryKeyMixin, Base):
+    """Email-ownership verification for a NOT-YET-created account. Keyed by email (not user_id —
+    no user exists yet), unlike PasswordResetOtpChallenge/PasswordResetToken. Combines both OTP
+    (otp_hash) and the resulting short-lived registration authorization (verification_token_hash)
+    in one row, since there's no second resource (a password reset) to separately authorize."""
+
+    __tablename__ = "registration_otp_challenges"
+
+    email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    otp_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    # Set when the OTP is correctly entered; the verification token is only valid afterward.
+    verified_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    verification_token_hash: Mapped[str | None] = mapped_column(String(128), unique=True, index=True, nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Set once the token is redeemed to actually create the account (single-use).
+    consumed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # A newer OTP request for the same email supersedes this one.
+    revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)

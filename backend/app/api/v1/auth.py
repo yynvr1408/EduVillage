@@ -11,8 +11,11 @@ from app.schemas.auth import (
     LoginOtpRequired,
     LoginRequest,
     RegisterRequest,
+    RegistrationVerificationOut,
+    RequestRegistrationOtpRequest,
     ResetAuthorizationOut,
     ResetPasswordRequest,
+    VerifyRegistrationOtpRequest,
     VerifyResetOtpRequest,
 )
 from app.schemas.user import UserOut
@@ -36,6 +39,37 @@ def _set_session_cookie(response: Response, token: str, settings: Settings) -> N
     )
 
 
+@router.post("/register/request-otp", status_code=202)
+def register_request_otp(
+    payload: RequestRegistrationOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    sent, dev_otp = auth_service.request_registration_otp(db, payload.email, ip=request.client.host if request.client else None)
+    body = {
+        "message": "A verification code has been sent to that email address.",
+        "otp_ttl_minutes": settings.otp_ttl_minutes,
+        "resend_cooldown_seconds": settings.otp_request_cooldown_seconds,
+    }
+    if dev_otp:
+        body["dev_otp"] = dev_otp
+    return body
+
+
+@router.post("/register/verify-otp", response_model=RegistrationVerificationOut)
+def register_verify_otp(
+    payload: VerifyRegistrationOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    verification_token = auth_service.verify_registration_otp(
+        db, email=payload.email, otp=payload.otp, ip=request.client.host if request.client else None
+    )
+    return RegistrationVerificationOut(verification_token=verification_token, expires_in_minutes=settings.reset_token_ttl_minutes)
+
+
 @router.post("/register", response_model=AuthResponse, status_code=201)
 def register(
     payload: RegisterRequest,
@@ -47,6 +81,7 @@ def register(
         db, full_name=payload.full_name, email=payload.email, password=payload.password, role=payload.role,
         invite_code=payload.invite_code, college_id=payload.college_id, college_code=payload.college_code,
         section_id=payload.section_id, branch_id=payload.branch_id, all_sections=payload.all_sections,
+        verification_token=payload.verification_token,
     )
     token = auth_service.create_session(db, user)
     _set_session_cookie(response, token, settings)

@@ -63,6 +63,11 @@ class Settings(BaseSettings):
         extra = {e.strip().lower() for e in (self.blocked_registration_emails_extra or "").split(",") if e.strip()}
         return baseline | extra
 
+    # Registration requires proving control of the email address first (see
+    # auth_service.request_registration_otp/verify_registration_otp). True in real use; tests
+    # that don't exercise this flow switch it off centrally (see tests/conftest.py).
+    require_registration_otp: bool = True
+
     # Recording policy: recording is always an explicit, per-class teacher action; this is the
     # institution-wide kill switch. Recordings stay private until a teacher publishes them.
     recording_enabled: bool = True
@@ -111,8 +116,28 @@ class Settings(BaseSettings):
     # should not read like one. Optional: falls back to emailjs_template_id if unset, so this still
     # works (with the reset-flavored wording) before the dedicated template is created.
     emailjs_login_template_id: str | None = None
+    # A third template ("verify your email to finish registering") for the registration-OTP flow.
+    # Optional: falls back to emailjs_template_id if unset.
+    emailjs_registration_template_id: str | None = None
     emailjs_public_key: str | None = None
     emailjs_private_key: str | None = None
+    # EmailJS's free tier caps templates per account (2 at the time of writing), so the
+    # registration-OTP template may need to live in a SEPARATE EmailJS account from the one
+    # used for password-reset/login-approval. A template belongs to one account's service, so
+    # that requires its own full credential set, not just a template id. All three must be set
+    # together for this to take effect; otherwise registration falls back to the shared account
+    # (using emailjs_registration_template_id there, or emailjs_template_id if that's unset too).
+    emailjs_registration_service_id: str | None = None
+    emailjs_registration_public_key: str | None = None
+    emailjs_registration_private_key: str | None = None
+
+    @property
+    def emailjs_registration_uses_separate_account(self) -> bool:
+        return bool(
+            self.emailjs_registration_service_id
+            and self.emailjs_registration_public_key
+            and self.emailjs_registration_template_id
+        )
     otp_ttl_minutes: int = 5
     # A second sign-in to a student/teacher account that is already signed in elsewhere needs an emailed OTP.
     concurrent_login_otp: bool = True

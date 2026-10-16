@@ -19,6 +19,23 @@ class RegisterRequest(BaseModel):
     branch_id: str | None = Field(default=None, max_length=36)
     section_id: str | None = Field(default=None, max_length=36)
     all_sections: bool = False  # teachers only: branch-wide assignment instead of one section
+    # Proves control of `email` (see /auth/register/verify-otp). Required unless the deployment
+    # has registration-OTP switched off.
+    verification_token: str | None = Field(default=None, max_length=128)
+
+
+class RequestRegistrationOtpRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyRegistrationOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class RegistrationVerificationOut(BaseModel):
+    verification_token: str
+    expires_in_minutes: int
 
 
 class LoginRequest(BaseModel):

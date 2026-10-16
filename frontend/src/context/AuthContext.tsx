@@ -15,7 +15,15 @@ interface AuthContextType {
   setSharedDevice: (enabled: boolean) => void
   login: (email: string, password: string) => Promise<User | LoginOtpChallenge>
   verifyLoginOtp: (email: string, otp: string) => Promise<User>
-  register: (email: string, fullName: string, password: string, role: Role, inviteCode?: string, college?: CollegeSelection) => Promise<User>
+  register: (
+    email: string,
+    fullName: string,
+    password: string,
+    role: Role,
+    inviteCode?: string,
+    college?: CollegeSelection,
+    verificationToken?: string
+  ) => Promise<User>
   logout: () => Promise<void>
   switchUser: () => Promise<void>
   checkUnsavedWork: () => Promise<{ hasUnsaved: boolean; count: number; draftTitles: string[] }>
@@ -90,9 +98,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     role: Role,
     inviteCode?: string,
-    college?: CollegeSelection
+    college?: CollegeSelection,
+    verificationToken?: string
   ): Promise<User> => {
-    const res = await authService.register(email, fullName, password, role, inviteCode, college)
+    const res = await authService.register(email, fullName, password, role, inviteCode, college, verificationToken)
     setUser(res.user)
     return res.user
   }
