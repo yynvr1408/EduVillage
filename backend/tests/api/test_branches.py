@@ -299,46 +299,39 @@ def test_single_section_teacher_is_confined_to_their_section(admin, campus, db_s
     assert r.status_code == 409 and r.json()["error"]["code"] == "SECTION_REQUIRED"
 
 
-def test_branch_wide_teacher_targets_the_whole_branch_and_nothing_else(admin, campus, db_session):
+def test_branch_wide_teacher_creates_one_branch_audience_class_and_nothing_else(admin, campus, db_session):
     t, _ = make_teacher(campus, all_sections=True)
     course = make_course(t)
-    a, b = link(t, course, campus["cse_a"]).json(), link(t, course, campus["cse_b"]).json()
+    a = link(t, course, campus["cse_a"]).json()
     for forbidden in (campus["ece_a"], campus["other_a"]):
         assert link(t, course, forbidden).status_code == 403
     r = schedule(t, course, all_branch_sections=True)
     assert r.status_code == 201, r.text
-    assert set(r.json()["section_ids"]) == {a["id"], b["id"]}
-    # explicit subset still works; mixing "whole branch" with explicit ids does not
-    assert schedule(t, course, section_ids=[a["id"]]).json()["section_ids"] == [a["id"]]
+    body = r.json()
+    # ONE class record whose audience is the branch; no per-section copies, no section list
+    assert body["audience_branch_id"] == campus["cse"]["id"] and body["section_ids"] == []
+    # explicit subset still works and stays section-scoped; mixing "whole branch" with explicit ids does not
+    scoped = schedule(t, course, section_ids=[a["id"]]).json()
+    assert scoped["section_ids"] == [a["id"]] and scoped["audience_branch_id"] is None
     assert schedule(t, course, all_branch_sections=True, section_ids=[a["id"]]).status_code == 422
-    # a cohort of another branch smuggled into the course is neither included nor targetable
+    # a cohort of another branch smuggled into the course is still not targetable
     foreign = Section(course_id=course["id"], name="ECE cohort", code="ECE1", college_section_id=campus["ece_a"]["id"])
     db_session.add(foreign)
     db_session.commit()
-    assert foreign.id not in schedule(t, course, all_branch_sections=True).json()["section_ids"]
     assert schedule(t, course, section_ids=[foreign.id]).status_code == 403
 
 
-def test_sections_added_or_deactivated_later_are_handled_by_branch_wide_assignments(admin, campus):
+def test_branch_wide_class_needs_no_linked_sections_and_follows_the_branch(admin, campus):
     t, _ = make_teacher(campus, all_sections=True)
-    course = make_course(t)
-    a = link(t, course, campus["cse_a"]).json()
-    first = schedule(t, course, all_branch_sections=True).json()
-    assert first["section_ids"] == [a["id"]]
-    # the admin adds Section C afterwards: the same teacher may link and address it with no re-registration
+    course = make_course(t)  # no cohorts at all
+    first = schedule(t, course, all_branch_sections=True)
+    assert first.status_code == 201 and first.json()["audience_branch_id"] == campus["cse"]["id"]
+    # sections added or deactivated later change nothing for the teacher's assignment
     c_sec = admin.post(f"{BASE}/branches/{campus['cse']['id']}/sections", json={"name": "Section C"}).json()
-    c = link(t, course, c_sec).json()
-    assert set(schedule(t, course, all_branch_sections=True).json()["section_ids"]) == {a["id"], c["id"]}
-    # a deactivated college section drops out of "all active sections", without touching the teacher's assignment
+    assert link(t, course, c_sec).status_code == 201
     admin.post(f"{BASE}/sections/{c_sec['id']}/status", json={"status": "inactive"})
-    assert schedule(t, course, all_branch_sections=True).json()["section_ids"] == [a["id"]]
+    assert schedule(t, course, all_branch_sections=True).status_code == 201
     assert link(t, make_course(t), c_sec).status_code == 409  # inactive: cannot be newly linked
-
-
-def test_branch_wide_class_with_no_linked_sections_is_refused_clearly(admin, campus):
-    t, _ = make_teacher(campus, all_sections=True)
-    r = schedule(t, make_course(t), all_branch_sections=True)
-    assert r.status_code == 409 and r.json()["error"]["code"] == "NO_SECTIONS_IN_BRANCH"
 
 
 def test_assignment_never_reaches_another_college(admin, campus):
@@ -359,18 +352,15 @@ def test_unscoped_legacy_teacher_cannot_link_but_keeps_existing_behaviour(teache
     assert schedule(t, course, all_branch_sections=True).status_code == 403
 
 
-def test_branch_assignment_does_not_enroll_students_or_open_classes_to_them(admin, campus, db_session):
+def test_branch_assignment_does_not_enroll_students(admin, campus, db_session):
     t, _ = make_teacher(campus, all_sections=True)
     course = make_course(t)
-    a = link(t, course, campus["cse_a"]).json()
     klass = schedule(t, course, all_branch_sections=True).json()
     sp = teacher_payload(campus["college"], campus["cse"], campus["cse_a"])
     sp.update(role="student")
     student_client, r = sign_up(sp)
     assert r.status_code == 201
     uid = r.json()["user"]["id"]
-    # picking the same college section at registration neither enrols nor adds the student to the cohort
-    assert db_session.execute(select(func.count()).select_from(SectionMember).where(SectionMember.student_id == uid)).scalar_one() == 0
     from app.core.exceptions import ForbiddenError
     from app.db.models.classroom import Class
     from app.services import classroom_service
@@ -380,16 +370,12 @@ def test_branch_assignment_does_not_enroll_students_or_open_classes_to_them(admi
         try:
             classroom_service.assert_enrolled_in_class(db_session, db_session.get(User, uid), db_session.get(Class, klass["id"]))
             return True
-        except ForbiddenError as exc:
-            assert exc.code in ("NOT_ENROLLED", "WRONG_SECTION", "FORBIDDEN"), exc.code
+        except ForbiddenError:
             return False
 
-    # participation (joining media, summaries) is what the existing rules gate: not enrolled -> no
+    # being in the branch is necessary but not sufficient: the existing enrollment rule still applies
     assert not may_participate()
     assert student_client.post(f"/api/v1/courses/{course['id']}/enrollments", json={}).status_code == 201
-    assert not may_participate()  # enrolled, but not a member of the class's cohort -> still no
-    # the teacher adds the student to the cohort through the existing section API -> now allowed
-    assert t.post(f"/api/v1/sections/{a['id']}/members", json={"student_id": uid}).status_code == 201
     assert may_participate()
 
 

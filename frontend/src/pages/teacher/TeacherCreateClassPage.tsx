@@ -124,7 +124,7 @@ export const TeacherCreateClassPage: React.FC = () => {
               />
             </FormField>
 
-            {sections.length > 0 && (
+            {(sections.length > 0 || branchName) && (
               <FormField
                 label="Target Cohort / Section (Optional)"
                 htmlFor="section"

@@ -25,7 +25,7 @@ from app.db.models.summary import LectureSummary, LectureTranscript
 from app.db.models.user import User
 from app.integrations import livekit
 from app.integrations.object_storage import get_storage
-from app.services import audit_service, classroom_service, course_service, section_service, summary_service
+from app.services import audit_service, classroom_service, course_service, section_service, summary_service, teaching_scope_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -249,6 +249,8 @@ def can_access(db: Session, user: User, recording: ClassRecording) -> bool:
         return False
     if recording.status != RecordingStatus.available or not recording.is_published:
         return False
+    if not teaching_scope_service.student_in_branch_audience(db, user, _class_of(db, recording)):
+        return False  # recording of a branch-wide class from another branch or college
     allowed = _allowed_section_ids(db, recording)
     if allowed:
         return section_service.is_member_of_any(db, user.id, allowed)

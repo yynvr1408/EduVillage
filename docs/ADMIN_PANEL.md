@@ -47,3 +47,7 @@ Class targeting (enforced in `teaching_scope_service`, used by `POST /classes` a
 - `all_branch_sections: true` (branch-wide teachers only) expands to every course section linked to an ACTIVE section of the branch at that moment;
 - plain cohorts (no link) and unassigned legacy teachers behave exactly as before. Assignments never enrol students: participation still needs course enrollment and cohort membership.
 `GET /users/me/teaching-scope` reports the caller's scope.
+
+## Branch-wide classes ("Other Classes")
+
+A teacher assigned to "All Sections" creates a class with `all_branch_sections: true`. It is ONE `classes` row with `audience_branch_id` set to the teacher's branch (no per-section copies, no section list, one LiveKit room). Students see it in the Student Portal under "Other Classes" only when all of these hold: they belong to that branch of that college (via their college section), they pass the normal course-enrollment rule, and the class's teacher is still assigned to all sections of that branch. The same check guards `GET /classes`, `GET /classes/{id}`, the LiveKit join token, summaries and recording access (`WRONG_BRANCH` / 404 for others). Section-specific classes and teachers are unchanged. Migration `e6a0ffee0005` adds the nullable column.

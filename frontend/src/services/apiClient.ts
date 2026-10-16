@@ -238,6 +238,8 @@ function mapClass(c: Raw, courses: CourseIndex): ClassRoom {
     id: c.id,
     course_id: c.course_id,
     section_id: c.section_ids?.[0],
+    branch_id: c.audience_branch_id ?? undefined,
+    branch_name: c.audience_branch_name ?? undefined,
     course_title: course?.title,
     course_code: course?.code,
     teacher_id: c.teacher_id,

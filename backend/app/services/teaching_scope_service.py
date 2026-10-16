@@ -82,14 +82,14 @@ def _course_section_in_scope(db: Session, scope: Scope, section: Section) -> boo
 
 def resolve_class_audience(
     db: Session, teacher: User, course: Course, section_ids: list[str], all_branch_sections: bool
-) -> list[str]:
-    """Server-side targeting rules for a new class. Returns the course-section ids the class will address.
+) -> tuple[list[str], str | None]:
+    """Server-side targeting rules for a new class. Returns (course-section ids, branch audience id).
 
     * unscoped teacher: unchanged behaviour (explicit ids, or empty = whole course);
     * scoped teacher: every explicit section must be a plain cohort or inside their scope; a whole-course class
       is refused when the course has cohorts outside their scope;
-    * all_branch_sections: only for a branch-wide teacher; expands to every course section linked to an ACTIVE
-      college section of that branch right now (sections added later are included next time).
+    * all_branch_sections: only for a branch-wide teacher. The class is ONE record whose audience is the
+      teacher's branch (every student of that branch, whatever their section), not a list of sections.
     """
     scope = get_scope(db, teacher)
     ids = list(dict.fromkeys(section_ids))
@@ -98,21 +98,9 @@ def resolve_class_audience(
             raise ForbiddenError("Only a teacher assigned to all sections of a branch can address the whole branch.", code="NOT_BRANCH_WIDE")
         if ids:
             raise ValidationFailedError("Choose either specific sections or the whole branch, not both.", code="INVALID_SECTION")
-        rows = db.execute(
-            select(Section.id)
-            .join(CollegeSection, Section.college_section_id == CollegeSection.id)
-            .where(
-                Section.course_id == course.id,
-                CollegeSection.branch_id.in_(scope.branch_ids),
-                CollegeSection.status == CollegeStatus.active,
-            )
-        ).scalars()
-        resolved = list(rows)
-        if not resolved:
-            raise ConflictError("This course has no sections linked to the active sections of your branch.", code="NO_SECTIONS_IN_BRANCH")
-        return resolved
+        return [], next(iter(scope.branch_ids))
     if scope.kind == "none":
-        return ids
+        return ids, None
     for sid in ids:
         section = db.get(Section, sid)
         if section is not None and section.course_id == course.id and not _course_section_in_scope(db, scope, section):
@@ -125,7 +113,7 @@ def resolve_class_audience(
         ]
         if outside:
             raise ConflictError("Choose the section(s) you teach; this course also has sections outside your assignment.", code="SECTION_REQUIRED")
-    return ids
+    return ids, None
 
 
 def list_teachers_for_student(db: Session, student: User) -> list[dict]:
@@ -194,3 +182,32 @@ def describe(db: Session, user: User) -> dict:
         {"id": s.id, "name": s.name, "branch_id": s.branch_id} for s in selectable_college_sections(db, user)
     ]
     return out
+
+
+def student_branch_ids(db: Session, student: User) -> set[str]:
+    """Branches a student belongs to (via their college section), only within their own college."""
+    if not student.college_id:
+        return set()
+    rows = db.execute(
+        select(CollegeSection.branch_id)
+        .join(UserCollegeSection, UserCollegeSection.college_section_id == CollegeSection.id)
+        .where(UserCollegeSection.user_id == student.id, CollegeSection.college_id == student.college_id)
+    ).scalars()
+    return set(rows)
+
+
+def teacher_covers_branch(db: Session, teacher_id: str, branch_id: str) -> bool:
+    return (
+        db.execute(
+            select(UserBranchAssignment.id).where(UserBranchAssignment.user_id == teacher_id, UserBranchAssignment.branch_id == branch_id)
+        ).first()
+        is not None
+    )
+
+
+def student_in_branch_audience(db: Session, student: User, cls) -> bool:
+    """True when the class is not branch-wide, or the student is in that branch (same college) and the class's
+    teacher is still assigned to all sections of it. Sharing a college code alone is never enough."""
+    if not cls.audience_branch_id:
+        return True
+    return cls.audience_branch_id in student_branch_ids(db, student) and teacher_covers_branch(db, cls.teacher_id, cls.audience_branch_id)
