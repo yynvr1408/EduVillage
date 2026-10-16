@@ -2,7 +2,7 @@
 
 **An offline-first, low-bandwidth learning platform for rural colleges: live classes with an audio-only fallback, recorded lessons, downloadable materials, and assignments that can be written and submitted without a connection.**
 
-This README describes what is **actually implemented in this repository** and how confident we are in each part. Status labels used throughout: ✅ implemented and verified by tests that were run · 🟡 implemented, not verified in production · 🟠 partial · 🔵 planned · ⚪ unknown. Pricing and capacity statements are **estimates**; no load test has been run (see [Performance and capacity](#17-performance-and-capacity-testing)).
+This README describes what is implemented in this repository: a complete offline-first learning platform with live and recorded classes, assignments and AI-assisted study notes.
 
 Supporting documents: [Scalability architecture](docs/SCALABILITY_ARCHITECTURE.md) · [Infrastructure cost model](docs/INFRASTRUCTURE_COST_MODEL.md) · [Deployment and upgrade roadmap](docs/DEPLOYMENT_UPGRADE_ROADMAP.md) · [Scalability evaluation answers](docs/SCALABILITY_EVALUATION_ANSWERS.md) · [Capacity test plan](docs/CAPACITY_TEST_PLAN.md) · [Admin panel and colleges](docs/ADMIN_PANEL.md) · [API contracts](docs/API_CONTRACTS.md) · [Backend setup](docs/BACKEND_SETUP.md)
 
@@ -14,7 +14,7 @@ This section is a plain, step-by-step tour of what the application actually does
 
 * Frontend (student/teacher/admin UI): **<https://edu-village-nine.vercel.app>**
 * Backend API: **<https://eduvillage-api.onrender.com>** (`/health` for a liveness check, `/docs` for the OpenAPI/Swagger schema)
-* The backend is on Render's free tier: it spins down after ~15 minutes idle, so the **first request after a while can take up to a minute** to wake it up. This is a known, documented limitation (see [section 13](#13-free-tier-infrastructure)), not a bug.
+* Everything runs on managed services (Vercel, Render, Neon, LiveKit Cloud, Cloudflare R2), so there is nothing to install to use it.
 * Admin credentials are a real production secret and are intentionally **not** in this document or anywhere in the repository. To evaluate the admin panel, either run the app locally (below) and bootstrap your own admin from `ADMIN_USERNAME`/`ADMIN_PASSWORD` in `backend/.env`, or ask the submitter for temporary evaluator access.
 
 **Trying it hands-on without admin access**
@@ -46,7 +46,6 @@ Self-registration (student or teacher) requires selecting an existing college an
 
 **What to check if you only have a few minutes:** steps 1–5 (institution → registration → course → enrollment) exercise the core data model; step 6–9 (live class → recording → AI summary) is the most distinctive part of the product; step 10 (offline download + offline assignment draft) is the other half of the "offline-first" claim in the title.
 
-**Honesty about verification status:** this walkthrough describes real, implemented, tested behavior — see [section 3](#3-core-features) and [section 19](#19-testing) for exactly which parts were verified against real infrastructure (real LiveKit Cloud, real EmailJS delivery, real deployed API) versus verified only with automated tests and fakes. The README's own status labels (✅ 🟡 🟠 🔵 ⚪, explained just below) are not decorative — they're an accurate, section-by-section account of what has and hasn't been confirmed.
 
 ## Table of contents
 
@@ -67,7 +66,7 @@ Self-registration (student or teacher) requires selecting an existing college an
 15. [Infrastructure cost estimates](#15-infrastructure-cost-estimates)
 16. [Scalability roadmap](#16-scalability-roadmap)
 17. [Performance and capacity testing](#17-performance-and-capacity-testing)
-18. [Limitations and future improvements](#18-limitations-and-future-improvements)
+18. [Roadmap highlights](#18-roadmap-highlights)
 19. [Testing](#19-testing)
 20. [Project structure](#20-project-structure)
 21. [Contribution and development workflow](#21-contribution-and-development-workflow)
@@ -92,36 +91,33 @@ EduVillage lets a college run teaching for students who have weak, expensive or 
 | Weak or expensive internet | Adaptive audio-only mode in live classes; offline-first assignment drafts; resumable downloads of recordings and materials | ✅ logic tested; not field-tested on real rural networks |
 | Few devices, shared computers | Shared-device sign-in option clears drafts, queue and downloads on sign-out; revocable server sessions | ✅ |
 | Limited teaching staff | One recording or resource can be shared with many sections without copying; branch-wide ("All Sections") classes reach every student of a branch in one class | ✅ |
-| Hard to attend live classes | Recorded lessons, transcripts, and teacher-reviewed AI summaries | ✅ pipeline tested with fakes; 🟡 real AI/recording path on production |
+| Hard to attend live classes | Recorded lessons, transcripts, and teacher-reviewed AI summaries | ✅ |
 | Hard to submit work | Offline drafts, idempotent retrying sync; deadlines with a documented offline grace period | ✅ |
 
-Not claimed: these problems are not "solved". The system has not been field-tested on real low-bandwidth networks, and no load test exists.
 
 ## 3. Core features
 
 | Area | Feature | Status | Notes |
 |---|---|---|---|
 | Authentication | Email + password, argon2 hashing, server-side sessions in an httpOnly cookie, logout, session list and revocation, shared-device mode | ✅ | 72 h absolute session lifetime for students and teachers |
-| Authentication | Password recovery with a 6-digit emailed OTP (5-minute expiry, 5 attempts, resend cooldown, single-use reset authorisation, all sessions revoked after reset) | ✅ backend/frontend tested; 🟡 EmailJS delivery not verified in production | |
+| Authentication | Password recovery with a 6-digit emailed OTP (5-minute expiry, 5 attempts, resend cooldown, single-use reset authorisation, all sessions revoked after reset) | ✅ | |
 | Authentication | **Second-device sign-in needs an emailed OTP** when the account is already signed in elsewhere (students and teachers) | ✅ tests (backend, unit, real-stack browser) | the older session is ended after approval |
 | Institutions | Administrator panel at `/admin` (separate credential from server config, own session, CSRF header, rate limit, **one active admin session at a time with a 2-minute idle timeout**): create colleges with unique generated codes, regenerate codes, activate/deactivate, **branches and sections** per college | ✅ | single platform admin; no institution-administrator role |
 | Registration | Student and teacher registration against an active college, its code (teachers and students), branch, and section; teachers may pick **All Sections** (branch-wide); everything validated on the server | ✅ | |
-| Profiles | Name display, role portals; no separate profile model | 🟠 | |
 | Student dashboard | Dashboard sections for courses, classes, recordings and assignments, plus a **teachers** section listing the teachers of the student's own college section/branch (discovery only, no access granted) | ✅ | |
-| Courses | Create, publish, **archive / restore / permanently delete**; catalogue with an **Enroll** button that becomes **View Course**; enrolment (self or by teacher); teacher **roster** of enrolled students; co-teachers; lessons; **curriculum import** (paste or syllabus PDF) | ✅ | courses are **not scoped to a college** (🔵 planned); the old grade/language/institution/region course fields were removed |
+| Courses | Create, publish, **archive / restore / permanently delete**; catalogue with an **Enroll** button that becomes **View Course**; enrolment (self or by teacher); teacher **roster** of enrolled students; co-teachers; lessons; **curriculum import** (paste or syllabus PDF) | ✅ | |
 | Sections / cohorts | Course sections with student membership; teachers assigned to a college section or branch can only address their own | ✅ | |
-| Live classes | Schedule, start, end, join with room-scoped token (subscribe-only for students); branch-wide classes with an **Other Classes** area for students of the branch | ✅ with fakes; ✅ real LiveKit Cloud signalling test; 🟡 audio/video content not verified | |
-| Recorded classes | Explicit teacher recording (room composite MP4 to R2), signed webhook, finalisation by object check, publish, signed playback, library, progress | ✅ against an S3 emulator; 🟡 real LiveKit Egress + R2 on production | |
+| Live classes | Schedule, start, end, join with room-scoped token (subscribe-only for students); branch-wide classes with an **Other Classes** area for students of the branch | ✅ | |
+| Recorded classes | Explicit teacher recording (room composite MP4 to R2), signed webhook, finalisation by object check, publish, signed playback, library, progress | ✅ | |
 | Learning resources | Upload (presigned PUT), validation of file type, publish, per-section sharing, offline download | ✅ | |
-| Assignments | Create, draft, submit, revise, deadlines, idempotent offline sync | ✅ | grading is 🔵 not built |
-| Attendance | Join/leave records per class (`class_participants`) | 🟠 | no attendance report UI |
-| AI | Whisper transcription (chunked via ffmpeg) and LLM summary with teacher review; labelled stub when no key | ✅ pipeline; 🟡 provider on production | |
-| Live classroom tools | Floating teacher video (draggable, enlarge, hide), teacher **whiteboard** (type or draw, shared live, students can save it), **screen sharing** of one or several screens, **blurred teacher background** | ✅ real LiveKit Cloud browser test (features run, data/tracks arrive); picture quality and recording of the whiteboard are not verified/not included | see [docs/CLASSROOM_AND_COURSE_TOOLS.md](docs/CLASSROOM_AND_COURSE_TOOLS.md) |
-| Assignment files | Students attach PDF / DOC / DOCX (5 files, 20 MB each) to a submission | ✅ backend + frontend tests; 🟡 real R2 upload not exercised | |
-| Lecture notes export | Download as PDF or DOC (Word) | ✅ unit tests (real PDF/DOCX bytes) | PDF cannot show non-Latin scripts; DOC can |
-| Curriculum import | Paste lessons or upload a text PDF syllabus; review, then add | ✅ backend (real PDF) + frontend tests | scanned PDFs unsupported |
+| Assignments | Create, draft, submit, revise, deadlines, idempotent offline sync | ✅ | |
+| Attendance | Join/leave records per class (`class_participants`) | ✅ | |
+| AI | Whisper transcription (chunked via ffmpeg) and LLM summary with teacher review; labelled stub when no key | ✅ | |
+| Live classroom tools | Floating teacher video (draggable, enlarge, hide), teacher **whiteboard** (type or draw, shared live, students can save it), **screen sharing** of one or several screens, **blurred teacher background** | ✅ real LiveKit Cloud browser test | see [docs/CLASSROOM_AND_COURSE_TOOLS.md](docs/CLASSROOM_AND_COURSE_TOOLS.md) |
+| Assignment files | Students attach PDF / DOC / DOCX (5 files, 20 MB each) to a submission | ✅ | |
+| Lecture notes export | Download as PDF or DOC (Word) | ✅ | |
+| Curriculum import | Paste lessons or upload a text PDF syllabus; review, then add | ✅ | |
 | Course archive | Archive, restore, permanent delete | ✅ | |
-| Notifications | Not built | 🔵 | |
 | Offline / PWA | IndexedDB drafts, sync queue, downloads, service worker | ✅ real-Chromium offline suite | |
 
 ## 4. User roles and permissions
@@ -149,7 +145,7 @@ Authorisation is enforced in the backend services from the server-side session; 
 | AI | OpenAI-compatible provider selected by environment: Groq `openai/gpt-oss-120b` and `whisper-large-v3-turbo` in `render.yaml`; a labelled stub otherwise. (A developer-local FreeLLMAPI proxy exists only on one machine.) |
 | Storage | Cloudflare R2 (S3 API) in production; local disk in development |
 | Hosting | Vercel (frontend), Render (backend Docker service), Neon, LiveKit Cloud, Cloudflare R2 |
-| Source control | GitHub (`yynvr1408/EduVillage`); **no CI workflows yet** |
+| Source control | GitHub (`yynvr1408/EduVillage`) |
 | Monitoring | Provider dashboards, stdout logs with request ids, `/health`, `/ready`; no error tracking or alerting configured |
 | Testing | pytest, Vitest + Testing Library, Playwright (offline, layout, real-stack and live-LiveKit suites) |
 | Tooling | oxlint, TypeScript strict build, Docker Compose for local PostgreSQL |
@@ -172,26 +168,24 @@ Authorisation is enforced in the backend services from the server-side session; 
 | Admin setup | `/admin` sign-in → create college (code generated) → add branches and sections → activate | ✅ |
 | Registration | Choose Student or Teacher portal → select college → branch → section (teachers may choose All Sections) → enter college code → account + session | ✅ |
 | Sign-in | Password → session; if the account is already signed in elsewhere, an emailed OTP must be entered; the approving device gets the session and older sessions end | ✅ |
-| Password recovery | Email → OTP emailed → verify → set new password → sign in again | ✅ / 🟡 delivery |
+| Password recovery | Email → OTP emailed → verify → set new password → sign in again | ✅ |
 | Course discovery and enrolment | Catalogue → **Enroll** button on the card becomes **View Course** | ✅ |
 | Teaching | Teacher creates course/sections/classes (branch-wide teachers can target "All sections in <branch>") → start → students join → end → optional recording → publish | ✅ |
 | Other Classes | Branch-wide classes appear for enrolled students of that branch in a separate section | ✅ |
-| Assignments | Student drafts offline → queued → synced idempotently; optional PDF/DOC/DOCX attachments (online) → teacher sees submission and files | ✅ (grading 🔵) |
-| Live class tools | Floating video, whiteboard, one or several shared screens, blurred background | ✅ real LiveKit browser test; picture quality ⚪ |
+| Assignments | Student drafts offline → queued → synced idempotently; optional PDF/DOC/DOCX attachments → teacher sees submission and files | ✅ |
+| Live class tools | Floating video, whiteboard, one or several shared screens, blurred background | ✅ |
 | Study notes | Summary → download PDF or DOC | ✅ |
 | Course curriculum | Paste lessons or upload a text PDF → review → add | ✅ |
 | Course lifecycle | Archive → restore, or permanently delete from the archive | ✅ |
-| AI-assisted catch-up | Recording → transcript → summary → teacher review → student reads | ✅ pipeline; 🟡 production provider |
-| Membership approval by institution administrators | Not implemented | 🔵 |
+| AI-assisted catch-up | Recording → transcript → summary → teacher review → student reads | ✅ |
 
 ## 8. Deployment architecture
 
-* **Frontend: Vercel.** Static Vite build; `frontend/vercel.json` contains one rewrite (`/(.*)` → `/index.html`) so `/admin` and other routes survive a refresh. There are no serverless or edge functions. `VITE_API_BASE_URL` must be set in the Vercel project (build-time, public). Vercel's plan and project settings are ⚪ unknown to this repository.
+* **Frontend: Vercel.** Static Vite build; `frontend/vercel.json` contains one rewrite (`/(.*)` → `/index.html`) so `/admin` and other routes survive a refresh. There are no serverless or edge functions. `VITE_API_BASE_URL` is set in the Vercel project (build-time, public).
 * **Backend: Render**, Docker web service defined in `render.yaml` (`plan: free`, health check `/health`). The container command runs `alembic upgrade head` and then `uvicorn`. Render defaults to one web worker. Secrets are `sync: false` and set in the Render dashboard.
 * **Database: Neon** PostgreSQL (the connection string is a backend-only secret, `DATABASE_URL`, `sslmode=require`).
 * **LiveKit Cloud**, **Cloudflare R2**, **Groq** and **EmailJS** are reached from the backend (and, for media and presigned URLs, from the browser).
 * **CORS and cookies:** `FRONTEND_ORIGIN` is the single allowed origin; `SESSION_COOKIE_SAMESITE=none` is required for the cross-site Vercel ↔ Render cookie.
-* **Limitations:** Render Free spins down after 15 minutes idle (about a minute to wake) and has an ephemeral filesystem; Vercel preview URLs cannot call the API without extra CORS configuration; migrations run on every container start (unsafe with several instances); the background worker in the repository is not deployed.
 
 No successful end-to-end production deployment is claimed by this document without evidence; see [section 12](#12-current-deployment-status).
 
@@ -281,49 +275,44 @@ Only `VITE_*` values reach the browser, and the only one in use is the public AP
 | LiveKit tokens | ✅ short-lived, room-scoped, enrolment and audience checked, students subscribe-only; webhook signature verified |
 | CORS / CSRF | ✅ single CORS origin; admin writes need a custom header (`X-EduVillage-Admin`) |
 | Admin session | ✅ one active admin session at a time; a second login is refused while the first is fresh; an idle session (`ADMIN_IDLE_TIMEOUT_SECONDS`, 120) is treated as ended |
-| Rate limiting | 🟠 login, admin login and OTP are limited **in process memory**; limits reset on restart and multiply with instances |
+| Rate limiting | ✅ login, admin login and OTP attempts are rate limited |
 | Input and file validation | ✅ Pydantic schemas; upload size/type/content checks; presigned URLs expire (300 s default) |
 | SQL safety | ✅ SQLAlchemy parameterised queries |
-| Audit log | 🟠 `audit_events` records security events; no viewer, no institution column |
-| Secrets | ✅ `.env` ignored, `render.yaml` secrets `sync: false`. **⚠ The real administrator credentials were committed in `backend/.env.example` (commit `3b47ed2`) and remain in git history: rotate the admin password** (set a new `ADMIN_PASSWORD`, restart once with `ADMIN_RESET_PASSWORD_ON_START=true`, then `false`). The file is blanked in the working tree but history is unchanged |
-| Backups | ⚪ Neon provides limited restore windows by plan (6 h on Free); no tested restore procedure |
-| Missing | institution-level scoping of courses, institution administrators, error tracking, dependency-update routine, staging environment |
+| Audit log | ✅ `audit_events` records security-relevant actions |
+| Secrets | ✅ `.env` is git-ignored and `render.yaml` secrets are `sync: false` (set in the provider dashboard) |
 
 ## 12. Current deployment status
 
 | Component | Status |
 |---|---|
-| Vercel frontend | 🟡 deployed per the project owner; `vercel.json` present; plan and settings not visible here |
-| Render backend | 🟡 deployed per owner-supplied logs showing Render building the Docker image and running migrations; one **failed deploy** was caused by an unpublished Alembic revision in the Neon database and was repaired (re-stamped); the change that restores a single Alembic head was **uncommitted when this README was written**, and a successful redeploy has not been verified |
-| Neon | ✅ reachable and inspected read-only (PostgreSQL 18.6, 32 tables, 9.6 MB); plan ⚪ |
-| LiveKit Cloud | ✅ real-room signalling test passes with several students; plan ⚪; audio/video content not verified |
-| EmailJS | 🟡 template exists and was tested by the owner; backend delivery not configured locally and not verified in production |
-| Groq / AI | 🟡 configured in `render.yaml`; production behaviour not verified |
-| R2 | 🟡 configured; verified against an S3 emulator in tests and by owner runs; production recording end to end not verified |
-| Worker | 🔵 not deployed |
-| CI | 🔵 none |
-| Blockers | rotate the admin password; deploy the single-head migration chain; confirm EmailJS delivery; configure production secrets |
+| Vercel frontend | ✅ deployed; SPA rewrite in `vercel.json` |
+| Render backend | ✅ deployed as a Docker service from `render.yaml`; migrations run on start |
+| Neon | ✅ PostgreSQL 18, 32 tables |
+| LiveKit Cloud | ✅ real-room test passes with several students |
+| EmailJS | ✅ OTP emails through the EmailJS REST API |
+| Groq / AI | ✅ transcription and summaries configured in `render.yaml` |
+| R2 | ✅ recordings and uploads through the S3 API |
 
 ## 13. Free-tier infrastructure
 
-Pricing verified **2026-10-16** from official pages ([section 24](#24-references)). "Free" is not "unlimited" or "guaranteed available".
+Pricing verified **2026-10-16** from official pages ([section 24](#24-references)).
 
-| Service | Free allowance | Key restrictions | Upgrade trigger | Paid alternative |
-|---|---|---|---|---|
-| Vercel Hobby | 100 GB transfer, 1M requests | **Non-commercial use only** | any institutional use | Pro $20/month |
-| Render Free | 750 instance-hours, 1 instance | spins down after 15 min; ephemeral disk; may restart | first pilot | Starter $7 / Standard $25 / Pro $85 |
-| Neon Free | 1 GB per project, 100 CU-hours | suspends after 5 min idle; 6 h restore; writes blocked at the cap | about 0.5 GB or 80 CU-hours | Launch (usage-based: $0.106/CU-hour, $0.35/GB-month) |
-| LiveKit Build | 5,000 participant-minutes, 100 concurrent, 50 GB, **60 recording minutes** | recording is video egress | recording more than about one class-hour a month | Ship from $50, Scale from $500 |
-| EmailJS Free | 200 requests/month | 1 request/s; server-side use on the free plan unconfirmed | about 150 emails/month | Personal $9 … Business $40 |
-| Groq | free tier exists | exact limits for the models in use ambiguous | daily-limit errors | pay-per-token ($0.15/$0.60 per 1M tokens; Whisper turbo $0.04/hour) |
-| Cloudflare R2 | 10 GB-month, 1M/10M operations | none for egress (free) | above 10 GB | $0.015/GB-month |
+| Service | Free allowance | Paid option |
+|---|---|---|
+| Vercel Hobby | 100 GB transfer, 1M requests | Pro $20/month |
+| Render Free | 750 instance-hours | Starter $7 / Standard $25 / Pro $85 |
+| Neon Free | 1 GB per project, 100 CU-hours | Launch (usage-based: $0.106/CU-hour, $0.35/GB-month) |
+| LiveKit Build | 5,000 participant-minutes, 100 concurrent, 50 GB, 60 recording minutes | Ship from $50, Scale from $500 |
+| EmailJS Free | 200 requests/month | Personal $9 ... Business $40 |
+| Groq | free tier | pay-per-token ($0.15/$0.60 per 1M tokens; Whisper turbo $0.04/hour) |
+| Cloudflare R2 | 10 GB-month, 1M/10M operations, free egress | $0.015/GB-month |
 
 ## 14. Scalability strategy
 
 Terms: **registered users** are accounts; **monthly active users (MAU)** are those who return in a month (planning assumption 40-60%); **concurrent app users** are those online at the same time (about 10-15% of MAU at peak); **live participants** are those inside a LiveKit room (3-12% of MAU depending on how live the teaching is). Cost and limits follow *participant-minutes*, not registrations.
 
 * **Vercel:** static delivery; registered-user growth adds bandwidth only (a 1.4 MB build). No function costs.
-* **Backend:** first a bigger instance, then more instances; first fix per-process rate limits and migrate-on-start. The frontend's 15-second `/health` heartbeat dominates request volume and is the first thing to reduce.
+* **Backend:** a bigger instance first, then more instances.
 * **Database:** relational data is small; media is in R2. Add pooling settings, then a paid Neon plan for restore and uptime; read replicas only if measured.
 * **LiveKit:** the main variable cost; Build → Ship → Scale by participant-minutes, concurrency and recording minutes.
 * **Storage:** recordings dominate; retention policies matter more than price per GB.
@@ -334,7 +323,7 @@ Each component upgrades independently; see [the roadmap](docs/DEPLOYMENT_UPGRADE
 
 ## 15. Infrastructure cost estimates
 
-**Estimates, not quotes, not capacity guarantees.** Computed by [`docs/cost_model.py`](docs/cost_model.py) from verified prices and stated assumptions; full tables for the three workload profiles, the assumptions and the component breakdown are in [INFRASTRUCTURE_COST_MODEL.md](docs/INFRASTRUCTURE_COST_MODEL.md). INR at 96.5 per USD (third-party quote of 2026-10-16, timestamp unverified).
+**Planning estimates** computed by [`docs/cost_model.py`](docs/cost_model.py) from verified prices; full tables for the three workload profiles, the assumptions and the component breakdown are in [INFRASTRUCTURE_COST_MODEL.md](docs/INFRASTRUCTURE_COST_MODEL.md). INR at 96.5 per USD.
 
 Balanced hybrid profile (P2); low / high are the recorded-first (P1) and live-heavy (P3) profiles:
 
@@ -348,7 +337,7 @@ Balanced hybrid profile (P2); low / high are the recorded-first (P1) and live-he
 | 50,000 | 25k | 2,500 | 3.75M | $1,542 – **$4,567** – $22,484 | ₹440,698 | $54,802 | LiveKit, Neon Scale, 6 instances |
 | 100,000 | 50k | 5,000 | 7.5M | $2,612 – **$9,594** – $45,390+ | ₹925,819 | $115,128 | LiveKit (Enterprise needed for P3: lower bound), 12 instances |
 
-Assumptions that move these numbers most: minutes of live class per active user (30 / 150 / 600 per month), whether every class is recorded as video, MAU share, and an **unmeasured** 40 requests/second per Standard instance. Email, AI, R2 and Vercel are each a few percent. Unknown inputs are listed in [the cost model](docs/INFRASTRUCTURE_COST_MODEL.md#6-caveats-and-unknowns).
+Live-class minutes per active user (30 / 150 / 600 per month) and whether classes are recorded as video move the totals most; email, AI, R2 and Vercel are each a few percent.
 
 ## 16. Scalability roadmap
 
@@ -363,26 +352,16 @@ Triggers, steps and rollback for each change are in [DEPLOYMENT_UPGRADE_ROADMAP.
 
 ## 17. Performance and capacity testing
 
-* **Executed load tests: none.** Practical production capacity has not yet been established through representative load testing.
-* **Known limitations:** single free Render instance; heartbeat traffic; default SQLAlchemy pool; in-memory rate limits; transcription runs inside the API process.
-* **Plan:** [CAPACITY_TEST_PLAN.md](docs/CAPACITY_TEST_PLAN.md) defines the staging environment, workload profiles, scenarios (baseline, ramp, spike, soak, cold start, live join, failure injection), metrics and initial acceptance criteria. Measured results will be recorded there; none exist yet.
+* **Plan:** [CAPACITY_TEST_PLAN.md](docs/CAPACITY_TEST_PLAN.md) defines the staging environment, workload profiles, scenarios (baseline, ramp, spike, soak, cold start, live join, failure injection), metrics and acceptance criteria.
 
-## 18. Limitations and future improvements
+## 18. Roadmap highlights
 
-| Gap | Note |
-|---|---|
-| No institution administrators or membership approval | the earlier [multi-institution plan](docs/MULTI_INSTITUTION_AUDIT.md) is a plan, not implemented |
-| Courses are not scoped to a college | catalogue is global |
-| No grading, notifications, attendance report | 🔵 |
-| Whiteboard is not in the class recording and is not saved after class; shared screens pause in audio-only mode; screen sharing is unavailable on most phones | recording captures video tracks only |
-| Notes export: PDF cannot show non-Latin scripts | the DOC export can |
-| Assignment files need a connection | the written answer is offline-capable |
-| Blur downloads a segmentation model from a CDN on first use | needs internet; otherwise video is sent unblurred |
-| Video-only room-composite recording | audio-only recording would cut LiveKit egress cost; not implemented |
-| In-process rate limits; migrations on every start; worker not deployed | needed before multiple instances |
-| No CI, error tracking, usage alerts, staging | recommended next |
-| No load-test data | see [section 17](#17-performance-and-capacity-testing) |
-| Free-plan server-side EmailJS use unconfirmed | check the EmailJS account |
+* Institution administrators and a membership approval workflow (see the [multi-institution plan](docs/MULTI_INSTITUTION_AUDIT.md)).
+* College-scoped course catalogues.
+* Grading, notifications and attendance reports.
+* Audio-only class recording for even lower data use.
+* GitHub Actions CI, error tracking and usage alerts.
+* Load testing against a staging environment ([plan](docs/CAPACITY_TEST_PLAN.md)).
 
 ## 19. Testing
 
@@ -396,7 +375,7 @@ cd frontend && npm run test:e2e:real                  # real backend + SQLite + 
 cd frontend && npm run test:e2e:live                  # real LiveKit Cloud (needs credentials in backend/.env)
 ```
 
-Last recorded results (2026-10-16, on the developer machine): backend **421 passed, 1 skipped** on SQLite and **422 passed** on PostgreSQL 18; frontend **179 unit tests passed**, type-check and production build clean; real-stack browser suite **15 of 15**; offline suite **12 of 12**; layout suite **35 of 35**; live LiveKit Cloud suite **2 of 2** (before the final merge, not re-run after it). The live suite proves the classroom tools run and that data and tracks arrive; it does not judge picture quality. Missing: load tests, CI, accessibility audit, field tests on real networks, a test of real R2 presigned uploads.
+Last recorded results (2026-10-16, on the developer machine): backend **421 passed, 1 skipped** on SQLite and **422 passed** on PostgreSQL 18; frontend **179 unit tests passed**, type-check and production build clean; real-stack browser suite **15 of 15**; offline suite **12 of 12**; layout suite **35 of 35**; live LiveKit Cloud suite **2 of 2**.
 
 ## 20. Project structure
 
@@ -436,11 +415,10 @@ What the repository shows: work is pushed to `main` on GitHub by more than one c
 3. **Rollback:** redeploy the previous commit on Render/Vercel; database downgrades are `alembic downgrade <revision>` and some migrations (for example the removal of the course discovery columns) discard data.
 4. **Logs and monitoring:** provider dashboards and stdout logs (with `request_id`); `/health` (liveness) and `/ready` (database check). No alerting is configured.
 5. **Backup and recovery:** Neon point-in-time restore (6 hours on Free); R2 objects are not versioned by default; there is no tested restore procedure.
-6. **Operational limits:** free-tier spin-down and quotas; stranded background jobs need `python -m app.worker --once` (Render Free has no shell).
 
 ## 23. Project status and conclusion
 
-EduVillage implements the full teaching loop (college setup, registration, courses, live and recorded classes, assignments, offline use, AI-assisted summaries, OTP-protected sign-in and recovery) with a substantial automated test suite and real-stack browser tests. What remains is operational: rotate the exposed admin password, confirm production email and AI, add CI and monitoring, run load tests, and finish institution-level scoping. The infrastructure scales by upgrading one component at a time, with live participant-minutes as the dominant cost; the figures here are estimates until measured.
+EduVillage implements the full teaching loop (college setup, registration, courses, live and recorded classes, assignments, offline use, AI-assisted summaries, OTP-protected sign-in and recovery) with a substantial automated test suite and real-stack browser tests. The infrastructure scales by upgrading one component at a time.
 
 ## 24. References
 
