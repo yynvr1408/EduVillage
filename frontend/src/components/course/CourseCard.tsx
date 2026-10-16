@@ -9,9 +9,11 @@ import { Button } from '../ui/Button'
 export interface CourseCardProps {
   course: Course
   isTeacher?: boolean
+  /** Student catalog: while not enrolled, the footer button reads Enroll; after enrolling it becomes View Course. */
+  enroll?: { enrolled: boolean; isEnrolling: boolean; onEnroll: () => void }
 }
 
-export const CourseCard: React.FC<CourseCardProps> = ({ course, isTeacher = false }) => {
+export const CourseCard: React.FC<CourseCardProps> = ({ course, isTeacher = false, enroll }) => {
   const detailLink = isTeacher
     ? `/teacher/courses/${course.id}/manage`
     : `/student/courses/${course.id}`
@@ -47,11 +49,17 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, isTeacher = fals
         <span className="text-xs text-[#687775] font-medium">
           {isTeacher ? 'Manage Curriculum' : 'Offline Ready'}
         </span>
-        <Link to={detailLink}>
-          <Button size="sm" variant={isTeacher ? 'outline' : 'primary'} icon={<ArrowRight className="w-3.5 h-3.5" />}>
-            {isTeacher ? 'Manage' : 'View Course'}
+        {enroll && !enroll.enrolled ? (
+          <Button size="sm" variant="primary" isLoading={enroll.isEnrolling} onClick={enroll.onEnroll}>
+            Enroll
           </Button>
-        </Link>
+        ) : (
+          <Link to={detailLink}>
+            <Button size="sm" variant={isTeacher ? 'outline' : 'primary'} icon={<ArrowRight className="w-3.5 h-3.5" />}>
+              {isTeacher ? 'Manage' : 'View Course'}
+            </Button>
+          </Link>
+        )}
       </CardFooter>
     </Card>
   )
