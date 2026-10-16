@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { AlertCircle, LogIn } from 'lucide-react'
+import { AlertCircle, Clock, LogIn, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { isOtpChallenge, type LoginOtpChallenge } from '../../services/authService'
+import type { User } from '../../types'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { FormField } from '../../components/ui/FormField'
@@ -14,7 +16,7 @@ export interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
-  const { login, logout, isSharedDevice, setSharedDevice } = useAuth()
+  const { login, verifyLoginOtp, logout, isSharedDevice, setSharedDevice } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -24,6 +26,84 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
   const [error, setError] = useState<string | null>(null)
 
   const from = (location.state as any)?.from?.pathname || '/'
+
+  // Second-device sign-in: the account is already signed in elsewhere, so the owner approves with an emailed code.
+  const [challenge, setChallenge] = useState<LoginOtpChallenge | null>(null)
+  const [otp, setOtp] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [resendCooldown])
+
+  const finishSignIn = async (user: User) => {
+    if (portal && user.role !== portal) {
+      await logout()
+      setChallenge(null)
+      setPassword('')
+      setError(
+        `This account is registered as a ${user.role}. Please use the ${user.role === 'teacher' ? 'Teacher' : 'Student'} login instead.`
+      )
+      return
+    }
+    if (from && from !== '/') {
+      navigate(from, { replace: true })
+    } else {
+      navigate(user.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', {
+        replace: true,
+      })
+    }
+  }
+
+  const startChallenge = (c: LoginOtpChallenge) => {
+    setChallenge(c)
+    setOtp('')
+    setResendCooldown(c.resend_cooldown_seconds)
+    setNotice(null)
+  }
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isLoading || !challenge) return
+    if (otp.length !== 6) {
+      setError('Enter the full 6-digit code.')
+      return
+    }
+    setIsLoading(true)
+    setError(null)
+    try {
+      const user = await verifyLoginOtp(challenge.email, otp)
+      setPassword('')
+      await finishSignIn(user)
+    } catch (err: any) {
+      setError(err?.isNetworkError ? 'Cannot reach the server. Check your connection and try again.' : err?.message || 'That code is incorrect or has expired.')
+      setOtp('')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || isLoading) return
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res = await login(email, password)
+      if (isOtpChallenge(res)) {
+        startChallenge(res)
+        setNotice('A new code is on its way.')
+      } else {
+        await finishSignIn(res) // the other session ended meanwhile
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Could not resend the code. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,21 +116,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
     setError(null)
 
     try {
-      const user = await login(email, password)
-      if (portal && user.role !== portal) {
-        await logout()
-        setError(
-          `This account is registered as a ${user.role}. Please use the ${user.role === 'teacher' ? 'Teacher' : 'Student'} login instead.`
-        )
+      const result = await login(email, password)
+      if (isOtpChallenge(result)) {
+        startChallenge(result)
         return
       }
-      if (from && from !== '/') {
-        navigate(from, { replace: true })
-      } else {
-        navigate(user.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', {
-          replace: true,
-        })
-      }
+      await finishSignIn(result)
     } catch (err: any) {
       setError(err.message || 'Invalid credentials or connection error.')
     } finally {
@@ -99,6 +170,65 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
             </div>
           )}
 
+          {challenge ? (
+            <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4" noValidate>
+              <p className="text-xs text-[#687775] leading-relaxed" role="status">
+                {challenge.message} Sent to <strong className="text-[#202B2A]">{challenge.email}</strong>.
+              </p>
+              {challenge.dev_otp && (
+                <p className="text-xs text-[#8A5700] bg-[#FFF0CB] p-2.5 rounded-lg border border-[#8A5700]/30">
+                  Development mode: email is not configured. Your code is <strong className="font-mono">{challenge.dev_otp}</strong>.
+                </p>
+              )}
+              {notice && <p className="text-xs text-[#247A4D]">{notice}</p>}
+              <FormField label="Verification Code" htmlFor="login-otp" required>
+                <input
+                  id="login-otp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => {
+                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                    setError(null)
+                  }}
+                  maxLength={6}
+                  className="w-full text-center text-2xl font-mono tracking-[0.5em] pl-[0.5em] py-3 rounded-lg border border-[#CBD7D1] bg-[#FFFFFF] text-[#202B2A] focus:outline-none focus:ring-2 focus:ring-[#0F5B57] focus:border-[#0F5B57]"
+                  required
+                />
+              </FormField>
+              <div className="flex items-center justify-center gap-1.5 text-xs text-[#687775]">
+                <Clock className="w-3.5 h-3.5" />
+                <span>The code is valid for {challenge.otp_ttl_minutes} minutes.</span>
+              </div>
+              <Button type="submit" fullWidth isLoading={isLoading} disabled={otp.length !== 6} icon={<ShieldCheck className="w-4 h-4" />}>
+                Verify and Sign In
+              </Button>
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendCooldown > 0 || isLoading}
+                  className="font-semibold text-[#0F5B57] hover:underline disabled:text-[#687775] disabled:no-underline disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChallenge(null)
+                    setOtp('')
+                    setPassword('')
+                    setError(null)
+                  }}
+                  className="font-semibold text-[#687775] hover:text-[#0F5B57] cursor-pointer"
+                >
+                  Back
+                </button>
+              </div>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <FormField label="Email Address" htmlFor="email" required>
               <Input
@@ -162,6 +292,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
               Sign In
             </Button>
           </form>
+          )}
 
         </div>
 

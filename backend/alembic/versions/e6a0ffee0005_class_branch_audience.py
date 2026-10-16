@@ -1,7 +1,7 @@
 """classes.audience_branch_id: branch-wide class audience
 
 Revision ID: e6a0ffee0005
-Revises: d5f0ffee0004
+Revises: 815ac36126a9
 Create Date: 2026-10-16 20:00:00
 
 Nullable and defaults to NULL, so every existing class keeps its current (course / section) audience.
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e6a0ffee0005"
-down_revision: Union[str, Sequence[str], None] = "d5f0ffee0004"
+down_revision: Union[str, Sequence[str], None] = "815ac36126a9"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

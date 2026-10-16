@@ -94,6 +94,8 @@ class Settings(BaseSettings):
     emailjs_public_key: str | None = None
     emailjs_private_key: str | None = None
     otp_ttl_minutes: int = 5
+    # A second sign-in to a student/teacher account that is already signed in elsewhere needs an emailed OTP.
+    concurrent_login_otp: bool = True
     otp_max_attempts: int = 5
     otp_request_cooldown_seconds: int = 60
     # The reset AUTHORIZATION issued after a correct OTP (not the OTP itself, which uses otp_ttl_minutes).

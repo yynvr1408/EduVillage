@@ -26,6 +26,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class LoginOtpRequired(BaseModel):
+    """202 body: the account is already signed in elsewhere, so this sign-in needs the emailed code."""
+
+    otp_required: bool = True
+    email: str
+    message: str
+    otp_ttl_minutes: int
+    resend_cooldown_seconds: int
+
+
 class AuthResponse(BaseModel):
     user: UserOut
 

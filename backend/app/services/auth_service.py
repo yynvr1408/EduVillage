@@ -221,6 +221,62 @@ def _hash_otp(otp: str) -> str:
     return hmac.new(settings.session_secret.encode("utf-8"), otp.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def _GENERIC_OTP_ERROR() -> UnauthorizedError:
+    return UnauthorizedError("That code is incorrect or has expired.", code="INVALID_OTP")
+
+
+def _claim_otp(db: Session, user: User, purpose: str, otp: str) -> None:
+    """Verifies `otp` against the newest outstanding challenge of `purpose` for `user`, atomically.
+    Raises one generic error for every failure; returns only when the code was correct and has just been
+    marked verified (so it can never be redeemed twice)."""
+    now = utcnow()
+    challenge = db.execute(
+        select(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.user_id == user.id,
+            PasswordResetOtpChallenge.purpose == purpose,
+            PasswordResetOtpChallenge.verified_at.is_(None),
+            PasswordResetOtpChallenge.revoked_at.is_(None),
+            PasswordResetOtpChallenge.expires_at > now,
+        )
+        .order_by(PasswordResetOtpChallenge.created_at.desc())
+    ).scalars().first()
+    if not challenge:
+        raise _GENERIC_OTP_ERROR()
+
+    # Atomic attempt claim: the row lock serializes concurrent guesses against the same
+    # challenge, so the attempt cap can never be bypassed by racing requests.
+    claimed = db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.id == challenge.id,
+            PasswordResetOtpChallenge.attempts < PasswordResetOtpChallenge.max_attempts,
+            PasswordResetOtpChallenge.verified_at.is_(None),
+            PasswordResetOtpChallenge.revoked_at.is_(None),
+            PasswordResetOtpChallenge.expires_at > now,
+        )
+        .values(attempts=PasswordResetOtpChallenge.attempts + 1)
+    )
+    db.commit()
+    if claimed.rowcount != 1:
+        raise _GENERIC_OTP_ERROR()
+
+    db.refresh(challenge)
+    if not hmac.compare_digest(challenge.otp_hash, _hash_otp(otp)):
+        raise _GENERIC_OTP_ERROR()
+
+    # Atomic verified-claim: of several concurrent requests submitting the same correct OTP,
+    # only the one that actually flips verified_at here succeeds.
+    verified_claim = db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(PasswordResetOtpChallenge.id == challenge.id, PasswordResetOtpChallenge.verified_at.is_(None))
+        .values(verified_at=now)
+    )
+    db.commit()
+    if verified_claim.rowcount != 1:
+        raise _GENERIC_OTP_ERROR()
+
+
 def request_password_reset(db: Session, email: str, *, ip: str | None = None) -> str | None:
     """Returns the raw OTP only in non-production, so the flow is testable without EmailJS wired
     up. In production the OTP is only ever emailed, never returned. The response is identical
@@ -294,55 +350,9 @@ def verify_reset_otp(db: Session, *, email: str, otp: str, ip: str | None = None
 
     now = utcnow()
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
-    generic_error = UnauthorizedError("That code is incorrect or has expired.", code="INVALID_OTP")
     if not user:
-        raise generic_error
-
-    challenge = db.execute(
-        select(PasswordResetOtpChallenge)
-        .where(
-            PasswordResetOtpChallenge.user_id == user.id,
-            PasswordResetOtpChallenge.purpose == RESET_PURPOSE,
-            PasswordResetOtpChallenge.verified_at.is_(None),
-            PasswordResetOtpChallenge.revoked_at.is_(None),
-            PasswordResetOtpChallenge.expires_at > now,
-        )
-        .order_by(PasswordResetOtpChallenge.created_at.desc())
-    ).scalars().first()
-    if not challenge:
-        raise generic_error
-
-    # Atomic attempt claim: the row lock serializes concurrent guesses against the same
-    # challenge, so the attempt cap can never be bypassed by racing requests.
-    claimed = db.execute(
-        update(PasswordResetOtpChallenge)
-        .where(
-            PasswordResetOtpChallenge.id == challenge.id,
-            PasswordResetOtpChallenge.attempts < PasswordResetOtpChallenge.max_attempts,
-            PasswordResetOtpChallenge.verified_at.is_(None),
-            PasswordResetOtpChallenge.revoked_at.is_(None),
-            PasswordResetOtpChallenge.expires_at > now,
-        )
-        .values(attempts=PasswordResetOtpChallenge.attempts + 1)
-    )
-    db.commit()
-    if claimed.rowcount != 1:
-        raise generic_error
-
-    db.refresh(challenge)
-    if not hmac.compare_digest(challenge.otp_hash, _hash_otp(otp)):
-        raise generic_error
-
-    # Atomic verified-claim: of several concurrent requests submitting the same correct OTP,
-    # only the one that actually flips verified_at here goes on to mint a reset authorization.
-    verified_claim = db.execute(
-        update(PasswordResetOtpChallenge)
-        .where(PasswordResetOtpChallenge.id == challenge.id, PasswordResetOtpChallenge.verified_at.is_(None))
-        .values(verified_at=now)
-    )
-    db.commit()
-    if verified_claim.rowcount != 1:
-        raise generic_error
+        raise _GENERIC_OTP_ERROR()
+    _claim_otp(db, user, RESET_PURPOSE, otp)
 
     reset_token = generate_session_token()
     reset = PasswordResetToken(
@@ -411,3 +421,112 @@ def reset_password(db: Session, *, reset_token: str, new_password: str) -> None:
     )
     db.commit()
     audit_service.record(db, actor_id=user.id, action="password_reset", resource_type="user", resource_id=user.id)
+
+
+# ---- second-device login approval ------------------------------------------------------------------
+
+LOGIN_PURPOSE = "login_approval"
+
+
+def has_active_session(db: Session, user: User) -> bool:
+    return (
+        db.execute(
+            select(UserSession.id).where(
+                UserSession.user_id == user.id, UserSession.revoked_at.is_(None), UserSession.expires_at > utcnow()
+            )
+        ).first()
+        is not None
+    )
+
+
+def _token_is_users_active_session(db: Session, token: str | None, user: User) -> bool:
+    if not token:
+        return False
+    owner = get_user_from_session_token(db, token)
+    return owner is not None and owner.id == user.id
+
+
+def login_requires_otp(db: Session, user: User, presented_token: str | None) -> bool:
+    """A student/teacher who is ALREADY signed in somewhere may only start another session by proving, with a
+    code emailed to the account's own address, that the account owner approves it. Knowing the password is not
+    enough. Not required when this very browser holds the user's valid session (re-login on the same device),
+    when nobody is signed in, or for administrators (separate login)."""
+    if not settings.concurrent_login_otp or user.role not in (UserRole.student, UserRole.teacher):
+        return False
+    if not has_active_session(db, user):
+        return False
+    if _token_is_users_active_session(db, presented_token, user):
+        return False
+    if settings.is_production and not settings.emailjs_configured:
+        # No way to deliver a code: failing closed would lock everyone out for the session lifetime.
+        logger.warning("Concurrent-login OTP skipped: EmailJS is not configured in production.")
+        return False
+    return True
+
+
+def request_login_otp(db: Session, user: User, *, ip: str | None = None) -> tuple[bool, str | None]:
+    """Emails a login-approval code. Returns (code_was_sent, raw_otp_for_development). The raw code is returned
+    only outside production and only when email is not configured; in production it is only ever emailed."""
+    from app.core.exceptions import ServiceUnavailableError
+    from app.integrations import email as email_integration
+
+    _check_rate_limit(f"login-otp-req-email:{user.email}")
+    if ip:
+        _check_rate_limit(f"login-otp-req-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+
+    now = utcnow()
+    latest = db.execute(
+        select(PasswordResetOtpChallenge)
+        .where(PasswordResetOtpChallenge.user_id == user.id, PasswordResetOtpChallenge.purpose == LOGIN_PURPOSE)
+        .order_by(PasswordResetOtpChallenge.created_at.desc())
+    ).scalars().first()
+    if latest and (now - latest.created_at) < timedelta(seconds=settings.otp_request_cooldown_seconds):
+        return False, None  # the code already sent is still valid; do not email again inside the cooldown
+
+    db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.user_id == user.id,
+            PasswordResetOtpChallenge.purpose == LOGIN_PURPOSE,
+            PasswordResetOtpChallenge.verified_at.is_(None),
+            PasswordResetOtpChallenge.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+    otp = _generate_otp()
+    challenge = PasswordResetOtpChallenge(
+        user_id=user.id,
+        otp_hash=_hash_otp(otp),
+        purpose=LOGIN_PURPOSE,
+        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        max_attempts=settings.otp_max_attempts,
+    )
+    db.add(challenge)
+    db.commit()
+    audit_service.record(db, actor_id=user.id, action="login_otp_requested", resource_type="user", resource_id=user.id)
+
+    sent = email_integration.send_otp_email(to=user.email, otp=otp, ttl_minutes=settings.otp_ttl_minutes)
+    if not sent and settings.emailjs_configured:
+        challenge.revoked_at = utcnow()
+        db.commit()
+        logger.warning("login_otp_email_not_sent user_id=%s", user.id)
+        raise ServiceUnavailableError("We could not send the verification code. Please try again shortly.", code="OTP_SEND_FAILED")
+    return sent, (None if settings.is_production or settings.emailjs_configured else otp)
+
+
+def verify_login_otp(db: Session, *, email: str, otp: str, ip: str | None = None) -> User:
+    """Redeems the approval code. On success the account's other sessions are ended and the caller (who just
+    proved control of the mailbox) is the one who gets the session - the router creates it."""
+    normalized_email = email.strip().lower()
+    _check_rate_limit(f"login-otp-email:{normalized_email}")
+    if ip:
+        _check_rate_limit(f"login-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+    user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
+    if not user or user.role not in (UserRole.student, UserRole.teacher) or user.status != UserStatus.active:
+        raise _GENERIC_OTP_ERROR()
+    _claim_otp(db, user, LOGIN_PURPOSE, otp)
+    ended = revoke_all_sessions_except(db, user, keep_token=None)
+    audit_service.record(db, actor_id=user.id, action="login_otp_verified", resource_type="user", resource_id=user.id)
+    if ended:
+        logger.info("login_otp_handover user_id=%s ended_sessions=%s", user.id, ended)
+    return user

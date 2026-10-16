@@ -1,180 +1,398 @@
 # EduVillage
 
-Offline-first, low-bandwidth educational learning platform that helps students continue learning despite unreliable, expensive, or high-latency cellular connectivity.
+**An offline-first, low-bandwidth learning platform for rural colleges: live classes with an audio-only fallback, recorded lessons, downloadable materials, and assignments that can be written and submitted without a connection.**
 
-EduVillage features live real-time audio/video classrooms with adaptive audio-only fallback, recorded lectures, AI-assisted missed-class recovery and lecture summaries with teacher review, downloadable learning resources, IndexedDB-backed offline assignment drafts, and retryable idempotent synchronization.
+This README describes what is **actually implemented in this repository** and how confident we are in each part. Status labels used throughout: ✅ implemented and verified by tests that were run · 🟡 implemented, not verified in production · 🟠 partial · 🔵 planned · ⚪ unknown. Pricing and capacity statements are **estimates**; no load test has been run (see [Performance and capacity](#17-performance-and-capacity-testing)).
 
-Backend documentation lives in [`docs/`](docs/): [audit](docs/BACKEND_AUDIT.md), [deduplication report](docs/DEDUPLICATION_REPORT.md), [requirements matrix](docs/BACKEND_REQUIREMENTS_MATRIX.md), [API contracts](docs/API_CONTRACTS.md), [setup](docs/BACKEND_SETUP.md).
+Supporting documents: [Scalability architecture](docs/SCALABILITY_ARCHITECTURE.md) · [Infrastructure cost model](docs/INFRASTRUCTURE_COST_MODEL.md) · [Deployment and upgrade roadmap](docs/DEPLOYMENT_UPGRADE_ROADMAP.md) · [Scalability evaluation answers](docs/SCALABILITY_EVALUATION_ANSWERS.md) · [Capacity test plan](docs/CAPACITY_TEST_PLAN.md) · [Admin panel and colleges](docs/ADMIN_PANEL.md) · [API contracts](docs/API_CONTRACTS.md) · [Backend setup](docs/BACKEND_SETUP.md)
+
+## Table of contents
+
+1. [Overview](#1-project-overview)
+2. [Problem and solution](#2-problem-statement-and-solution)
+3. [Core features](#3-core-features)
+4. [User roles and permissions](#4-user-roles-and-permissions)
+5. [Technology stack](#5-technology-stack)
+6. [System architecture](#6-system-architecture)
+7. [Application workflows](#7-application-workflows)
+8. [Deployment architecture](#8-deployment-architecture)
+9. [Local development setup](#9-local-development-setup)
+10. [Environment variables](#10-environment-variables)
+11. [Security](#11-security)
+12. [Current deployment status](#12-current-deployment-status)
+13. [Free-tier infrastructure](#13-free-tier-infrastructure)
+14. [Scalability strategy](#14-scalability-strategy)
+15. [Infrastructure cost estimates](#15-infrastructure-cost-estimates)
+16. [Scalability roadmap](#16-scalability-roadmap)
+17. [Performance and capacity testing](#17-performance-and-capacity-testing)
+18. [Limitations and future improvements](#18-limitations-and-future-improvements)
+19. [Testing](#19-testing)
+20. [Project structure](#20-project-structure)
+21. [Contribution and development workflow](#21-contribution-and-development-workflow)
+22. [Deployment and operations](#22-deployment-and-operations)
+23. [Project status and conclusion](#23-project-status-and-conclusion)
+24. [References](#24-references)
 
 ---
 
-## Architecture & Technology Stack
+## 1. Project overview
 
-- **Frontend:** React 19 + TypeScript (strict mode) with Vite 8, PWA (Service Worker + IndexedDB via Dexie.js)
-- **Backend:** FastAPI + Pydantic v2 + SQLAlchemy 2 + Alembic (SQLite for local development; PostgreSQL for production). One modular monolith, plus an independently runnable worker (`python -m app.worker`).
-- **Real-time:** WebRTC via LiveKit; adaptive audio-only mode is implemented in the frontend (media subscription control)
-- **AI:** Speech-to-text + LLM for lecture summaries (a clearly labeled stub generator is used when no provider key is set)
-- **Storage:** Local disk for uploads in development; S3-compatible object storage (required for recordings) behind one interface
+EduVillage lets a college run teaching for students who have weak, expensive or intermittent internet and few devices. Teachers schedule live classes and record them; students join live (dropping to audio only on poor connections), catch up from recordings and AI-assisted summaries a teacher approves, download material for offline study, and write assignments that are saved on the device and synchronised safely when the network returns. Colleges, branches and sections are managed by an administrator, and registration is tied to a college code.
 
-### Frontend
-- **Framework & Language:** React 19 + TypeScript (strict mode) with Vite 8
-- **Styling:** Mobile-first Tailwind CSS v4 with a strict monochrome design system
-- **Routing:** React Router v7 with protected student and teacher portals
-- **Server State & Forms:** TanStack Query v5 + React Hook Form + Zod
-- **Real-Time Classroom:** LiveKit Client SDK + LiveKit React SDK with adaptive WebRTC subscription control
-- **Offline Storage:** IndexedDB via Dexie.js v4 + `dexie-react-hooks`
-- **PWA & Caching:** Workbox Service Worker via `vite-plugin-pwa`
-- **Testing:** Vitest + React Testing Library + Playwright
+* **Target users:** students and teachers of rural colleges; a platform administrator who sets up colleges.
+* **Objectives:** keep learning possible on poor connections; reuse a scarce teacher's lessons across sections without copying media; keep student data private to the right college, branch and section; stay inexpensive to run.
+* **Architecture in one line:** a static React PWA on Vercel talks to a FastAPI backend (Docker on Render) backed by Neon PostgreSQL; LiveKit Cloud carries live media; Cloudflare R2 stores recordings and uploads; Groq provides transcription and summaries; EmailJS delivers OTP emails. Details in [section 6](#6-system-architecture).
 
-### Backend
-- **Framework:** FastAPI, all routes under `/api/v1`
-- **Auth:** server-side sessions in an httpOnly cookie (argon2 password hashing, revocable sessions); teacher registration needs an invite code
-- **Authorization:** enforced in services (course teacher / enrolled student / section membership), never from client-supplied roles
-- **Real-Time Tokenization:** short-lived, room-scoped LiveKit tokens; recording through LiveKit Egress to object storage, completion via a signed webhook
+## 2. Problem statement and solution
 
+| Challenge in rural colleges | What EduVillage does | Status |
+|---|---|---|
+| Weak or expensive internet | Adaptive audio-only mode in live classes; offline-first assignment drafts; resumable downloads of recordings and materials | ✅ logic tested; not field-tested on real rural networks |
+| Few devices, shared computers | Shared-device sign-in option clears drafts, queue and downloads on sign-out; revocable server sessions | ✅ |
+| Limited teaching staff | One recording or resource can be shared with many sections without copying; branch-wide ("All Sections") classes reach every student of a branch in one class | ✅ |
+| Hard to attend live classes | Recorded lessons, transcripts, and teacher-reviewed AI summaries | ✅ pipeline tested with fakes; 🟡 real AI/recording path on production |
+| Hard to submit work | Offline drafts, idempotent retrying sync; deadlines with a documented offline grace period | ✅ |
+
+Not claimed: these problems are not "solved". The system has not been field-tested on real low-bandwidth networks, and no load test exists.
+
+## 3. Core features
+
+| Area | Feature | Status | Notes |
+|---|---|---|---|
+| Authentication | Email + password, argon2 hashing, server-side sessions in an httpOnly cookie, logout, session list and revocation, shared-device mode | ✅ | 72 h absolute session lifetime for students and teachers |
+| Authentication | Password recovery with a 6-digit emailed OTP (5-minute expiry, 5 attempts, resend cooldown, single-use reset authorisation, all sessions revoked after reset) | ✅ backend/frontend tested; 🟡 EmailJS delivery not verified in production | |
+| Authentication | **Second-device sign-in needs an emailed OTP** when the account is already signed in elsewhere (students and teachers) | ✅ tests (backend, unit, real-stack browser) | the older session is ended after approval |
+| Institutions | Administrator panel at `/admin` (separate credential from server config, own session, CSRF header, rate limit): create colleges with unique generated codes, regenerate codes, activate/deactivate, **branches and sections** per college | ✅ | single platform admin; no institution-administrator role |
+| Registration | Student and teacher registration against an active college, its code (teachers and students), branch, and section; teachers may pick **All Sections** (branch-wide); everything validated on the server | ✅ | |
+| Profiles | Name display, role portals; no separate profile model | 🟠 | |
+| Courses | Create, publish, archive, delete; catalogue; enrolment (self or by teacher); co-teachers; lessons | ✅ | courses are **not scoped to a college** (🔵 planned) |
+| Sections / cohorts | Course sections with student membership; teachers assigned to a college section or branch can only address their own | ✅ | |
+| Live classes | Schedule, start, end, join with room-scoped token (subscribe-only for students); branch-wide classes with an **Other Classes** area for students of the branch | ✅ with fakes; ✅ real LiveKit Cloud signalling test; 🟡 audio/video content not verified | |
+| Recorded classes | Explicit teacher recording (room composite MP4 to R2), signed webhook, finalisation by object check, publish, signed playback, library, progress | ✅ against an S3 emulator; 🟡 real LiveKit Egress + R2 on production | |
+| Learning resources | Upload (presigned PUT), validation of file type, publish, per-section sharing, offline download | ✅ | |
+| Assignments | Create, draft, submit, revise, deadlines, idempotent offline sync | ✅ | grading is 🔵 not built |
+| Attendance | Join/leave records per class (`class_participants`) | 🟠 | no attendance report UI |
+| AI | Whisper transcription (chunked via ffmpeg) and LLM summary with teacher review; labelled stub when no key | ✅ pipeline; 🟡 provider on production | |
+| Notifications | Not built | 🔵 | |
+| Offline / PWA | IndexedDB drafts, sync queue, downloads, service worker | ✅ real-Chromium offline suite | |
+
+## 4. User roles and permissions
+
+Roles that exist in the code are exactly: **student**, **teacher**, and one **administrator** account. There is no institution-administrator or membership-approval role.
+
+| Role | Can | Cannot |
+|---|---|---|
+| Student | Browse the catalogue, enrol, join live classes of enrolled courses they are authorised for (section or branch audience), watch published recordings, submit assignments, use offline features | Create courses or classes; see another branch's branch-wide classes; use any admin endpoint |
+| Teacher | Create courses, sections, classes, resources, assignments; record; review summaries; scope limited to the assigned college section / branch for class targeting | Teach outside their assignment's scope; register as administrator; use admin endpoints |
+| Administrator | Manage colleges, codes, branches, sections at `/admin` | Use the student/teacher API (admin session is rejected there, and vice versa) |
+
+Authorisation is enforced in the backend services from the server-side session; a client-supplied role or ID is never trusted. College codes identify a college for registration only and grant no privilege.
+
+## 5. Technology stack
+
+| Layer | Technology (all verified in the repository) |
+|---|---|
+| Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS v4, React Router 7, TanStack Query 5, React Hook Form + Zod, Dexie 4 (IndexedDB), `vite-plugin-pwa` / Workbox, LiveKit client + React components, lucide-react |
+| Backend | Python 3.12 (Docker image), FastAPI 0.143, Pydantic v2, SQLAlchemy 2, Alembic, uvicorn, argon2-cffi, boto3, httpx, `openai` SDK (OpenAI-compatible APIs), `livekit-api`, ffmpeg |
+| Database | PostgreSQL 18 on Neon (production); SQLite for local development and most tests; PostgreSQL also used for tests |
+| Authentication | Server-side sessions (hashed token in `user_sessions`), argon2 passwords, emailed OTP |
+| Live classes | LiveKit Cloud (token issuance, rooms, Egress, signed webhooks) |
+| Email / OTP | EmailJS REST API called from the backend |
+| AI | OpenAI-compatible provider selected by environment: Groq `openai/gpt-oss-120b` and `whisper-large-v3-turbo` in `render.yaml`; a labelled stub otherwise. (A developer-local FreeLLMAPI proxy exists only on one machine.) |
+| Storage | Cloudflare R2 (S3 API) in production; local disk in development |
+| Hosting | Vercel (frontend), Render (backend Docker service), Neon, LiveKit Cloud, Cloudflare R2 |
+| Source control | GitHub (`yynvr1408/EduVillage`); **no CI workflows yet** |
+| Monitoring | Provider dashboards, stdout logs with request ids, `/health`, `/ready`; no error tracking or alerting configured |
+| Testing | pytest, Vitest + Testing Library, Playwright (offline, layout, real-stack and live-LiveKit suites) |
+| Tooling | oxlint, TypeScript strict build, Docker Compose for local PostgreSQL |
+
+## 6. System architecture
+
+```mermaid<br/>flowchart LR<br/>  subgraph Browser["Browser - React PWA"]<br/>    UI["Student / Teacher / Admin UI"]<br/>    IDB[("IndexedDB\ndrafts, queue, downloads")]<br/>    LKC["LiveKit client"]<br/>  end<br/>  VERCEL["Vercel\nstatic Vite build + SPA rewrite"]<br/>  API["FastAPI on Render (Docker)\nBackgroundTasks, ffmpeg"]<br/>  NEON[("Neon PostgreSQL")]<br/>  LK["LiveKit Cloud\nrooms + Egress"]<br/>  R2[("Cloudflare R2")]<br/>  GROQ["Groq API"]<br/>  EJS["EmailJS"]<br/><br/>  UI -->|static files| VERCEL<br/>  UI -->|"HTTPS + session cookie"| API<br/>  UI <--> IDB<br/>  API --> NEON<br/>  API -->|room token| UI<br/>  LKC <-->|WebRTC| LK<br/>  API -->|room and egress control| LK<br/>  LK -->|MP4 via S3 API| R2<br/>  LK -->|signed webhook| API<br/>  UI -->|presigned GET/PUT| R2<br/>  API -->|transcribe, summarise| GROQ<br/>  API -->|OTP email| EJS<br/>```
+
+* **Frontend ↔ backend:** the SPA calls the API directly (`VITE_API_BASE_URL`), through one module (`frontend/src/services/apiClient.ts`). The session is an httpOnly cookie (`SameSite=None; Secure` between Vercel and Render); the API allows one CORS origin (`FRONTEND_ORIGIN`).
+* **Database:** SQLAlchemy sessions per request; Alembic migrations (`backend/alembic/`) run when the container starts.
+* **LiveKit:** the backend authorises and issues short-lived room tokens; media goes browser ↔ LiveKit. Recording is LiveKit Egress straight into R2, finalised through a signed webhook plus an object check.
+* **EmailJS:** the backend generates and verifies OTPs and calls EmailJS's REST API server-side; the browser never sees an OTP.
+* **AI:** a background task transcribes recording audio in chunks and asks the LLM for a summary; teachers approve before students see it.
+* **Boundaries:** role and audience checks happen in `backend/app/services/*`; the admin API uses a separate cookie, a CSRF header and its own rate limit.
+
+## 7. Application workflows
+
+| Workflow | Steps | Status |
+|---|---|---|
+| Admin setup | `/admin` sign-in → create college (code generated) → add branches and sections → activate | ✅ |
+| Registration | Choose Student or Teacher portal → select college → branch → section (teachers may choose All Sections) → enter college code → account + session | ✅ |
+| Sign-in | Password → session; if the account is already signed in elsewhere, an emailed OTP must be entered; the approving device gets the session and older sessions end | ✅ |
+| Password recovery | Email → OTP emailed → verify → set new password → sign in again | ✅ / 🟡 delivery |
+| Course discovery and enrolment | Catalogue → **Enroll** button on the card becomes **View Course** | ✅ |
+| Teaching | Teacher creates course/sections/classes (branch-wide teachers can target "All sections in <branch>") → start → students join → end → optional recording → publish | ✅ |
+| Other Classes | Branch-wide classes appear for enrolled students of that branch in a separate section | ✅ |
+| Assignments | Student drafts offline → queued → synced idempotently → teacher sees submission | ✅ (grading 🔵) |
+| AI-assisted catch-up | Recording → transcript → summary → teacher review → student reads | ✅ pipeline; 🟡 production provider |
+| Membership approval by institution administrators | Not implemented | 🔵 |
+
+## 8. Deployment architecture
+
+* **Frontend: Vercel.** Static Vite build; `frontend/vercel.json` contains one rewrite (`/(.*)` → `/index.html`) so `/admin` and other routes survive a refresh. There are no serverless or edge functions. `VITE_API_BASE_URL` must be set in the Vercel project (build-time, public). Vercel's plan and project settings are ⚪ unknown to this repository.
+* **Backend: Render**, Docker web service defined in `render.yaml` (`plan: free`, health check `/health`). The container command runs `alembic upgrade head` and then `uvicorn`. Render defaults to one web worker. Secrets are `sync: false` and set in the Render dashboard.
+* **Database: Neon** PostgreSQL (the connection string is a backend-only secret, `DATABASE_URL`, `sslmode=require`).
+* **LiveKit Cloud**, **Cloudflare R2**, **Groq** and **EmailJS** are reached from the backend (and, for media and presigned URLs, from the browser).
+* **CORS and cookies:** `FRONTEND_ORIGIN` is the single allowed origin; `SESSION_COOKIE_SAMESITE=none` is required for the cross-site Vercel ↔ Render cookie.
+* **Limitations:** Render Free spins down after 15 minutes idle (about a minute to wake) and has an ephemeral filesystem; Vercel preview URLs cannot call the API without extra CORS configuration; migrations run on every container start (unsafe with several instances); the background worker in the repository is not deployed.
+
+No successful end-to-end production deployment is claimed by this document without evidence; see [section 12](#12-current-deployment-status).
+
+## 9. Local development setup
+
+**Prerequisites:** Python 3.12, Node.js 20+ with npm, Git. ffmpeg is needed only for transcription tests (tests fall back to a bundled binary). Docker is optional (`backend/compose.yaml` provides local PostgreSQL 16).
+
+```bash
+git clone https://github.com/yynvr1408/EduVillage.git
+cd EduVillage
 ```
-backend/
-  app/
-    main.py            # app entrypoint, middleware, exception handlers, /health, /ready
-    config.py          # Settings (reads .env)
-    dependencies.py    # get_db, get_current_user (session-cookie auth)
-    worker.py          # background worker (summary / transcription jobs)
-    seed.py            # optional demo accounts (python -m app.seed)
-    core/              # security, exceptions, permissions, logging
-    db/models/         # SQLAlchemy models (users, courses, sections, classes, recordings, summaries, sync...)
-    schemas/           # Pydantic request/response models
-    services/          # business logic — routers stay thin
-    integrations/      # LiveKit, object storage (local/S3), speech-to-text, LLM provider
-    api/v1/            # route handlers, one file per domain
-  alembic/             # migrations (`alembic upgrade head`)
-  tests/               # api/ and unit/
-```
 
----
-
-## Visual Design System (Strict Monochrome)
-
-The visual design system strictly follows educational usability standards optimized for low-end mobile hardware and high contrast readability:
-
-- **Background:** `#FFFFFF`
-- **Primary Text:** `#111111`
-- **Secondary Background:** `#F5F5F5`
-- **Borders:** `#E5E5E5`
-- **Secondary Text:** `#666666`
-- **Primary Buttons:** `#111111` (Text: `#FFFFFF`)
-- **Semantic Accents (Feedback only):**
-  - Error: `#B42318`
-  - Success: `#166534`
-  - Warning: `#854D0E`
-- **Typography:** Inter sans-serif font family
-- **Accessibility:** Minimum 44px touch targets on mobile devices (`.touch-target`), visible keyboard focus indicators (`:focus-visible`), and zero horizontal overflow.
-
----
-
-## Local Demo Accounts (development only)
-
-`python -m app.seed` (after `alembic upgrade head`) creates a demo teacher and student account, a published course, a section and an assignment, for local development convenience. **It refuses to run when `APP_ENV=production`**, and the credentials it creates are not published here — run the script yourself and read `backend/app/seed.py` to see them. There is no demo-login shortcut in the UI; register a real account through `/register` on any deployed environment.
-
----
-
-## Quickstart
-
-### 1. Backend
+**Backend**
 
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate        # Windows (source venv/bin/activate on macOS/Linux)
-pip install -r requirements.txt
-copy .env.example .env       # Windows (cp on macOS/Linux)
+venv\Scripts\activate            # Windows; use: source venv/bin/activate  on macOS/Linux
+pip install -r requirements-dev.txt   # includes pytest, moto and an ffmpeg binary for tests
+copy .env.example .env           # Windows; use: cp .env.example .env
 alembic upgrade head
-python -m app.seed           # optional demo data
-uvicorn app.main:app --reload
-python -m app.worker         # optional second terminal: background job worker
+python -m app.seed               # optional demo data (refuses to run when APP_ENV=production)
+uvicorn app.main:app --reload    # http://localhost:8000  (/health, /ready, /docs)
+python -m app.worker             # optional: background job worker in a second terminal
 ```
 
-Backend: `http://localhost:8000` — `/health`, `/ready`, interactive docs at `/docs`. The default `.env` uses `sqlite:///./dev.db`; set `DATABASE_URL` to PostgreSQL (or run `docker compose up` in `backend/`) for production parity. LiveKit, S3 and the AI providers are optional: the features that need them return typed `503` errors or use the labeled stub until configured. Full variable list: [docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md).
+The default database is SQLite (`sqlite:///./dev.db`). For PostgreSQL set `DATABASE_URL` or run `docker compose up` in `backend/`.
 
-### 2. Frontend
+**Frontend**
 
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev                      # http://localhost:5173
 ```
 
-Frontend: `http://localhost:5173`. Set `VITE_API_BASE_URL` (default `http://localhost:8000`) if the API is elsewhere. The API must list the frontend's origin in `FRONTEND_ORIGIN` because authentication uses a cookie.
+**Do not point a local `.env` at the production database or services.** Use a separate Neon project and test credentials.
 
----
+**Troubleshooting**
 
-## API
+| Symptom | Fix |
+|---|---|
+| `alembic: command not found` | activate the virtual environment, or run `python -m alembic ...` |
+| Cookies not set between the two dev servers | keep `SESSION_COOKIE_SAMESITE=lax` and `FRONTEND_ORIGIN=http://localhost:5173` locally |
+| `LIVEKIT_NOT_CONFIGURED` (503) | live classes need `LIVEKIT_*`; everything else works without them |
+| "Multiple head revisions" | keep a single Alembic head: new migrations must follow the latest revision |
+| OTP email not arriving locally | with no `EMAILJS_*` set outside production, the OTP is returned in the API response (`dev_otp`) and shown by the UI |
 
-All endpoints are under `/api/v1`; the complete, generated list with authorization rules and error codes is in [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md). Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
+## 10. Environment variables
 
-The frontend talks to the API only through `frontend/src/services/apiClient.ts`, which adapts the backend contract to the page view-models.
+Backend-only unless stated. Never commit a populated `.env`; `backend/.env.example` holds blanks and safe defaults.
 
----
+| Name | Purpose | Required | Where to get it |
+|---|---|---|---|
+| `APP_ENV` | `development` or `production` | yes | choose |
+| `FRONTEND_ORIGIN` | the single allowed CORS origin | yes | your Vercel URL |
+| `SESSION_SECRET` | keys OTP hashing | yes in production | generate a long random value (Render can generate) |
+| `SESSION_COOKIE_SAMESITE` | `none` for Vercel ↔ Render, otherwise `lax` | production | choose |
+| `SESSION_TTL_HOURS` | student/teacher session lifetime (default 72) | no | choose |
+| `DATABASE_URL` | PostgreSQL connection string (SQLite default) | yes | Neon dashboard |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | administrator account (stored hashed); blank disables admin sign-in | for `/admin` | choose; never commit |
+| `ADMIN_RESET_PASSWORD_ON_START`, `ADMIN_SESSION_TTL_MINUTES` | password reset switch; admin session length | no | |
+| `TEACHER_COLLEGE_REQUIRED`, `STUDENT_COLLEGE_REQUIRED` | require college/code/branch/section at registration (default true) | no | |
+| `TEACHER_INVITE_CODE` | legacy teacher gate when college is not required | no | choose |
+| `CONCURRENT_LOGIN_OTP` | second-device OTP rule (default true) | no | |
+| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | live classes | for live classes | LiveKit Cloud project settings |
+| `RECORDING_ENABLED`, `SIGNED_URL_TTL_SECONDS` | recording kill switch; presigned URL lifetime | no | |
+| `STORAGE_BACKEND`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_FORCE_PATH_STYLE` | `local` or `s3` (R2) | for recordings | Cloudflare R2 |
+| `LLM_API_KEY`, `LLM_MODEL`, `LLM_BASE_URL` | summaries (OpenAI-compatible API) | for real AI | provider console (Groq in `render.yaml`) |
+| `SPEECH_TO_TEXT_API_KEY`, `SPEECH_TO_TEXT_MODEL`, `SPEECH_TO_TEXT_BASE_URL` | transcription; set the base URL for non-OpenAI providers | for real AI | provider console |
+| `EMAILJS_SERVICE_ID`, `EMAILJS_TEMPLATE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY` | OTP email; template variables `to_email`, `otp`, `ttl_minutes` | for email | EmailJS dashboard (private key: Account → Security) |
+| `OTP_TTL_MINUTES`, `OTP_MAX_ATTEMPTS`, `OTP_REQUEST_COOLDOWN_SECONDS`, `RESET_TOKEN_TTL_MINUTES` | OTP tuning | no | defaults 5 / 5 / 60 / 10 |
+| `MAX_UPLOAD_MB`, `FFMPEG_PATH`, `FFMPEG_TIMEOUT_SECONDS`, `STT_*`, `OFFLINE_SUBMISSION_GRACE_HOURS` | limits and processing | no | defaults in `backend/app/config.py` |
+| **`VITE_API_BASE_URL`** *(frontend, public)* | API base URL baked into the build | yes | your Render URL |
 
-## Offline-First Architecture & Storage
+Only `VITE_*` values reach the browser, and the only one in use is the public API URL. Never place a key, secret or password in a `VITE_` variable.
 
-### 1. IndexedDB Stores (Dexie.js `EduVillageDB`)
-- `assignmentDrafts`: Preserves answers locally as student types ("Saved on this device"). Survives app reloads and power cycles.
-- `syncOperations`: Persistent queue of pending submissions, each with a unique `operation_id`.
-- `downloadedResources` / `downloadedRecordings`: Explicit downloads stored as real binary Blobs for offline study (a failed download is an error, never placeholder content).
-- `cachedLessonMetadata`, `cachedSummaries`: cached content for offline reading.
+## 11. Security
 
-### 2. Synchronization Lifecycle
-1. **Offline:** mutations are written to IndexedDB; the badge shows *Saved on this device* or *Waiting to sync*.
-2. **Reconnection:** periodic `/health` heartbeats detect connectivity.
-3. **Queue processing:** `syncManager.processQueue()` posts batches to `POST /api/v1/sync/operations`.
-4. **Server confirmation:** a submission is *Submitted* only when the server answers `accepted`. `rejected` / `conflict` stay visible as needing attention. Retrying the same `operation_id` can never create a second submission (enforced by the database, tested including simultaneous duplicates).
-5. **Shared device:** logout revokes the server session; on a shared device it also clears drafts, the queue, downloads and caches.
+| Control | State |
+|---|---|
+| Password hashing | ✅ argon2 |
+| Sessions | ✅ random token, only its hash stored; httpOnly cookie; expiry; revocation; separate admin cookie and 120-minute admin sessions |
+| OTP | ✅ 6 digits, HMAC-hashed with a server secret, 5 minutes, 5 attempts, cooldown, atomic claims, single-purpose (login approval vs. password reset), generic errors, never returned in production |
+| Authorisation | ✅ in services; client role/college/branch/section values are validated server-side; branch-wide audiences enforced for list, detail, token and recordings |
+| LiveKit tokens | ✅ short-lived, room-scoped, enrolment and audience checked, students subscribe-only; webhook signature verified |
+| CORS / CSRF | ✅ single CORS origin; admin writes need a custom header (`X-EduVillage-Admin`) |
+| Rate limiting | 🟠 login, admin login and OTP are limited **in process memory**; limits reset on restart and multiply with instances |
+| Input and file validation | ✅ Pydantic schemas; upload size/type/content checks; presigned URLs expire (300 s default) |
+| SQL safety | ✅ SQLAlchemy parameterised queries |
+| Audit log | 🟠 `audit_events` records security events; no viewer, no institution column |
+| Secrets | ✅ `.env` ignored, `render.yaml` secrets `sync: false`. **⚠ The real administrator credentials were committed in `backend/.env.example` (commit `3b47ed2`) and remain in git history: rotate the admin password** (set a new `ADMIN_PASSWORD`, restart once with `ADMIN_RESET_PASSWORD_ON_START=true`, then `false`). The file is blanked in the working tree but history is unchanged |
+| Backups | ⚪ Neon provides limited restore windows by plan (6 h on Free); no tested restore procedure |
+| Missing | institution-level scoping of courses, institution administrators, error tracking, dependency-update routine, staging environment |
 
----
+## 12. Current deployment status
 
-## Real-Time Classroom & Adaptive Audio-Only Mode
+| Component | Status |
+|---|---|
+| Vercel frontend | 🟡 deployed per the project owner; `vercel.json` present; plan and settings not visible here |
+| Render backend | 🟡 deployed per owner-supplied logs showing Render building the Docker image and running migrations; one **failed deploy** was caused by an unpublished Alembic revision in the Neon database and was repaired (re-stamped); the change that restores a single Alembic head was **uncommitted when this README was written**, and a successful redeploy has not been verified |
+| Neon | ✅ reachable and inspected read-only (PostgreSQL 18.6, 32 tables, 9.6 MB); plan ⚪ |
+| LiveKit Cloud | ✅ real-room signalling test passes with several students; plan ⚪; audio/video content not verified |
+| EmailJS | 🟡 template exists and was tested by the owner; backend delivery not configured locally and not verified in production |
+| Groq / AI | 🟡 configured in `render.yaml`; production behaviour not verified |
+| R2 | 🟡 configured; verified against an S3 emulator in tests and by owner runs; production recording end to end not verified |
+| Worker | 🔵 not deployed |
+| CI | 🔵 none |
+| Blockers | rotate the admin password; deploy the single-head migration chain; confirm EmailJS delivery; configure production secrets |
 
-1. **Authorization flow:** the client requests `POST /api/v1/classes/{id}/join-token`; FastAPI verifies enrollment, section membership and class state and issues a scoped LiveKit JWT (teachers publish; students listen). The backend never proxies media.
-2. **Adaptive media subscription control (frontend):** the classroom monitors WebRTC connection quality; on sustained degradation (or manual toggle) `useAdaptiveAudio` unsubscribes from remote video tracks while keeping audio.
-3. **Recording:** a teacher explicitly starts/stops recording; everyone in the room sees a recording notice. A recording stays private until the teacher publishes it from *Recorded Lessons*; students then stream it via short-lived signed URLs.
-4. **Summary panel:** side panel on desktop, bottom sheet on mobile; opening it never interrupts the WebRTC connection.
+## 13. Free-tier infrastructure
 
----
+Pricing verified **2026-10-16** from official pages ([section 24](#24-references)). "Free" is not "unlimited" or "guaranteed available".
 
-## Testing
+| Service | Free allowance | Key restrictions | Upgrade trigger | Paid alternative |
+|---|---|---|---|---|
+| Vercel Hobby | 100 GB transfer, 1M requests | **Non-commercial use only** | any institutional use | Pro $20/month |
+| Render Free | 750 instance-hours, 1 instance | spins down after 15 min; ephemeral disk; may restart | first pilot | Starter $7 / Standard $25 / Pro $85 |
+| Neon Free | 1 GB per project, 100 CU-hours | suspends after 5 min idle; 6 h restore; writes blocked at the cap | about 0.5 GB or 80 CU-hours | Launch (usage-based: $0.106/CU-hour, $0.35/GB-month) |
+| LiveKit Build | 5,000 participant-minutes, 100 concurrent, 50 GB, **60 recording minutes** | recording is video egress | recording more than about one class-hour a month | Ship from $50, Scale from $500 |
+| EmailJS Free | 200 requests/month | 1 request/s; server-side use on the free plan unconfirmed | about 150 emails/month | Personal $9 … Business $40 |
+| Groq | free tier exists | exact limits for the models in use ambiguous | daily-limit errors | pay-per-token ($0.15/$0.60 per 1M tokens; Whisper turbo $0.04/hour) |
+| Cloudflare R2 | 10 GB-month, 1M/10M operations | none for egress (free) | above 10 GB | $0.015/GB-month |
+
+## 14. Scalability strategy
+
+Terms: **registered users** are accounts; **monthly active users (MAU)** are those who return in a month (planning assumption 40-60%); **concurrent app users** are those online at the same time (about 10-15% of MAU at peak); **live participants** are those inside a LiveKit room (3-12% of MAU depending on how live the teaching is). Cost and limits follow *participant-minutes*, not registrations.
+
+* **Vercel:** static delivery; registered-user growth adds bandwidth only (a 1.4 MB build). No function costs.
+* **Backend:** first a bigger instance, then more instances; first fix per-process rate limits and migrate-on-start. The frontend's 15-second `/health` heartbeat dominates request volume and is the first thing to reduce.
+* **Database:** relational data is small; media is in R2. Add pooling settings, then a paid Neon plan for restore and uptime; read replicas only if measured.
+* **LiveKit:** the main variable cost; Build → Ship → Scale by participant-minutes, concurrency and recording minutes.
+* **Storage:** recordings dominate; retention policies matter more than price per GB.
+* **Email:** EmailJS quotas are small; switch provider when approaching them.
+* **AI:** one transcription and one summary per class; negligible cost at current prices.
+
+Each component upgrades independently; see [the roadmap](docs/DEPLOYMENT_UPGRADE_ROADMAP.md) and [architecture](docs/SCALABILITY_ARCHITECTURE.md).
+
+## 15. Infrastructure cost estimates
+
+**Estimates, not quotes, not capacity guarantees.** Computed by [`docs/cost_model.py`](docs/cost_model.py) from verified prices and stated assumptions; full tables for the three workload profiles, the assumptions and the component breakdown are in [INFRASTRUCTURE_COST_MODEL.md](docs/INFRASTRUCTURE_COST_MODEL.md). INR at 96.5 per USD (third-party quote of 2026-10-16, timestamp unverified).
+
+Balanced hybrid profile (P2); low / high are the recorded-first (P1) and live-heavy (P3) profiles:
+
+| Registered | MAU | Peak app users | Live participant-min/month | Monthly USD (low – **balanced** – high) | Monthly INR (balanced) | Annual USD (balanced) | Main cost drivers |
+|---:|---:|---:|---:|---|---:|---:|---|
+| 100 | 50 | 5 | 7.5k | $0 – **$50** – $63 | ₹4,845 | $603 | LiveKit Ship once recording is used |
+| 500 | 250 | 25 | 37.5k | $115 – **$128** – $275 | ₹12,372 | $1,539 | LiveKit, Neon, Render Standard |
+| 1,000 | 500 | 50 | 75k | $134 – **$174** – $582 | ₹16,749 | $2,083 | LiveKit, Neon |
+| 5,000 | 2.5k | 250 | 375k | $218 – **$607** – $1,816 | ₹58,552 | $7,281 | LiveKit overage |
+| 10,000 | 5k | 500 | 750k | $337 – **$1,020** – $4,129 | ₹98,421 | $12,239 | LiveKit Scale, 2 API instances |
+| 50,000 | 25k | 2,500 | 3.75M | $1,542 – **$4,567** – $22,484 | ₹440,698 | $54,802 | LiveKit, Neon Scale, 6 instances |
+| 100,000 | 50k | 5,000 | 7.5M | $2,612 – **$9,594** – $45,390+ | ₹925,819 | $115,128 | LiveKit (Enterprise needed for P3: lower bound), 12 instances |
+
+Assumptions that move these numbers most: minutes of live class per active user (30 / 150 / 600 per month), whether every class is recorded as video, MAU share, and an **unmeasured** 40 requests/second per Standard instance. Email, AI, R2 and Vercel are each a few percent. Unknown inputs are listed in [the cost model](docs/INFRASTRUCTURE_COST_MODEL.md#6-caveats-and-unknowns).
+
+## 16. Scalability roadmap
+
+| Stage | Registered users (planning band) | Upgrades (all triggered by measurements) | Balanced monthly cost |
+|---|---|---|---|
+| 1 MVP | about 100 | current stack; fix security items; confirm email; add CI and usage alerts | $0-50 |
+| 2 College pilot | 100-1,000 | Vercel Pro, Render Standard, Neon paid, LiveKit Ship, EmailJS Personal | $128-174 |
+| 3 Multi-college | 1,000-10,000 | second instance, worker, lower heartbeat rate, email provider, retention policy, college-scoped courses | $607-1,020 |
+| 4 Large | 10,000-100,000 | several instances, Neon Scale, LiveKit Scale/Enterprise, replica only if measured, tested restores | $4,567-9,594 |
+
+Triggers, steps and rollback for each change are in [DEPLOYMENT_UPGRADE_ROADMAP.md](docs/DEPLOYMENT_UPGRADE_ROADMAP.md). Kubernetes is deliberately not on the roadmap.
+
+## 17. Performance and capacity testing
+
+* **Executed load tests: none.** Practical production capacity has not yet been established through representative load testing.
+* **Known limitations:** single free Render instance; heartbeat traffic; default SQLAlchemy pool; in-memory rate limits; transcription runs inside the API process.
+* **Plan:** [CAPACITY_TEST_PLAN.md](docs/CAPACITY_TEST_PLAN.md) defines the staging environment, workload profiles, scenarios (baseline, ramp, spike, soak, cold start, live join, failure injection), metrics and initial acceptance criteria. Measured results will be recorded there; none exist yet.
+
+## 18. Limitations and future improvements
+
+| Gap | Note |
+|---|---|
+| No institution administrators or membership approval | the earlier [multi-institution plan](docs/MULTI_INSTITUTION_AUDIT.md) is a plan, not implemented |
+| Courses are not scoped to a college | catalogue is global |
+| No grading, notifications, attendance report | 🔵 |
+| Video-only room-composite recording | audio-only recording would cut LiveKit egress cost; not implemented |
+| In-process rate limits; migrations on every start; worker not deployed | needed before multiple instances |
+| No CI, error tracking, usage alerts, staging | recommended next |
+| No load-test data | see [section 17](#17-performance-and-capacity-testing) |
+| `student_dashboard` layout tests: 4 "sparse data" layout tests fail | the student home page gained a fifth section; the layout test still expects four (a pre-existing mismatch, not fixed) |
+| Free-plan server-side EmailJS use unconfirmed | check the EmailJS account |
+
+## 19. Testing
 
 ```bash
-cd backend && pytest                 # SQLite; add TEST_DATABASE_URL=... to run against PostgreSQL
-cd frontend && npm test              # Vitest
-cd frontend && npx tsc -b && npm run build
-cd frontend && npx playwright test --project="Desktop Chrome"   # e2e against the dev server (needs the backend + demo data)
-cd frontend && npm run test:e2e:offline   # real Chromium + production build + service worker: opens and plays downloads with the network disconnected
+cd backend && pytest                                  # SQLite; set TEST_DATABASE_URL to run on PostgreSQL
+cd frontend && npm test                               # Vitest (unit/component)
+cd frontend && npm run build                          # tsc -b + vite build
+cd frontend && npm run test:e2e:offline               # real Chromium: offline downloads/playback
+cd frontend && npm run test:e2e:layout                # layout / responsive checks
+cd frontend && npm run test:e2e:real                  # real backend + SQLite + built frontend, no mocks
+cd frontend && npm run test:e2e:live                  # real LiveKit Cloud (needs credentials in backend/.env)
 ```
 
-Results recorded on 2026-10-15: backend 159 passed on SQLite, 157 on PostgreSQL 18; frontend 25 passed; type-check and production build clean. See [docs/BACKEND_REQUIREMENTS_MATRIX.md](docs/BACKEND_REQUIREMENTS_MATRIX.md) for what each test does and does not prove.
+Last recorded results (2026-10-16, on the developer machine): backend **387 passed, 1 skipped** on SQLite; on PostgreSQL 18 all passed except one test written by another contributor that deletes a user who still has audit records (fails on PostgreSQL only, also without these changes); frontend **156 unit tests passed**, type-check and build clean; real-stack browser suite **15 of 15 passed**; offline suite **12 of 12 passed**; layout suite **31 passed, 4 failed** (the known mismatch above). Missing: load tests, CI, accessibility audit, field tests on real networks, a real LiveKit audio/video content test.
 
----
+## 20. Project structure
 
-## Known Constraints (honest status)
+```
+EduVillage/
+  README.md
+  render.yaml                      # Render Blueprint (backend)
+  docs/                            # architecture, costs, roadmap, test plans, audits, cost_model.py
+  backend/
+    Dockerfile  compose.yaml  alembic.ini  requirements*.txt  .env.example
+    app/
+      main.py  config.py  dependencies.py  worker.py  seed.py
+      api/v1/                      # routes: auth, admin, registration, users, courses, classes, recordings, resources, assignments, summaries, sections, synchronization, dashboard, webhooks
+      core/                        # security, exceptions, permissions, logging, middleware
+      db/models/                   # SQLAlchemy models (32 tables)
+      integrations/                # livekit, object_storage, llm_provider, speech_to_text, email
+      schemas/  services/  utils/
+    alembic/versions/              # migrations (single head)
+    tests/                         # api/, unit/, integration/
+  frontend/
+    vercel.json  vite.config.ts  playwright.*.config.ts  package.json
+    src/
+      pages/ (auth, admin, student, teacher, classroom)  components/  context/  hooks/
+      services/ (apiClient, authService, syncManager, downloadManager, adminApi, registrationApi, ...)
+      db/ (Dexie)  routes/  types/  utils/  test/
+    e2e/  e2e-offline/  e2e-layout/  e2e-real/  e2e-live/
+```
 
-1. **LiveKit, recording and S3 are not verified against real services.** The backend implements token issuance, the recording lifecycle, the signed webhook and signed playback URLs, and the tests exercise them against mocked boundaries. A real LiveKit server with Egress and an S3-compatible bucket are required in production; until configured, endpoints return `503 LIVEKIT_NOT_CONFIGURED` / `RECORDING_NOT_CONFIGURED`.
-2. **AI summaries need provider keys for real output.** Without `LLM_API_KEY` the pipeline produces a stub result labeled `generator: "stub"`; without `SPEECH_TO_TEXT_API_KEY` transcription from a recording fails with `STT_NOT_CONFIGURED` (no summary is invented). Teachers must review before students see a summary.
-3. **Background Sync API:** the W3C `SyncManager` is Chromium-only, so EduVillage pairs IndexedDB queuing with a foreground `NetworkContext` that triggers an idempotent batch sync on reconnection or launch.
-4. **Storage quota:** downloads are subject to the browser quota; the Downloads page shows real usage via `navigator.storage.estimate()`, or says it is unavailable.
-5. **Not built:** grading, due-date enforcement, cross-institution sharing, multi-process rate limiting, external job queue.
+## 21. Contribution and development workflow
 
----
+What the repository shows: work is pushed to `main` on GitHub by more than one contributor, with merge commits when histories diverge. **There is no documented branch strategy, pull-request policy or CI.** Recommendations (not an existing policy): feature branches and pull requests; run `pytest`, `npm test`, `npx tsc -b` before pushing; keep a single Alembic head and never run a local migration against the production database; add a GitHub Actions workflow for the backend and frontend suites.
 
-## Against the problem statement
+## 22. Deployment and operations
 
-> *"Rural colleges face weak internet, few devices, and limited teachers... Build a simple tool for live and recorded classes that works on low bandwidth. Success means students can attend, catch up, and submit work even on poor connections."*
+1. **Build and deploy:** push to `main`; Render rebuilds the Docker image from `backend/Dockerfile` (via `render.yaml`) and runs `alembic upgrade head` then `uvicorn` on start; Vercel builds the frontend (`npm run build`, output `dist`).
+2. **Migrations:** `cd backend && alembic upgrade head` (idempotent). Check `alembic heads` shows one head before deploying.
+3. **Rollback:** redeploy the previous commit on Render/Vercel; database downgrades are `alembic downgrade <revision>` and some migrations (for example the removal of the course discovery columns) discard data.
+4. **Logs and monitoring:** provider dashboards and stdout logs (with `request_id`); `/health` (liveness) and `/ready` (database check). No alerting is configured.
+5. **Backup and recovery:** Neon point-in-time restore (6 hours on Free); R2 objects are not versioned by default; there is no tested restore procedure.
+6. **Operational limits:** free-tier spin-down and quotas; stranded background jobs need `python -m app.worker --once` (Render Free has no shell).
 
-| Ask | Status | Implementation |
-|---|---|---|
-| Weak internet / low bandwidth | Implemented (frontend logic tested; not field-tested) | Audio-only fallback, offline-first assignment sync |
-| Live classes | Implemented; **needs a LiveKit server to run live** | Role-based, room-scoped join tokens |
-| Recorded classes | Implemented; **needs LiveKit Egress + S3 to record** | Recording lifecycle, publish, signed playback, library |
-| Students catch up | Implemented | Recording playback, transcript, teacher-approved AI summary |
-| Submit work on poor connections | Implemented and tested | Offline drafts + idempotent sync with retry queue |
-| Few devices | Implemented | Shared-device mode, session revocation, local data wipe |
-| Limited teachers | Implemented (same-teacher scope) | Sections, co-teachers, recordings and resources reused across sections without copying |
+## 23. Project status and conclusion
+
+EduVillage implements the full teaching loop (college setup, registration, courses, live and recorded classes, assignments, offline use, AI-assisted summaries, OTP-protected sign-in and recovery) with a substantial automated test suite and real-stack browser tests. What remains is operational: rotate the exposed admin password, confirm production email and AI, add CI and monitoring, run load tests, and finish institution-level scoping. The infrastructure scales by upgrading one component at a time, with live participant-minutes as the dominant cost; the figures here are estimates until measured.
+
+## 24. References
+
+* Vercel: https://vercel.com/docs · https://vercel.com/pricing
+* Render: https://render.com/docs · https://render.com/pricing · https://render.com/docs/free
+* Neon: https://neon.com/docs · https://neon.com/pricing
+* LiveKit: https://docs.livekit.io/ · https://livekit.com/pricing
+* EmailJS: https://www.emailjs.com/docs/ · https://www.emailjs.com/pricing/
+* Groq: https://console.groq.com/docs/models · https://console.groq.com/docs/rate-limits
+* Cloudflare R2: https://developers.cloudflare.com/r2/ · https://developers.cloudflare.com/r2/pricing/
+* FastAPI: https://fastapi.tiangolo.com/ · SQLAlchemy: https://docs.sqlalchemy.org/ · Alembic: https://alembic.sqlalchemy.org/ · React: https://react.dev/ · Vite: https://vite.dev/
+* Project documents: [docs/](docs/)

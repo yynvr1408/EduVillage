@@ -7,6 +7,18 @@ import type { AuthResponse, User } from '../types'
  * the user object kept here is only a display cache so the UI can render while offline.
  * On a shared device the cache lives in sessionStorage and disappears with the tab.
  */
+/** 202 from /auth/login: the account is signed in on another device, so this sign-in needs the emailed code. */
+export interface LoginOtpChallenge {
+  otp_required: true
+  email: string
+  message: string
+  otp_ttl_minutes: number
+  resend_cooldown_seconds: number
+  dev_otp?: string
+}
+
+export const isOtpChallenge = (r: AuthResponse | User | LoginOtpChallenge): r is LoginOtpChallenge => 'otp_required' in r
+
 export const authService = {
   isSharedDevice(): boolean {
     return localStorage.getItem('eduvillage_shared_device') === 'true'
@@ -24,10 +36,21 @@ export const authService = {
     this.getStorage().setItem('eduvillage_user', JSON.stringify(user))
   },
 
-  async login(email: string, password: string): Promise<AuthResponse> {
-    const data = await apiRequest<AuthResponse>('/auth/login', {
+  async login(email: string, password: string): Promise<AuthResponse | LoginOtpChallenge> {
+    const data = await apiRequest<AuthResponse | LoginOtpChallenge>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    })
+    if (isOtpChallenge(data)) return data // no session yet: nothing to cache
+    this.cacheUser(data.user)
+    return data
+  },
+
+  /** Redeems the emailed approval code; the server then starts the session for THIS device. */
+  async verifyLoginOtp(email: string, otp: string): Promise<AuthResponse> {
+    const data = await apiRequest<AuthResponse>('/auth/login/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
     })
     this.cacheUser(data.user)
     return data
