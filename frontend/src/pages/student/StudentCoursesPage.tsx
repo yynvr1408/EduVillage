@@ -5,7 +5,6 @@ import type { Course } from '../../types'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { CourseCard } from '../../components/course/CourseCard'
 import { Input } from '../../components/ui/Input'
-import { Button } from '../../components/ui/Button'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 
@@ -97,20 +96,15 @@ export const StudentCoursesPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
           {filteredCourses.map((course) => (
-            <div key={course.id} className="flex flex-col gap-2">
-              <CourseCard course={course} />
-              {!enrolledIds.has(course.id) && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  fullWidth
-                  isLoading={enrollingId === course.id}
-                  onClick={() => handleEnroll(course.id)}
-                >
-                  Enroll to access lessons, classes and assignments
-                </Button>
-              )}
-            </div>
+            <CourseCard
+              key={course.id}
+              course={course}
+              enroll={{
+                enrolled: enrolledIds.has(course.id),
+                isEnrolling: enrollingId === course.id,
+                onEnroll: () => handleEnroll(course.id),
+              }}
+            />
           ))}
         </div>
       )}

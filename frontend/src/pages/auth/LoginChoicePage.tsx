@@ -51,13 +51,6 @@ export const LoginChoicePage: React.FC = () => {
             <ArrowRight className="w-4 h-4 text-[#CBD7D1] group-hover:text-[#0F5B57] transition-colors shrink-0" />
           </Link>
         </div>
-
-        <p className="text-center text-xs text-[#687775] mt-6">
-          Don't have an account yet?{' '}
-          <Link to="/register" className="font-semibold text-[#0F5B57] hover:underline">
-            Register here
-          </Link>
-        </p>
       </div>
     </div>
   )
