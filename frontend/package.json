@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e:offline": "playwright test -c playwright.offline.config.ts",
     "test:e2e:layout": "playwright test -c playwright.layout.config.ts",
-    "test:e2e:real": "playwright test -c playwright.real.config.ts"
+    "test:e2e:real": "playwright test -c playwright.real.config.ts",
+    "test:e2e:live": "playwright test -c playwright.live.config.ts"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.24",

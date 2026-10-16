@@ -131,7 +131,7 @@ const ClassroomStage: React.FC<{
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-1.5 text-xs text-[#CBD7D1] bg-[#202B2A] px-2.5 py-1 rounded-full border border-[#374947]">
             <Users className="w-3.5 h-3.5 text-[#FFFFFF]" />
-            <span>{remoteParticipants.length + 1}</span>
+            <span data-testid="participant-count">{remoteParticipants.length + 1}</span>
           </div>
 
           <Badge variant="live" size="sm">

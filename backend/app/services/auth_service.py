@@ -58,14 +58,17 @@ def register_user(
     from app.services import college_service
 
     # Everything is validated before the first row is written, so a rejection leaves no partial account.
+    # Students and teachers prove the same admin-issued college code; only "all sections" is teacher-only.
     target = college_service.validate_registration_target(
         db, college_id=college_id, branch_id=branch_id, section_id=section_id, all_sections=all_sections,
-        college_code=college_code, require_code=role == UserRole.teacher, allow_all_sections=role == UserRole.teacher,
+        college_code=college_code, require_code=True, allow_all_sections=role == UserRole.teacher,
     )
-    if role == UserRole.teacher and target is None:
-        if settings.teacher_college_required:
+    if target is None:
+        college_required = settings.teacher_college_required if role == UserRole.teacher else settings.student_college_required
+        if college_required:
             raise ValidationFailedError("Select your college, enter its college code and choose a section.", code="COLLEGE_REQUIRED")
-        _assert_may_register_as(role, invite_code)
+        if role == UserRole.teacher:
+            _assert_may_register_as(role, invite_code)
     # (with a valid target the admin-issued college code is the proof; it grants nothing beyond the role)
     normalized_email = email.strip().lower()
     existing = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()

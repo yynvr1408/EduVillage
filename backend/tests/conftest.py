@@ -21,8 +21,9 @@ if not _shutil.which("ffmpeg") and not os.environ.get("FFMPEG_PATH"):
     except Exception:  # noqa: BLE001 - ffmpeg-dependent tests are skipped when unavailable
         pass
 os.environ["SESSION_COOKIE_NAME"] = "eduvillage_session"
-# Legacy fixtures register teachers without a college; tests of the college rule switch this back on.
+# Legacy fixtures register teachers/students without a college; tests of the college rule switch this back on.
 os.environ["TEACHER_COLLEGE_REQUIRED"] = "false"
+os.environ["STUDENT_COLLEGE_REQUIRED"] = "false"
 # The suite is written against the local-disk storage backend and the labeled stub AI
 # providers; a developer's real .env (real S3/LiveKit/LLM credentials) must not leak into
 # tests, or they silently start hitting live third-party services instead of the fakes.

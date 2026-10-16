@@ -190,9 +190,45 @@ def test_teacher_without_college_is_rejected_when_required_and_legacy_gate_still
 
 # ---- students --------------------------------------------------------------------------------------
 
-def test_student_selects_college_and_section_without_a_code_and_is_not_enrolled_anywhere(admin, db_session):
+@pytest.mark.parametrize("bad", ["EV-AAAA-2222", "", "nonsense", None])
+def test_student_wrong_or_missing_code_rejected_and_no_account_created(admin, db_session, bad):
     college, secs = make_college(admin)
-    client, r = register(college, secs[0], code=None, role="student")
+    email = f"nobody-{secrets.token_hex(4)}@example.com"
+    _, r = register(college, secs[0], code=bad, role="student", email=email)
+    assert r.status_code in (403, 422), r.text
+    assert r.json()["error"]["code"] in {"INVALID_COLLEGE_CODE", "VALIDATION_FAILED"}
+    assert db_session.execute(select(User).where(User.email == email)).first() is None
+
+
+def test_students_and_teachers_share_one_college_code_not_separate_systems(admin):
+    college, secs = make_college(admin)
+    # A different college's code is rejected for a student exactly as it is for a teacher.
+    other, _ = make_college(admin)
+    _, r = register(college, secs[0], code=other["code"], role="student")
+    assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_COLLEGE_CODE"
+    # The college's own real code works for a student, same as for a teacher.
+    _, ok = register(college, secs[0], role="student")
+    assert ok.status_code == 201
+
+
+def test_student_without_college_is_rejected_when_required_and_legacy_gate_still_works_when_not(admin, monkeypatch):
+    monkeypatch.setattr(get_settings(), "student_college_required", True)
+    _, r = register(None, None, role="student")
+    assert r.status_code == 422 and r.json()["error"]["code"] == "COLLEGE_REQUIRED"
+    monkeypatch.setattr(get_settings(), "student_college_required", False)
+    _, legacy = register(None, None, role="student")
+    assert legacy.status_code == 201
+
+
+def test_student_cannot_register_for_all_sections(admin):
+    college, secs = make_college(admin)
+    _, r = register(college, None, role="student", all_sections=True)
+    assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_SECTION"
+
+
+def test_student_registers_with_college_code_and_section_and_is_not_enrolled_anywhere(admin, db_session):
+    college, secs = make_college(admin)
+    client, r = register(college, secs[0], role="student")
     assert r.status_code == 201, r.text
     uid = r.json()["user"]["id"]
     db_session.expire_all()
@@ -208,7 +244,7 @@ def test_student_selects_college_and_section_without_a_code_and_is_not_enrolled_
 def test_teacher_in_a_section_does_not_gain_access_to_students_or_their_course_data(published_course, admin):
     college, secs = make_college(admin)
     teacher_client, _ = register(college, secs[0])
-    student_client, _ = register(college, secs[0], code=None, role="student")
+    student_client, _ = register(college, secs[0], role="student")
     assert student_client.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={}).status_code == 201  # normal rules
     # Sharing a college section gives the new teacher no rights over another teacher's course or students.
     me = student_client.get("/api/v1/users/me").json()
@@ -225,7 +261,7 @@ def test_student_registration_stays_backward_compatible_without_college(client):
 def test_student_cross_college_section_rejected(admin):
     a, _ = make_college(admin)
     _, b_secs = make_college(admin)
-    _, r = register(a, b_secs[0], code=None, role="student")
+    _, r = register(a, b_secs[0], role="student")  # a's code, but b's section
     assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_BRANCH"
 
 

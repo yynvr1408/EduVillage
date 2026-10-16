@@ -157,3 +157,30 @@ class PublicCollegeOut(BaseModel):
     id: str
     name: str
     location: str | None
+
+
+class StudentVisibleTeacherBranchOut(BaseModel):
+    id: str
+    name: str
+
+
+class StudentVisibleTeacherSectionOut(BaseModel):
+    id: str
+    name: str
+
+
+class StudentVisibleCourseOut(BaseModel):
+    id: str
+    title: str
+
+
+class StudentVisibleTeacherOut(BaseModel):
+    """A teacher a student may discover within their own college/section. Discovery only — does
+    not imply enrollment or course access."""
+
+    id: str
+    full_name: str
+    branch: StudentVisibleTeacherBranchOut | None
+    section: StudentVisibleTeacherSectionOut | None
+    all_sections: bool
+    courses: list[StudentVisibleCourseOut]
