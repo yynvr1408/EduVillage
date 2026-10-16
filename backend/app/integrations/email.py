@@ -90,21 +90,26 @@ def send_login_approval_otp_email(*, to: str, otp: str, ttl_minutes: int) -> boo
 
 
 def send_registration_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
-    """Registration email-ownership verification, sent before any account exists. Uses a fully
-    separate EmailJS account when one is configured (emailjs_registration_uses_separate_account —
-    the free tier's per-account template cap often forces this); otherwise its own template on
-    the shared account when configured; otherwise falls back to the password-reset template."""
-    if settings.emailjs_registration_uses_separate_account:
-        return _send(
-            to_email=to,
-            template_id=settings.emailjs_registration_template_id,
-            template_params={"otp": otp, "ttl_minutes": ttl_minutes},
-            service_id=settings.emailjs_registration_service_id,
-            public_key=settings.emailjs_registration_public_key,
-            private_key=settings.emailjs_registration_private_key,
-        )
-    template_id = settings.emailjs_registration_template_id or settings.emailjs_template_id
-    return _send(to_email=to, template_id=template_id, template_params={"otp": otp, "ttl_minutes": ttl_minutes})
+    """Registration email-ownership verification, sent before any account exists. Each of
+    service/template/public key/private key falls back independently to the shared account's
+    value when not set for registration specifically — NOT all-or-nothing. That matters because
+    a template belongs to one SERVICE, and EmailJS's free tier caps templates per service, so the
+    registration template commonly lives on a second service added to the SAME account (same
+    public/private key, different service_id) rather than a wholly separate account. Requiring
+    every field to be overridden together would silently pair the new template with the old
+    service_id and get rejected by EmailJS."""
+    return _send(
+        to_email=to,
+        template_id=settings.emailjs_registration_template_id or settings.emailjs_template_id,
+        template_params={"otp": otp, "ttl_minutes": ttl_minutes},
+        service_id=settings.emailjs_registration_service_id or settings.emailjs_service_id,
+        public_key=settings.emailjs_registration_public_key or settings.emailjs_public_key,
+        private_key=(
+            settings.emailjs_registration_private_key
+            if settings.emailjs_registration_private_key is not None
+            else settings.emailjs_private_key
+        ),
+    )
 
 
 # No send_password_changed_email(): the EmailJS setup in this task configures exactly one

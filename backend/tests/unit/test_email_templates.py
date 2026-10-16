@@ -60,6 +60,31 @@ def test_registration_otp_uses_a_fully_separate_emailjs_account_when_configured(
     assert captured["accessToken"] == "reg-priv"
 
 
+def test_registration_otp_uses_a_new_service_under_the_same_account(monkeypatch):
+    """The common real case: a second Gmail connection (new service_id) was added to the SAME
+    EmailJS account for the registration template, so only the service/template id differ — the
+    public/private key are deliberately left unset for registration and must still resolve to the
+    shared account's values, not silently pair the new template with the OLD service_id."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "emailjs_service_id", "old-svc")
+    monkeypatch.setattr(settings, "emailjs_template_id", "main-template")
+    monkeypatch.setattr(settings, "emailjs_public_key", "shared-pub")
+    monkeypatch.setattr(settings, "emailjs_private_key", "shared-priv")
+    monkeypatch.setattr(settings, "emailjs_registration_service_id", "new-gmail-svc")
+    monkeypatch.setattr(settings, "emailjs_registration_template_id", "reg-template")
+    monkeypatch.setattr(settings, "emailjs_registration_public_key", None)
+    monkeypatch.setattr(settings, "emailjs_registration_private_key", None)
+
+    captured = {}
+    monkeypatch.setattr(email_integration.httpx, "post", lambda url, json, timeout: captured.update(json) or _FakeResponse())
+
+    email_integration.send_registration_otp_email(to="a@example.com", otp="123456", ttl_minutes=5)
+    assert captured["service_id"] == "new-gmail-svc"
+    assert captured["template_id"] == "reg-template"
+    assert captured["user_id"] == "shared-pub"
+    assert captured["accessToken"] == "shared-priv"
+
+
 def test_registration_otp_uses_the_shared_account_when_no_separate_one_is_configured(monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "emailjs_service_id", "main-svc")

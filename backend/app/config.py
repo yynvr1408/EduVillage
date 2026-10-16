@@ -121,23 +121,15 @@ class Settings(BaseSettings):
     emailjs_registration_template_id: str | None = None
     emailjs_public_key: str | None = None
     emailjs_private_key: str | None = None
-    # EmailJS's free tier caps templates per account (2 at the time of writing), so the
-    # registration-OTP template may need to live in a SEPARATE EmailJS account from the one
-    # used for password-reset/login-approval. A template belongs to one account's service, so
-    # that requires its own full credential set, not just a template id. All three must be set
-    # together for this to take effect; otherwise registration falls back to the shared account
-    # (using emailjs_registration_template_id there, or emailjs_template_id if that's unset too).
+    # EmailJS's free tier caps templates per SERVICE, so the registration-OTP template commonly
+    # needs its own connected service (e.g. a second Gmail connection) — possibly, but not
+    # necessarily, under the SAME account as the shared one above. Each of these falls back to
+    # its "emailjs_*" counterpart independently (see email.send_registration_otp_email) — set
+    # just the service/template id if it's the same account with a new service; set all four for
+    # a wholly separate account.
     emailjs_registration_service_id: str | None = None
     emailjs_registration_public_key: str | None = None
     emailjs_registration_private_key: str | None = None
-
-    @property
-    def emailjs_registration_uses_separate_account(self) -> bool:
-        return bool(
-            self.emailjs_registration_service_id
-            and self.emailjs_registration_public_key
-            and self.emailjs_registration_template_id
-        )
     otp_ttl_minutes: int = 5
     # A second sign-in to a student/teacher account that is already signed in elsewhere needs an emailed OTP.
     concurrent_login_otp: bool = True
