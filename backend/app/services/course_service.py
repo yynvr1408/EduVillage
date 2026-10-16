@@ -137,27 +137,15 @@ def list_catalog(
     limit: int = 50,
     offset: int = 0,
     subject: str | None = None,
-    grade_level: str | None = None,
-    language: str | None = None,
-    institution: str | None = None,
-    region: str | None = None,
 ) -> list[Course]:
-    """Published courses anyone can browse before enrolling. Filters are discovery aids, not
-    access control — a student not matching any filter can still find and enroll in a course
+    """Published courses anyone can browse before enrolling. The subject filter is a discovery aid, not
+    access control — a student not matching it can still find and enroll in a course
     by browsing without filters; nothing here restricts who may enroll (see enroll_student)."""
     from app.utils.pagination import paginate
 
     stmt = select(Course).where(Course.status == CourseStatus.published)
     if subject:
         stmt = stmt.where(Course.subject == subject)
-    if grade_level:
-        stmt = stmt.where(Course.grade_level == grade_level)
-    if language:
-        stmt = stmt.where(Course.language == language)
-    if institution:
-        stmt = stmt.where(Course.institution == institution)
-    if region:
-        stmt = stmt.where(Course.region == region)
     stmt = stmt.order_by(Course.created_at.desc())
     return paginate(db, stmt, limit=limit, offset=offset)
 
@@ -170,19 +158,11 @@ def create_course(
     description: str | None,
     subject: str | None,
     status: CourseStatus,
-    grade_level: str | None = None,
-    language: str | None = None,
-    institution: str | None = None,
-    region: str | None = None,
 ) -> Course:
     course = Course(
         title=title,
         description=description,
         subject=subject,
-        grade_level=grade_level,
-        language=language,
-        institution=institution,
-        region=region,
         teacher_id=teacher.id,
         status=status,
     )

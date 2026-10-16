@@ -60,10 +60,6 @@ export interface Course {
   lessons_count?: number
   lessons?: Lesson[]
   status: CourseStatus
-  grade_level?: string
-  language?: string
-  institution?: string
-  region?: string
 }
 
 export interface Section {
