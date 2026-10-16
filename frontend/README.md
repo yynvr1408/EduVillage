@@ -1,32 +1,68 @@
-# React + TypeScript + Vite
+# EduVillage frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The EduVillage web app: a React 19 + TypeScript single-page application and progressive web app (installable, works offline) for students, teachers and the administrator. Deployed as static files on Vercel. Project overview: [../README.md](../README.md).
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+React 19, TypeScript, Vite 8, Tailwind CSS v4, React Router 7, TanStack Query, React Hook Form with Zod, Dexie (IndexedDB), `vite-plugin-pwa` (Workbox), LiveKit client and React components, `@livekit/track-processors` (background blur), `jspdf` and `docx` (notes export, loaded only when used), lucide-react icons. Tests: Vitest with Testing Library, Playwright. Lint: oxlint.
 
-## React Compiler
+## Commands
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev                  # http://localhost:5173
+npm run build                # tsc -b && vite build  (output in dist/)
+npm run preview              # serve the production build
+npm test                     # Vitest (unit and component tests)
+npm run lint                 # oxlint
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+npm run test:e2e:offline     # real Chromium, production build, service worker: offline downloads and playback
+npm run test:e2e:layout      # responsive layout at desktop, tablet and phone sizes (API mocked at the network layer)
+npm run test:e2e:real        # real backend + SQLite + built frontend, nothing mocked
+npm run test:e2e:live        # real LiveKit Cloud (needs LIVEKIT_* in backend/.env)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Set `VITE_API_BASE_URL` (default `http://localhost:8000`) when the API is elsewhere. It is the only environment variable the frontend uses and it is public; secrets never belong in a `VITE_` variable. The API lists the frontend's origin in `FRONTEND_ORIGIN`, because sign-in uses a cookie.
+
+## Portals and routes
+
+| Area | Routes |
+|---|---|
+| Public | `/login`, `/login/student`, `/login/teacher`, `/register/student`, `/register/teacher`, `/forgot-password`, `/verify-otp`, `/reset-password` |
+| Student | `/student/dashboard`, `courses`, `courses/:id`, `lessons/:id`, `classes`, `classes/:id/summary`, `recorded-lessons`, `assignments`, `assignments/:id`, `downloads`, `downloads/:id`, `profile` |
+| Teacher | `/teacher/dashboard`, `courses`, `courses/new`, `courses/:id/manage`, `classes`, `classes/new`, `recorded-lessons`, `materials`, `assignments`, `summaries`, `profile` |
+| Live class | `/classroom/:classId` (students and teachers) |
+| Administrator | `/admin` (sign-in and dashboard on one route; not linked anywhere) |
+
+## Source layout
+
+```
+src/
+  pages/        auth, student, teacher, classroom, admin
+  components/   ui (design system), layout, course, class (+ whiteboard), assignment, recording, summary, download
+  context/      AuthContext, NetworkContext, SyncContext
+  services/     apiClient (single transport and view-model mapping), authService, adminApi, registrationApi,
+                courseService, classService, assignmentService, syncManager, downloadEngine, downloadManager, playbackStore, connectivity
+  hooks/        useAdaptiveAudio, useConnectionRecovery, useScreenShares, useBackgroundBlur
+  db/           Dexie schema (drafts, sync queue, downloads, caches)
+  utils/        dates, summaryExport (PDF and Word)
+  routes/       AppRoutes, ProtectedRoute
+  test/         Vitest suites
+e2e-offline/  e2e-layout/  e2e-real/  e2e-live/  e2e/      Playwright suites
+```
+
+## Design system
+
+Teal brand colour `#0F5B57` on warm light surfaces (`#F8FAF7`, borders `#E1E8E4`, text `#202B2A` / `#687775`), Inter typography, shared components in `src/components/ui` (Button, Input, Select, Card, Badge, Dialog, Sheet, EmptyState, ErrorState, LoadingState, Skeleton), minimum 44 px touch targets, visible focus states and layouts that stay inside the viewport from phones to wide desktops.
+
+## Offline-first behaviour
+
+* **Drafts and sync:** assignment answers are saved on the device (IndexedDB) while typing and sent through an idempotent queue when the connection returns; a submission shows as confirmed only after the server accepts it.
+* **Downloads:** recordings and resources download in resumable ranged chunks into IndexedDB and open offline; the Downloads page shows real storage use.
+* **Service worker:** the application shell is precached so any route opens offline; API responses are never cached (private data stays out of the cache).
+* **Connectivity:** the device, the API and the live media connection are tracked separately so guidance matches the real cause; live classes switch to audio-only on a weak link and restore video when it recovers.
+* **Shared devices:** signing out on a shared device clears drafts, the queue, downloads and caches.
+
+## Live classroom
+
+The teacher's camera is a small floating window (drag, enlarge, hide) for the teacher and the students; the teacher can blur their background, open a whiteboard shared over the LiveKit data channel, and share one or several screens. Students see a tab per shared item, can save the whiteboard as an image and receive a late join's full board. Implementation: `pages/classroom/ClassroomPage.tsx`, `components/class/`, `hooks/useScreenShares.ts`, `hooks/useBackgroundBlur.ts`. Details: [../docs/CLASSROOM_AND_COURSE_TOOLS.md](../docs/CLASSROOM_AND_COURSE_TOOLS.md).

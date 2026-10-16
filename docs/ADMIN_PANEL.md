@@ -1,59 +1,58 @@
 # Admin panel and college management
 
-Route: `/admin` (not linked from any page). The SPA rewrite in `frontend/vercel.json` already serves it on direct navigation and refresh.
+The administrator sets up institutions at `/admin` (not linked from any page; the SPA rewrite in `frontend/vercel.json` serves it on direct navigation and refresh). Related: [multi-college support](MULTI_INSTITUTION_AUDIT.md) · [API reference](API_CONTRACTS.md#admin) · [backend setup](BACKEND_SETUP.md) · [README](../README.md).
 
-## Configuration (server-side only)
+## Configuration (server side only)
 
 | Variable | Purpose |
 |---|---|
-| `ADMIN_USERNAME` | Admin sign-in name. Blank = admin login disabled. |
-| `ADMIN_PASSWORD` | Admin password. Hashed with argon2 when the account is created; never stored or logged in plaintext. |
-| `ADMIN_RESET_PASSWORD_ON_START` | `true` for one restart to replace the stored password with `ADMIN_PASSWORD`, then set back to `false`. |
-| `ADMIN_SESSION_TTL_MINUTES` | Admin session lifetime (default 120). |
-| `ADMIN_LOGIN_MAX_ATTEMPTS` | Failed attempts per username / IP per 15 minutes (default 5). |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | the administrator account, created at API start-up (`admin_service.bootstrap_admin`); the password is hashed with argon2 and never stored or logged in plaintext. Blank disables admin sign-in |
+| `ADMIN_RESET_PASSWORD_ON_START` | `true` for one restart replaces the stored password with `ADMIN_PASSWORD`, then set it back to `false` |
+| `ADMIN_SESSION_TTL_MINUTES` | session lifetime (default 120) |
+| `ADMIN_IDLE_TIMEOUT_SECONDS` | idle timeout (default 120) |
+| `ADMIN_LOGIN_MAX_ATTEMPTS` | failed attempts per username and client per 15 minutes (default 5) |
 
-Set them in `backend/.env` locally (gitignored) and in the Render dashboard (`render.yaml` lists the keys with `sync: false`). None of them is a `VITE_` variable and none reaches the frontend bundle.
-The account is created at API start-up (`admin_service.bootstrap_admin`) after `alembic upgrade head`.
+Set them in `backend/.env` locally (git-ignored) and in the hosting dashboard (`render.yaml` lists the keys as `sync: false`). None of them is a `VITE_` variable and none reaches the frontend bundle.
 
 ## Security model
 
-- Separate HttpOnly cookie (`eduvillage_admin_session`), server-side session with expiry and revocation on logout.
-- Every `/api/v1/admin/*` route except login requires a valid admin session whose user has role `admin` (checked on every request). Student/teacher sessions are rejected, and admin sessions are rejected by the student/teacher API.
-- Non-GET admin requests, including login, require the `X-EduVillage-Admin: 1` header (CSRF defence; CORS preflight blocks other origins).
-- Generic login error, constant-time check for unknown usernames, failed-attempt rate limiting (in-process; use a shared store if the API runs on several instances).
-- The admin role cannot be registered or used through `/auth/register`, `/auth/login` or password reset.
+* Its own httpOnly cookie (`eduvillage_admin_session`) and server-side session with expiry, idle timeout and revocation on sign-out.
+* **One active administrator session at a time:** a second sign-in with the correct password is refused while the first session is active; a session idle past the timeout counts as ended, so a forgotten sign-out never locks the administrator out.
+* Every `/api/v1/admin/*` route except sign-in requires a valid administrator session, checked on every request. Student and teacher sessions are rejected there, and an administrator session is rejected by the student and teacher API.
+* Requests that change data (including sign-in) carry the header `X-EduVillage-Admin: 1`; a cross-site form cannot add it and a cross-origin script is stopped by the CORS preflight.
+* Generic sign-in errors, a constant-time check for unknown usernames, and rate limiting of failed attempts.
+* The administrator role cannot be registered, signed in through `/auth/login`, or reset through password recovery, and nobody can self-register with the administrator's own email address. College codes never grant any privilege.
 
-## College codes
+## What the administrator manages
 
-`EV-XXXX-XXXX`, 8 symbols from a 32-symbol alphabet without 0/O/1/I (`secrets`, 40 bits). Unique indexes on the current code and on every retired code; collisions retry. Regenerating keeps the college id and moves the old code to `college_code_history` (never reissued, never resolves). `users.college_id` is nullable and not assigned to anyone; a code only identifies a college (`college_service.resolve_active_college_by_code`) and grants no privilege.
+| Item | Capabilities |
+|---|---|
+| Colleges | create (name required; optional location, contact email and phone), list with search, status filter and pagination, edit, activate or deactivate, copy the code, regenerate the code |
+| College codes | `EV-XXXX-XXXX` from a 32-symbol alphabet without look-alikes (`secrets`, 40 bits); unique across current and retired codes; regenerating retires the old code permanently and keeps every relationship |
+| Branches | add, rename, short code, search, activate or deactivate (with confirmation), per college |
+| Sections | add, rename, search, activate or deactivate (with confirmation), per branch |
+| Overview | total, active and inactive colleges, codes generated |
 
-## Registration with colleges and sections
+Names are unique per parent (case and spacing ignored). Deactivating a college, branch or section removes it from registration without touching existing accounts, assignments or classes. Every change is recorded in the audit log.
 
-- Public, code-free lookups: `GET /api/v1/registration/colleges` (active only) and `GET /api/v1/registration/colleges/{id}/sections` (active sections of an active college).
-- `POST /auth/register` accepts `college_id`, `section_id` and (teachers) `college_code`. Everything is validated before any row is written: college exists and is active, the code matches THAT college's current code (a wrong code and another college's code give the same error; retired codes fail), the section belongs to the college and is active. The role comes from the portal route but is checked server-side; `admin` can never be registered.
-- Stored as `users.college_id` plus a `user_college_sections` row. A college section is NOT a course section: choosing one never enrols a student in a course or gives a teacher access to anyone's course.
-- Administrators manage sections in /admin ("Sections" on each college). `TEACHER_COLLEGE_REQUIRED` (default true) makes the college fields mandatory for teachers; when false the old `TEACHER_INVITE_CODE` gate applies to teacher registrations that send no college.
-- Real end-to-end run (real backend + SQLite + built frontend, no mocks): `npm run test:e2e:real` in `frontend/`.
+## Registration against these records
 
-## Branches, sections and "All Sections"
+* Public lookups (active records only, never including codes): `GET /api/v1/registration/colleges`, `.../colleges/{id}/branches`, `.../branches/{id}/sections`.
+* `POST /auth/register` accepts `college_id`, `branch_id`, `section_id` (or `all_sections` for teachers) and `college_code`. Everything is validated before any record is written: the college is active, the code matches that college's current code (a wrong code and another college's code give the same error; retired codes fail), the branch belongs to the college, the section belongs to the branch, and active status at every level.
+* Stored as `users.college_id` plus a `user_college_sections` row, or a `user_branch_assignments` row for "All Sections". A college section is not a course section: choosing one never enrols a student in a course.
+* `TEACHER_COLLEGE_REQUIRED` and `STUDENT_COLLEGE_REQUIRED` (default true) make these fields mandatory.
 
-Hierarchy: College -> Branch (`college_branches`) -> Section (`college_sections`). A section's `(branch_id, college_id)` is a composite foreign key to the branch, so the database itself refuses a section that names another college. Names are unique per parent (case/spacing-insensitive). Admin endpoints: `GET/POST /admin/colleges/{id}/branches`, `PATCH /admin/branches/{id}`, `POST /admin/branches/{id}/status`, `GET/POST /admin/branches/{id}/sections`, `PATCH /admin/sections/{id}`, `POST /admin/sections/{id}/status`. Public (active only): `GET /registration/colleges/{id}/branches`, `GET /registration/branches/{id}/sections`.
+## Teaching scope and branch-wide classes
 
-Teacher assignment is either one college section (`user_college_sections`) or branch-wide (`user_branch_assignments`, sent as `all_sections: true`; no section row exists for it, and sections added later are covered). Students use the same college -> branch -> section choice but cannot pick "All Sections".
+* A teacher can link a course cohort only to a college section they are assigned to (or any section of their branch for All Sections), and cannot address cohorts outside that scope; a whole-course class is refused if the course contains cohorts outside the teacher's scope.
+* `all_branch_sections: true` (All Sections teachers only) creates one class with a branch audience: enrolled students of that branch see it under **Other Classes**, join the same single LiveKit room, and students of other branches or colleges cannot see or join it. The same check covers the class list, class detail, join tokens, summaries and recordings. `GET /users/me/teaching-scope` reports the caller's scope.
 
-Class targeting (enforced in `teaching_scope_service`, used by `POST /classes` and course-section creation):
-- a course section may carry `college_section_id`; a teacher can link only to a college section they are assigned to / whose branch they cover (unassigned teachers cannot link);
-- a scoped teacher cannot address a cohort linked to another section/branch/college, and a whole-course class is refused if the course contains such cohorts (`SECTION_REQUIRED`);
-- `all_branch_sections: true` (branch-wide teachers only) expands to every course section linked to an ACTIVE section of the branch at that moment;
-- plain cohorts (no link) and unassigned legacy teachers behave exactly as before. Assignments never enrol students: participation still needs course enrollment and cohort membership.
-`GET /users/me/teaching-scope` reports the caller's scope.
+## Second-device sign-in
 
-## Branch-wide classes ("Other Classes")
+Student and teacher accounts already signed in elsewhere cannot be signed in again with the password alone. The correct password returns `202 {otp_required: true}` and a 6-digit code is emailed (EmailJS) to the account's own address; `POST /auth/login/verify-otp` redeems it, ends the other sessions and signs in the device that proved control of the mailbox. The same browser holding the user's valid session, accounts with no active session, and the administrator are unaffected. The approval email can use its own EmailJS template (`EMAILJS_LOGIN_TEMPLATE_ID`, falling back to the password-reset template). Codes last `OTP_TTL_MINUTES` (5), allow `OTP_MAX_ATTEMPTS` (5) tries, are single use and are separate from password-reset codes. `CONCURRENT_LOGIN_OTP=false` switches the rule off. Without EmailJS settings and outside production the code is returned as `dev_otp`.
 
-A teacher assigned to "All Sections" creates a class with `all_branch_sections: true`. It is ONE `classes` row with `audience_branch_id` set to the teacher's branch (no per-section copies, no section list, one LiveKit room). Students see it in the Student Portal under "Other Classes" only when all of these hold: they belong to that branch of that college (via their college section), they pass the normal course-enrollment rule, and the class's teacher is still assigned to all sections of that branch. The same check guards `GET /classes`, `GET /classes/{id}`, the LiveKit join token, summaries and recording access (`WRONG_BRANCH` / 404 for others). Section-specific classes and teachers are unchanged. Migration `e6a0ffee0005` adds the nullable column.
+Session lifetime: `SESSION_TTL_HOURS` = 72 for students and teachers.
 
-## Second-device sign-in (emailed OTP)
+## Tests
 
-Student and teacher accounts that are already signed in somewhere cannot be signed in again with the password alone. `POST /auth/login` with the correct password answers `202 {otp_required: true}` and issues no session; a six-digit code is emailed (EmailJS) to the account's own address. `POST /auth/login/verify-otp {email, otp}` redeems it, ends the account's other sessions and starts the session for the device that proved mailbox control. Same browser holding the user's valid session, no active session, expired sessions and administrators are not affected. Codes expire after `OTP_TTL_MINUTES` (5), allow `OTP_MAX_ATTEMPTS` (5) tries, are single use, are superseded by a newer code, and are separate from password-reset codes (`purpose = login_approval`). `CONCURRENT_LOGIN_OTP=false` switches the rule off. In production with EmailJS unconfigured the rule is skipped (a code could not be delivered; failing closed would lock users out); outside production with no email configured the code is returned as `dev_otp`.
-
-Session lifetime: `SESSION_TTL_HOURS` = 72 hours (absolute, from sign-in) for students and teachers; `ADMIN_SESSION_TTL_MINUTES` = 120 for the administrator.
+`backend/tests/api/test_admin.py`, `test_college_registration.py`, `test_branches.py`, `test_other_classes.py`, `test_login_otp.py`; `frontend/src/test/admin_panel.test.tsx`, `register_college.test.tsx`, `other_classes.test.tsx`; browser: `e2e-layout/admin.spec.ts` (responsive) and the real-stack `e2e-real/` suite (admin builds a college, people register, branch-wide classes appear). Run the real-stack suite with `npm run test:e2e:real` in `frontend/`.

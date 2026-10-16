@@ -22,7 +22,7 @@ The browser downloads static files from Vercel and then talks to the API **direc
 |---|---|---|---|---|---|---|---|---|---|---|
 | Frontend | **Vercel** | Static React 19 / Vite 8 PWA; no server functions, no edge functions, no Next.js | Vercel | UNKNOWN (account not accessible) | Hobby: 100 GB transfer, 1M requests (non-commercial) | Pro $20/month | Bandwidth, requests | Hobby is non-commercial; one CORS origin means Vercel **preview** URLs cannot call the API | `frontend/vercel.json`, `frontend/package.json`, `backend/app/main.py` (CORS) | Move to Pro before a college pilot; add preview origins only if previews are used |
 | Backend API | **Render** (Docker) | FastAPI 0.143 modular monolith, `uvicorn` 1 worker, migrations in the container start command | Render | `free` (per `render.yaml`) | 750 h/month, spins down after 15 min, ephemeral disk, 1 instance | Starter $7 / Standard $25 / Pro $85 | Instance-hours, CPU, memory, bandwidth | Cold start ~1 min; one instance only; CPU/memory too small for ffmpeg + API together | `render.yaml`, `backend/Dockerfile`, deploy logs supplied by the owner | First upgrade: Standard instance (see roadmap) |
-| Database | **Neon** PostgreSQL 18.6 | SQLAlchemy 2 + Alembic, 32 tables | Neon (AWS; region UNKNOWN) | UNKNOWN (assumed Free) | 1 GB, 100 CU-hours, 6 h restore | Launch / Scale pay-as-you-go | Storage, CU-hours, connections | Suspends after 5 min idle; only 6 h of restore history; pool settings are SQLAlchemy defaults | `backend/app/db/session.py`; read-only inspection: 9.6 MB | Add `pool_pre_ping`, paid plan with 7-day restore at pilot |
+| Database | **Neon** PostgreSQL 18.6 | SQLAlchemy 2 + Alembic, 33 tables | Neon (AWS; region UNKNOWN) | UNKNOWN (assumed Free) | 1 GB, 100 CU-hours, 6 h restore | Launch / Scale pay-as-you-go | Storage, CU-hours, connections | Suspends after 5 min idle; only 6 h of restore history; pool settings are SQLAlchemy defaults | `backend/app/db/session.py`; read-only inspection: 9.6 MB | Add `pool_pre_ping`, paid plan with 7-day restore at pilot |
 | Live classes | **LiveKit Cloud** | Token issuance, room-composite Egress to R2, signed webhook | LiveKit Cloud (domain `livekit.cloud`) | UNKNOWN (assumed Build) | 5,000 min, 100 concurrent, 60 egress min | Ship $50, Scale $500 | Participant-minutes, concurrent connections, egress minutes, GB | 60 recorded minutes/month on free; **video** egress | `backend/app/integrations/livekit.py`, `frontend/e2e-live` | Ship before recording regularly |
 | Recording / uploads | **Cloudflare R2** | S3-compatible via boto3, presigned PUT/GET | Cloudflare | UNKNOWN (assumed free) | 10 GB, 1M Class A, 10M Class B, free egress | $0.015/GB-month | GB stored, operations | Not verified against real R2 in tests (moto emulator) except the owner's real-service runs | `backend/app/integrations/object_storage.py`, `docs/RECORDING_VERIFICATION.md` | Add a retention policy |
 | OTP email | **EmailJS** (REST, server-side via httpx) | OTP for password reset and second-device sign-in | EmailJS | UNKNOWN; **not configured locally** | 200 requests/month, 1 request/s | Personal $9 .. Business $40 | Requests/month | Quota and rate far below a college's login volume at scale | `backend/app/integrations/email.py`, `backend/app/config.py` | Confirm free-plan server-side policy; budget Personal at pilot |
@@ -36,7 +36,7 @@ The browser downloads static files from Vercel and then talks to the API **direc
 |---|---|---|
 | 1 | Frontend framework / build | React 19 + TypeScript, Vite 8, Tailwind v4, TanStack Query, Dexie, `vite-plugin-pwa`; `npm run build` = `tsc -b && vite build`. Built output is about 1.4 MB (`frontend/dist`). |
 | 2 | Vercel architecture | **Static SPA only.** `vercel.json` has one rewrite (`/(.*)` -> `/index.html`). No serverless/edge functions, no image optimisation, no SSR. Registered-user growth therefore does not create function costs; only bandwidth and requests count. |
-| 3 | Backend framework | FastAPI (one modular monolith; 111 API operations under `/api/v1`, plus `/health`, `/ready`). |
+| 3 | Backend framework | FastAPI (one modular monolith; 124 API operations under `/api/v1`, plus `/health`, `/ready`; see [API_CONTRACTS.md](API_CONTRACTS.md)). |
 | 4 | Backend host | **Render**, Docker web service (`render.yaml`; owner-supplied deploy logs show Render building the image and running Alembic). Plan assumed `free`. |
 | 5 | PostgreSQL provider | **Neon** (host `*.neon.tech`; PostgreSQL 18.6). |
 | 6 | Connection / pooling | `create_engine` with defaults (SQLAlchemy QueuePool: 5 + 10 overflow), no `pool_pre_ping`, no explicit pooler setting. Whether the Neon pooled endpoint is used is UNKNOWN. |
@@ -48,7 +48,7 @@ The browser downloads static files from Vercel and then talks to the API **direc
 | 12 | Recording / storage | LiveKit Egress writes MP4 straight to R2; the API finalises by `HEAD`; playback and downloads use presigned URLs. Local-disk storage exists for development only. |
 | 13 | Ephemeral local storage | **Yes on Render free** (filesystem is ephemeral), which is why `STORAGE_BACKEND=s3` is required in production. SQLite files exist only for development (`*.db` is git-ignored). |
 | 14 | Background work in request handlers | **Yes.** Transcription / summary jobs start through FastAPI `BackgroundTasks` inside the API process, including ffmpeg chunking. A standalone worker (`python -m app.worker`) exists but **is not deployed** (`render.yaml` has no worker). |
-| 15 | Safe with several instances | **Partially.** Sessions, jobs (atomic claims) and idempotent sync are database-backed. Not safe/accurate: login, admin and OTP **rate limits are in process memory** (limits multiply with instances); migrations run in every container start (concurrent boots race); BackgroundTasks jobs stranded on a restart need the undeployed worker. |
+| 15 | Safe with several instances | **Partially.** Sessions (including the administrator's single active session and idle timeout), jobs (atomic claims) and idempotent sync are database-backed. Not safe/accurate: login, admin and OTP **rate limits are in process memory** (limits multiply with instances); migrations run in every container start (concurrent boots race); BackgroundTasks jobs stranded on a restart need the undeployed worker. |
 | 16 | Institution-level access enforced by backend | **Partially.** Registration validates college, code, branch, section server-side; branch-wide classes are restricted to students of that branch (list, detail, token, recordings); teacher class targeting is limited to the assigned section/branch. **Courses and the catalogue are not scoped to a college**, there is no institution-administrator role and no membership approval workflow. |
 | 17 | Schema fit for multi-institution | Adequate (colleges -> branches -> sections, composite foreign key, unique names per parent, 48 indexes). Courses lack `college_id`; audit events lack an institution column. |
 | 18 | Hard quotas / usage billing | Yes: LiveKit minutes and egress, Neon CU-hours/storage, EmailJS requests, Groq tokens/audio, Vercel bandwidth, Render hours/bandwidth. See cost model. |
@@ -85,10 +85,23 @@ These are planning ranges, not capacity guarantees. Capacity must be **measured*
 
 | Category | Items |
 |---|---|
-| **Verified by tests that were run** | Auth, sessions, OTP flows, admin panel, colleges/branches/sections, registration validation, branch-wide classes and join-token authorisation, recording lifecycle and signed playback against an S3 emulator, offline sync and downloads, layout. Backend 387+ tests on SQLite and PostgreSQL 18; frontend 156 unit tests; real-browser suites. |
+| **Verified by tests that were run** | Auth, sessions, OTP flows, admin panel, colleges/branches/sections, registration validation, branch-wide classes and join-token authorisation, recording lifecycle and signed playback against an S3 emulator, offline sync and downloads, layout. Backend 421 tests on SQLite and 422 on PostgreSQL 18; frontend 179 unit tests; real-browser suites. |
 | **Verified against real external services by the owner or by an e2e suite** | LiveKit Cloud signalling with several students (`e2e-live`, not media content); Neon connectivity and schema (read-only inspection in this audit). |
 | **Implemented, not verified in production** | EmailJS delivery, Groq summaries/transcription on Render, R2 recording end to end on production, Vercel-to-Render cookie flow (`SameSite=None`). |
 | **Configured, not deployed** | Standalone worker (`app.worker`); FreeLLMAPI local proxy. |
 | **Planned / missing** | CI workflows, error tracking, usage alerts, staging environment, institution administrators and membership approval, college scoping of courses, audio-only recording, shared rate limiter, load-test results. |
 | **Assumed (cost model)** | MAU shares, concurrency shares, minutes per user, 40 requests/s per instance, CU sizing, recording size and retention. |
 | **Unknown** | Vercel / Render / Neon / LiveKit actual plans and usage; Neon pooler limits; production latency and error rate. |
+
+## 7. Newer features and their effect on scaling
+
+| Feature | Where it runs | Scaling effect |
+|---|---|---|
+| Whiteboard | LiveKit data channel (a few hundred bytes per stroke, sent in batches about 16 times a second while drawing) | no API load; works in audio-only mode; no storage |
+| Screen sharing (one or several screens) | LiveKit media tracks | counts as participant minutes and downstream bandwidth like video |
+| Teacher background blur | the teacher's browser (segmentation model fetched from a CDN once) | no server cost |
+| Assignment files (PDF, DOC, DOCX; 5 files of 20 MB at most) | direct browser-to-R2 uploads with presigned URLs, then a size and content check by the API | R2 storage and operations only; the API never carries the file bytes |
+| Lecture notes as PDF or Word | generated in the browser | no server cost |
+| Syllabus PDF import | the API reads the PDF text (10 MB at most, 100 pages) and proposes lessons | a short CPU burst per import; nothing stored |
+| Second-device sign-in code | one EmailJS request per second-device sign-in | adds to the email volume used in the cost model |
+| Administrator single session | `user_sessions.last_seen_at` updated on admin requests | one row per admin session |

@@ -37,6 +37,8 @@ Each simulated user also generates the **`GET /health` heartbeat every 15 s** th
 | Teacher actions | create course / class / section | Low volume |
 | Admin | `/admin/colleges`, `/admin/overview` | Low volume |
 | Password recovery | `POST /auth/forgot-password`, `POST /auth/verify-reset-otp` | Rate-limited by design |
+| Assignment files | `POST /assignments/{id}/attachments`, direct upload to storage, `.../complete`, `.../download` | Upload bytes go to R2, not the API; measure the init/complete calls and the size/content check |
+| Syllabus import | `POST /courses/{id}/syllabus/preview-pdf`, `POST /courses/{id}/lessons/bulk` | PDF parsing is the CPU cost |
 
 ## 4. Scenarios
 
@@ -47,7 +49,8 @@ Each simulated user also generates the **`GET /health` heartbeat every 15 s** th
 5. **Cold start**: stop traffic for 20 minutes (Render free and Neon free both suspend), then measure first-request latency and error rate.
 6. **Background load**: while the ramp runs, process a recording through the transcription pipeline with a synthetic 60-minute audio file to measure the effect of ffmpeg and Whisper/LLM calls on API latency (use the stub provider or a capped test key).
 7. **Live class join**: use real browsers or the LiveKit load-test tooling against the **test** LiveKit project to measure join success and time-to-first-frame at 10, 25, 50, 100 participants; record participant-minutes consumed (so the test does not exhaust the plan).
-8. **Failure injection**: kill the API mid-job, then verify that stranded jobs are recovered by `python -m app.worker --once`; revoke the database connection and verify graceful errors.
+8. **Classroom tools**: with the test LiveKit project, one teacher drawing continuously on the whiteboard while 25, 50 and 100 students watch; record message delivery delay and that a student joining late receives the full board; add one and then several shared screens and record participant-minutes and downstream GB consumed.
+9. **Failure injection**: kill the API mid-job, then verify that stranded jobs are recovered by `python -m app.worker --once`; revoke the database connection and verify graceful errors.
 
 ## 5. Metrics to record
 

@@ -10,7 +10,7 @@ Principles: the frontend **stays on Vercel**; upgrade **one component at a time,
 |---|---|---|---|
 | 0.1 | **Rotate the admin password.** The real admin credentials were committed to `backend/.env.example` (commit `3b47ed2`) and are in public git history. Blank the file (done in the working tree), set a new `ADMIN_PASSWORD` in the Render dashboard, set `ADMIN_RESET_PASSWORD_ON_START=true` for one restart, then back to `false`. Consider rewriting history only if the repository is public and policy requires it. | Credential exposure | **Open** |
 | 0.2 | Use a **separate development database** (a second Neon project) so a developer's local run can never touch production. | An uncommitted migration reached the shared database during this project | **Open** |
-| 0.3 | Keep a **single Alembic head**; migrations now include `815ac36126a9` before `e6a0ffee0005`. | Two heads break `alembic upgrade head` on deploy | Done in the working tree, needs to be pushed |
+| 0.3 | Keep a **single Alembic head**; migrations now include `815ac36126a9` before `e6a0ffee0005`. | Two heads break `alembic upgrade head` on deploy | Done (migration chain is linear; `alembic heads` shows one head) |
 | 0.4 | Confirm EmailJS delivery of the OTP from the **deployed** backend (`EMAILJS_*` set on Render). | Password recovery and second-device sign-in depend on it | Open |
 
 ## Stage 1 - MVP (about 100 registered users)

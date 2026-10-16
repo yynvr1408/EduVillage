@@ -1,166 +1,207 @@
-# API Contracts
+# API reference
 
-Everything below is **implemented** and appears in the generated OpenAPI document (`GET /openapi.json`, browsable at `/docs`). 83 operations (including `/health` and `/ready`). Interactive truth beats this file: if they disagree, `/openapi.json` wins.
+Generated from the running application by `backend/scripts/generate_docs.py`; do not edit by hand. Interactive documentation is served by the backend at `/docs` (Swagger) and `/openapi.json`.
 
-## Conventions
+124 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
 
-- **Base URL**: `http://localhost:8000`; all application routes are under `/api/v1`. `GET /health` and `GET /ready` are unversioned.
-- **Authentication**: an httpOnly session cookie (`eduvillage_session`) set by `POST /auth/register` and `POST /auth/login`. Browsers must send credentials (`fetch(..., { credentials: "include" })`). There is no bearer token. Sessions are stored hashed server-side and can be revoked (`POST /auth/logout`, `DELETE /users/me/sessions/{id}`, `POST /users/me/sessions/revoke-all`, password reset). The cookie is `SameSite=Lax`, `HttpOnly`, and `Secure` in production.
-- **Authorization** is enforced in services, never from client-supplied roles or ids:
-  - *Teacher on a course* = course owner or an added co-teacher. Nothing is automatic for other teachers.
-  - *Coursework* (assignments, resources, class join, summaries, recordings) requires **enrollment** for students; a published course is only a title/description/lesson-list preview.
-  - Sections narrow access further when a class, recording or resource is section-scoped.
-- **Pagination**: `limit` (default 50, max 200) and `offset` on list endpoints that accept them.
-- **Errors** always have this shape (also for validation errors, `422`):
+**Authentication.** Students and teachers authenticate with an httpOnly session cookie (`eduvillage_session`). The administrator uses a separate cookie (`eduvillage_admin_session`) and must send `X-EduVillage-Admin: 1` on every request that changes data. "public" means no session is required.
 
-```json
-{ "error": { "code": "ASSIGNMENT_CLOSED", "message": "...", "request_id": "uuid", "details": {} } }
-```
 
-Common codes: `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND` 404 (also used instead of 403 when revealing existence would leak, e.g. a student asking for a private recording), `CONFLICT` 409, `VALIDATION_FAILED` 422, `SERVICE_UNAVAILABLE` 503, plus the feature codes below.
+## admin
 
-## Operations
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/admin/auth/login` | public | admin login |
+| POST | `/api/v1/admin/auth/logout` | administrator session | admin logout |
+| GET | `/api/v1/admin/auth/me` | administrator session | admin me |
+| PATCH | `/api/v1/admin/branches/{branch_id}` | administrator session | update branch |
+| GET | `/api/v1/admin/branches/{branch_id}/sections` | administrator session | list branch sections |
+| POST | `/api/v1/admin/branches/{branch_id}/sections` | administrator session | create branch section |
+| POST | `/api/v1/admin/branches/{branch_id}/status` | administrator session | change branch status |
+| GET | `/api/v1/admin/colleges` | administrator session | list colleges |
+| POST | `/api/v1/admin/colleges` | administrator session | create college |
+| GET | `/api/v1/admin/colleges/{college_id}` | administrator session | get college |
+| PATCH | `/api/v1/admin/colleges/{college_id}` | administrator session | update college |
+| GET | `/api/v1/admin/colleges/{college_id}/branches` | administrator session | list branches |
+| POST | `/api/v1/admin/colleges/{college_id}/branches` | administrator session | create branch |
+| POST | `/api/v1/admin/colleges/{college_id}/regenerate-code` | administrator session | regenerate code |
+| POST | `/api/v1/admin/colleges/{college_id}/status` | administrator session | change status |
+| GET | `/api/v1/admin/overview` | administrator session | overview |
+| PATCH | `/api/v1/admin/sections/{section_id}` | administrator session | update college section |
+| POST | `/api/v1/admin/sections/{section_id}/status` | administrator session | change section status |
 
-| Method | Path | Success | Response model | Tag |
-|---|---|---|---|---|
-| `GET` | `/api/v1/assignments` | 200 | list of AssignmentOut | assignments |
-| `POST` | `/api/v1/assignments` | 201 | AssignmentOut | assignments |
-| `GET` | `/api/v1/assignments/{assignment_id}` | 200 | AssignmentOut | assignments |
-| `PATCH` | `/api/v1/assignments/{assignment_id}` | 200 | AssignmentOut | assignments |
-| `GET` | `/api/v1/assignments/{assignment_id}/submissions` | 200 | list of SubmissionOut | assignments |
-| `GET` | `/api/v1/assignments/{assignment_id}/submissions/me` | 200 | SubmissionOut | assignments |
-| `PUT` | `/api/v1/assignments/{assignment_id}/submissions/me` | 200 | SubmissionOut | assignments |
-| `POST` | `/api/v1/auth/forgot-password` | 202 | - | auth |
-| `POST` | `/api/v1/auth/login` | 200 | AuthResponse | auth |
-| `POST` | `/api/v1/auth/logout` | 204 | - | auth |
-| `POST` | `/api/v1/auth/register` | 201 | AuthResponse | auth |
-| `POST` | `/api/v1/auth/reset-password` | 204 | - | auth |
-| `GET` | `/api/v1/classes` | 200 | list of ClassOut | classes |
-| `POST` | `/api/v1/classes` | 201 | ClassOut | classes |
-| `GET` | `/api/v1/classes/recordings/{recording_id}/download` | 200 | - | classes |
-| `GET` | `/api/v1/classes/{class_id}` | 200 | ClassOut | classes |
-| `PATCH` | `/api/v1/classes/{class_id}` | 200 | ClassOut | classes |
-| `POST` | `/api/v1/classes/{class_id}/end` | 200 | ClassOut | classes |
-| `POST` | `/api/v1/classes/{class_id}/join-token` | 200 | JoinTokenResponse | classes |
-| `GET` | `/api/v1/classes/{class_id}/participants` | 200 | list of ParticipantOut | classes |
-| `GET` | `/api/v1/classes/{class_id}/recordings` | 200 | list of RecordingOut | classes |
-| `POST` | `/api/v1/classes/{class_id}/recordings/start` | 201 | RecordingOut | classes |
-| `POST` | `/api/v1/classes/{class_id}/recordings/{recording_id}/stop` | 200 | RecordingOut | classes |
-| `POST` | `/api/v1/classes/{class_id}/start` | 200 | ClassOut | classes |
-| `GET` | `/api/v1/classes/{class_id}/summary` | 200 | SummaryOut | summaries |
-| `POST` | `/api/v1/classes/{class_id}/summary-jobs` | 202 | SummaryJobOut | summaries |
-| `GET` | `/api/v1/courses` | 200 | list of CourseOut | courses |
-| `POST` | `/api/v1/courses` | 201 | CourseOut | courses |
-| `GET` | `/api/v1/courses/catalog` | 200 | list of CourseOut | courses |
-| `GET` | `/api/v1/courses/{course_id}` | 200 | CourseOut | courses |
-| `PATCH` | `/api/v1/courses/{course_id}` | 200 | CourseOut | courses |
-| `GET` | `/api/v1/courses/{course_id}/enrollments` | 200 | list of EnrollmentOut | courses |
-| `POST` | `/api/v1/courses/{course_id}/enrollments` | 201 | EnrollmentOut | courses |
-| `GET` | `/api/v1/courses/{course_id}/lessons` | 200 | list of LessonOut | courses |
-| `POST` | `/api/v1/courses/{course_id}/lessons` | 201 | LessonOut | courses |
-| `GET` | `/api/v1/courses/{course_id}/resources` | 200 | list of ResourceOut | resources |
-| `GET` | `/api/v1/courses/{course_id}/sections` | 200 | list of SectionOut | sections |
-| `POST` | `/api/v1/courses/{course_id}/sections` | 201 | SectionOut | sections |
-| `GET` | `/api/v1/courses/{course_id}/teachers` | 200 | list of CoTeacherOut | courses |
-| `POST` | `/api/v1/courses/{course_id}/teachers` | 201 | CoTeacherOut | courses |
-| `DELETE` | `/api/v1/courses/{course_id}/teachers/{teacher_id}` | 204 | - | courses |
-| `GET` | `/api/v1/jobs/{job_id}` | 200 | JobStatusOut | summaries |
-| `GET` | `/api/v1/lessons/{lesson_id}` | 200 | LessonOut | courses |
-| `PATCH` | `/api/v1/lessons/{lesson_id}` | 200 | LessonOut | courses |
-| `GET` | `/api/v1/recordings` | 200 | list of RecordingLibraryItem | recordings |
-| `DELETE` | `/api/v1/recordings/{recording_id}` | 204 | - | recordings |
-| `GET` | `/api/v1/recordings/{recording_id}` | 200 | RecordingDetail | recordings |
-| `GET` | `/api/v1/recordings/{recording_id}/playback` | 200 | PlaybackOut | recordings |
-| `POST` | `/api/v1/recordings/{recording_id}/progress` | 200 | ProgressOut | recordings |
-| `POST` | `/api/v1/recordings/{recording_id}/publish` | 200 | RecordingLibraryItem | recordings |
-| `POST` | `/api/v1/recordings/{recording_id}/sections` | 201 | RecordingLibraryItem | recordings |
-| `DELETE` | `/api/v1/recordings/{recording_id}/sections/{section_id}` | 204 | - | recordings |
-| `POST` | `/api/v1/recordings/{recording_id}/summary-jobs` | 202 | SummaryJobOut | recordings |
-| `GET` | `/api/v1/resources/download-content/{storage_key}` | 200 | - | resources |
-| `PUT` | `/api/v1/resources/upload-content/{storage_key}` | 204 | - | resources |
-| `POST` | `/api/v1/resources/upload-init` | 200 | UploadInitResponse | resources |
-| `DELETE` | `/api/v1/resources/{resource_id}` | 204 | - | resources |
-| `GET` | `/api/v1/resources/{resource_id}` | 200 | ResourceOut | resources |
-| `POST` | `/api/v1/resources/{resource_id}/complete` | 200 | ResourceOut | resources |
-| `GET` | `/api/v1/resources/{resource_id}/download` | 200 | - | resources |
-| `POST` | `/api/v1/resources/{resource_id}/sections` | 201 | ResourceOut | resources |
-| `DELETE` | `/api/v1/resources/{resource_id}/sections/{section_id}` | 204 | - | resources |
-| `GET` | `/api/v1/sections/{section_id}/members` | 200 | list of SectionMemberOut | sections |
-| `POST` | `/api/v1/sections/{section_id}/members` | 201 | SectionMemberOut | sections |
-| `DELETE` | `/api/v1/sections/{section_id}/members/{student_id}` | 204 | - | sections |
-| `GET` | `/api/v1/sections/{section_id}/resources` | 200 | list of ResourceOut | resources |
-| `GET` | `/api/v1/student/dashboard` | 200 | StudentDashboardOut | dashboard |
-| `GET` | `/api/v1/summaries` | 200 | list of SummaryOut | summaries |
-| `PATCH` | `/api/v1/summaries/{summary_id}` | 200 | SummaryOut | summaries |
-| `POST` | `/api/v1/summaries/{summary_id}/approve` | 200 | SummaryOut | summaries |
-| `POST` | `/api/v1/summaries/{summary_id}/request-changes` | 200 | SummaryOut | summaries |
-| `POST` | `/api/v1/sync/operations` | 200 | SyncBatchResponse | synchronization |
-| `GET` | `/api/v1/sync/operations/{operation_id}` | 200 | SyncOperationResult | synchronization |
-| `GET` | `/api/v1/sync/pending` | 200 | list of SyncOperationResult | synchronization |
-| `GET` | `/api/v1/teacher/dashboard` | 200 | TeacherDashboardOut | dashboard |
-| `GET` | `/api/v1/users/me` | 200 | UserOut | users |
-| `PATCH` | `/api/v1/users/me` | 200 | UserOut | users |
-| `GET` | `/api/v1/users/me/sessions` | 200 | list of SessionOut | users |
-| `POST` | `/api/v1/users/me/sessions/revoke-all` | 200 | RevokeAllResponse | users |
-| `DELETE` | `/api/v1/users/me/sessions/{session_id}` | 204 | - | users |
-| `POST` | `/api/v1/webhooks/livekit` | 200 | - | webhooks |
-| `GET` | `/health` | 200 | - |  |
-| `GET` | `/ready` | 200 | - |  |
+## assignments
 
-Every operation except `/health`, `/ready`, `POST /auth/register|login|forgot-password|reset-password` and `POST /webhooks/livekit` requires a valid session (401 otherwise). `POST /webhooks/livekit` is authenticated by LiveKit's signed JWT instead of a session.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/assignments` | signed-in user | list assignments |
+| POST | `/api/v1/assignments` | signed-in user | create assignment |
+| PUT | `/api/v1/assignments/attachments/upload-content/{storage_key:path}` | signed-in user | Local-storage upload target for submission files (S3/R2 uploads go straight to the presigned URL). |
+| GET | `/api/v1/assignments/{assignment_id}` | signed-in user | get assignment |
+| PATCH | `/api/v1/assignments/{assignment_id}` | signed-in user | update assignment |
+| GET | `/api/v1/assignments/{assignment_id}/attachments` | signed-in user | The caller's own attached files (a student sees theirs; teachers read files through the submissions list). |
+| POST | `/api/v1/assignments/{assignment_id}/attachments` | signed-in user | init attachment |
+| DELETE | `/api/v1/assignments/{assignment_id}/attachments/{attachment_id}` | signed-in user | delete attachment |
+| POST | `/api/v1/assignments/{assignment_id}/attachments/{attachment_id}/complete` | signed-in user | complete attachment |
+| GET | `/api/v1/assignments/{assignment_id}/attachments/{attachment_id}/download` | signed-in user | download attachment |
+| GET | `/api/v1/assignments/{assignment_id}/submissions` | signed-in user | list submissions |
+| GET | `/api/v1/assignments/{assignment_id}/submissions/me` | signed-in user | get my submission |
+| PUT | `/api/v1/assignments/{assignment_id}/submissions/me` | signed-in user | save my submission |
 
-## Feature contracts
+## auth
 
-### Registration
-`POST /auth/register` body: `{ full_name, email, password (8+), role: "student"|"teacher", invite_code? }`.
-`role: "teacher"` requires `invite_code` equal to the server's `TEACHER_INVITE_CODE`, otherwise `403 INVALID_INVITE_CODE`. If that variable is unset: allowed outside production, `403 TEACHER_REGISTRATION_CLOSED` in production. Rate limited: `429 RATE_LIMITED`.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/auth/forgot-password` | public | forgot password |
+| POST | `/api/v1/auth/login` | public | login |
+| POST | `/api/v1/auth/login/verify-otp` | public | verify login otp |
+| POST | `/api/v1/auth/logout` | signed-in user | logout |
+| POST | `/api/v1/auth/register` | public | register |
+| POST | `/api/v1/auth/reset-password` | public | reset password |
+| POST | `/api/v1/auth/verify-reset-otp` | public | verify reset otp |
 
-### Courses and sections
-- `GET /courses` — my courses (students: enrolled; teachers: owned + co-taught). `GET /courses/catalog` — published courses to browse. `POST /courses/{id}/enrollments` with `{}` self-enrolls a student in a **published** course.
-- `POST /courses/{id}/sections` `{name, code}` (course teachers; code unique per course and upper-cased → `409 SECTION_CODE_TAKEN`).
-- `POST /sections/{id}/members` `{student_id}` (course teachers; the student must already be enrolled → `409 NOT_ENROLLED`; duplicate → `409 ALREADY_MEMBER`). `GET /courses/{id}/sections`: teachers see all, a student sees only their own.
-- `POST /classes?course_id=` body `{title, scheduled_start, scheduled_end?, section_ids?: []}`. Empty `section_ids` = the whole course. Sections must belong to the class's course (`422 INVALID_SECTION`). A student outside the class's sections gets `403 WRONG_SECTION`.
+## classes
 
-### Live classes
-`POST /classes/{id}/start` (teachers; creates the LiveKit room), `POST /classes/{id}/end` (also stops any active recording), `POST /classes/{id}/join-token` → `{ livekit_url, token, room_name, can_publish, recording_active }`. The token is a short-lived LiveKit JWT scoped to the room; only course teachers get `can_publish`. Not live → `409`; LiveKit unconfigured → `503 LIVEKIT_NOT_CONFIGURED`. The backend never proxies media.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/classes` | signed-in user | list classes |
+| POST | `/api/v1/classes` | signed-in user | create class |
+| GET | `/api/v1/classes/recordings/{recording_id}/download` | signed-in user | Kept for existing clients; same authorization + signed URL as /recordings/{id}/playback. |
+| GET | `/api/v1/classes/{class_id}` | signed-in user | get class |
+| PATCH | `/api/v1/classes/{class_id}` | signed-in user | update class |
+| POST | `/api/v1/classes/{class_id}/cancel` | signed-in user | cancel class |
+| POST | `/api/v1/classes/{class_id}/end` | signed-in user | end class |
+| POST | `/api/v1/classes/{class_id}/join-token` | signed-in user | join token |
+| GET | `/api/v1/classes/{class_id}/participants` | signed-in user | list participants |
+| POST | `/api/v1/classes/{class_id}/participants/{student_id}/remove` | signed-in user | remove participant |
+| GET | `/api/v1/classes/{class_id}/recordings` | signed-in user | list recordings |
+| POST | `/api/v1/classes/{class_id}/recordings/start` | signed-in user | start recording |
+| POST | `/api/v1/classes/{class_id}/recordings/{recording_id}/stop` | signed-in user | stop recording |
+| POST | `/api/v1/classes/{class_id}/start` | signed-in user | start class |
 
-### Recording lifecycle
+## courses
 
-| Step | Endpoint | Rules |
-|---|---|---|
-| Start | `POST /classes/{id}/recordings/start` | course teacher; class must be live (`409 CLASS_NOT_LIVE`); already recording → `409 ALREADY_RECORDING`; `RECORDING_ENABLED=false` → `403 RECORDING_DISABLED`; needs `STORAGE_BACKEND=s3` plus LiveKit, else `503 RECORDING_NOT_CONFIGURED` |
-| Stop | `POST /classes/{id}/recordings/{rid}/stop` | idempotent; status → `processing` |
-| Provider result | `POST /webhooks/livekit` (`egress_ended`) | signature verified; `available` only if the object exists in storage, else `failed` |
-| Library | `GET /recordings?course_id=&section_id=` | teachers: recordings of courses they teach (all states). Students: only `available` **and** published recordings they are allowed to see |
-| Detail | `GET /recordings/{id}` | metadata, `has_transcript`, summary id/status (students see a summary only once approved), transcript when allowed, progress |
-| Playback | `GET /recordings/{id}/playback` → `{ url, expires_in, method }` | re-authorized on every call; signed URL, TTL `SIGNED_URL_TTL_SECONDS`; `409 RECORDING_NOT_READY / RECORDING_FAILED / RECORDING_ARCHIVED`, `404 RECORDING_MEDIA_MISSING` |
-| Publish | `POST /recordings/{id}/publish` `{published}` | course teacher; only a ready recording can be published |
-| Share | `POST /recordings/{id}/sections` `{section_id}` / `DELETE .../{section_id}` | the teacher must teach the recording's course **and** the target section's course; idempotent; delete removes only that association |
-| Progress | `POST /recordings/{id}/progress` `{position_seconds, completed}` | per user |
-| Delete | `DELETE /recordings/{id}` | removes the media, keeps the row as `archived` |
-| Transcribe + summarize | `POST /recordings/{id}/summary-jobs` | course teacher; the recording must be ready |
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/courses` | signed-in user | list courses |
+| POST | `/api/v1/courses` | signed-in user | create course |
+| GET | `/api/v1/courses/catalog` | signed-in user | Published courses a student can browse and then self-enroll in. |
+| DELETE | `/api/v1/courses/{course_id}` | signed-in user | Permanently deletes an empty, untouched draft; archives (never destroys) anything with |
+| GET | `/api/v1/courses/{course_id}` | signed-in user | get course |
+| PATCH | `/api/v1/courses/{course_id}` | signed-in user | update course |
+| POST | `/api/v1/courses/{course_id}/archive` | signed-in user | Explicit archive: out of the catalog and self-enrolment, nothing deleted, reversible with /restore. |
+| GET | `/api/v1/courses/{course_id}/enrollments` | signed-in user | list enrollments |
+| POST | `/api/v1/courses/{course_id}/enrollments` | signed-in user | create enrollment |
+| GET | `/api/v1/courses/{course_id}/lessons` | signed-in user | list lessons |
+| POST | `/api/v1/courses/{course_id}/lessons` | signed-in user | create lesson |
+| POST | `/api/v1/courses/{course_id}/lessons/bulk` | signed-in user | create lessons bulk |
+| POST | `/api/v1/courses/{course_id}/restore` | signed-in user | Reverts an archive (back to published). |
+| POST | `/api/v1/courses/{course_id}/syllabus/preview` | signed-in user | Proposes lessons from pasted text. Saves nothing. |
+| POST | `/api/v1/courses/{course_id}/syllabus/preview-pdf` | signed-in user | Proposes lessons from an uploaded syllabus PDF (text PDFs only). Saves nothing. |
+| GET | `/api/v1/courses/{course_id}/teachers` | signed-in user | list co teachers |
+| POST | `/api/v1/courses/{course_id}/teachers` | signed-in user | add co teacher |
+| DELETE | `/api/v1/courses/{course_id}/teachers/{teacher_id}` | signed-in user | remove co teacher |
+| GET | `/api/v1/lessons/{lesson_id}` | signed-in user | get lesson |
+| PATCH | `/api/v1/lessons/{lesson_id}` | signed-in user | update lesson |
 
-Recording status values: `recording`, `processing`, `available`, `failed`, `archived`.
-Student visibility rule: allowed sections = the class's sections ∪ the sections the recording is shared with; if that set is non-empty the student must belong to one of them, otherwise they must be enrolled in the recording's course.
+## dashboard
 
-### Summaries
-`POST /classes/{id}/summary-jobs` `{transcript_text?|resource_id?}` (course teachers → `202 {job_id,status}`; the same source returns the same job). `GET /jobs/{id}` (course teachers only). `GET /classes/{id}/summary`, `GET /summaries`. `PATCH /summaries/{id}` (edit while `needs_review`; flags `teacher_edited`), `POST /summaries/{id}/approve`, `POST /summaries/{id}/request-changes` (creates a new job). Statuses: `queued, processing, needs_review, completed, failed`. `SummaryOut` includes `generator` (`llm` or the labeled `stub`) and `generator_model`. Job `error_code` values include `STT_NOT_CONFIGURED`, `NO_TRANSCRIPT_SOURCE`, `LLM_ERROR`, `UNEXPECTED_ERROR`.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/student/dashboard` | signed-in user | student dashboard |
+| GET | `/api/v1/teacher/dashboard` | signed-in user | teacher dashboard |
 
-### Synchronization — `POST /sync/operations`
-Request: `{ operations: [{ operation_id (<=128), operation_type, entity_id, payload, client_updated_at? }] }` (1–50 per call).
-Supported `operation_type`: `assignment_submission` with `payload: { answer: { ... } }` and `entity_id` = assignment id.
-Per-operation result: `{ operation_id, status: "accepted"|"rejected"|"conflict", server_entity_id?, server_version?, server_updated_at?, error_code?, message? }`.
+## health
 
-Semantics:
-- Unique per `(authenticated user, operation_id)`. A replay returns the **originally recorded** result and changes nothing.
-- The same `operation_id` with a different `operation_type`, `entity_id` or `payload` → `conflict` / `OPERATION_ID_REUSED`; nothing is applied.
-- The submission and the idempotency record commit atomically; concurrent duplicates yield exactly one effect.
-- Refusals are recorded and replayed too: `ASSIGNMENT_CLOSED` / `ASSIGNMENT_NOT_PUBLISHED` (`conflict`), `FORBIDDEN` (not enrolled; `rejected`), `INVALID_PAYLOAD` (`rejected`), `UNSUPPORTED_OPERATION_TYPE` (`rejected`).
-- `GET /sync/operations/{operation_id}` and `GET /sync/pending` (everything not accepted, i.e. "requires attention").
-- Draft saves use `PUT /assignments/{id}/submissions/me {answer, submit:false}`; `submit:true` finalizes. A client should show "Submitted" only after an `accepted` result or a `submitted` server record.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/health` | public | health |
+| GET | `/ready` | public | ready |
 
-### Resources
-`POST /resources/upload-init` → `{ resource_id, upload: {method,url,fields} }` (local storage: `PUT` the raw bytes to the returned URL; S3: presigned `POST`) → `POST /resources/{id}/complete` (the server measures the size). `GET /resources/{id}/download` (redirect). Share into a section: `POST /resources/{id}/sections`, list with `GET /sections/{id}/resources`. Allowed: PDF, text, image, audio, video, common office types, up to 50 MB.
+## recordings
 
-### Webhook
-`POST /webhooks/livekit` — the body is LiveKit's webhook JSON; the `Authorization` header is LiveKit's JWT (signed with `LIVEKIT_API_SECRET`, carrying the body's SHA-256). An invalid or missing signature → `401 INVALID_WEBHOOK_SIGNATURE` with no state change. Only `egress_ended` is acted on.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/recordings` | signed-in user | list recordings |
+| DELETE | `/api/v1/recordings/{recording_id}` | signed-in user | delete recording |
+| GET | `/api/v1/recordings/{recording_id}` | signed-in user | get recording |
+| GET | `/api/v1/recordings/{recording_id}/playback` | signed-in user | playback |
+| POST | `/api/v1/recordings/{recording_id}/progress` | signed-in user | progress |
+| POST | `/api/v1/recordings/{recording_id}/publish` | signed-in user | publish |
+| POST | `/api/v1/recordings/{recording_id}/sections` | signed-in user | share |
+| DELETE | `/api/v1/recordings/{recording_id}/sections/{section_id}` | signed-in user | unshare |
+| POST | `/api/v1/recordings/{recording_id}/summary-jobs` | signed-in user | Teacher-triggered transcript + summary for a recording. Independent of playback: a failure |
+
+## registration
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/registration/branches/{branch_id}/sections` | public | registerable sections |
+| GET | `/api/v1/registration/colleges` | public | Active colleges only, read live from the admin-managed table. Public, and never includes college codes. |
+| GET | `/api/v1/registration/colleges/{college_id}/branches` | public | registerable branches |
+
+## resources
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/courses/{course_id}/resources` | signed-in user | list course resources |
+| GET | `/api/v1/resources/download-content/{storage_key:path}` | signed-in user | download content |
+| PUT | `/api/v1/resources/upload-content/{storage_key:path}` | signed-in user | Local-storage upload target: PUT the raw file bytes here. Not used with the S3 backend, |
+| POST | `/api/v1/resources/upload-init` | signed-in user | upload init |
+| DELETE | `/api/v1/resources/{resource_id}` | signed-in user | delete |
+| GET | `/api/v1/resources/{resource_id}` | signed-in user | get resource |
+| PATCH | `/api/v1/resources/{resource_id}` | signed-in user | Edit title/description and publish or unpublish. Publishing requires a fully processed resource. |
+| POST | `/api/v1/resources/{resource_id}/complete` | signed-in user | complete |
+| GET | `/api/v1/resources/{resource_id}/download` | signed-in user | download |
+| GET | `/api/v1/resources/{resource_id}/download-info` | signed-in user | Where and how to fetch the file, for clients that download in byte-range chunks. |
+| POST | `/api/v1/resources/{resource_id}/sections` | signed-in user | share resource |
+| DELETE | `/api/v1/resources/{resource_id}/sections/{section_id}` | signed-in user | unshare resource |
+| GET | `/api/v1/sections/{section_id}/resources` | signed-in user | list section resources |
+
+## sections
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/courses/{course_id}/sections` | signed-in user | list sections |
+| POST | `/api/v1/courses/{course_id}/sections` | signed-in user | create section |
+| GET | `/api/v1/sections/{section_id}/members` | signed-in user | list members |
+| POST | `/api/v1/sections/{section_id}/members` | signed-in user | add member |
+| DELETE | `/api/v1/sections/{section_id}/members/{student_id}` | signed-in user | remove member |
+
+## summaries
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/classes/{class_id}/summary` | signed-in user | get class summary |
+| POST | `/api/v1/classes/{class_id}/summary-jobs` | signed-in user | create summary job |
+| GET | `/api/v1/jobs/{job_id}` | signed-in user | get job |
+| GET | `/api/v1/summaries` | signed-in user | list summaries |
+| PATCH | `/api/v1/summaries/{summary_id}` | signed-in user | edit summary |
+| POST | `/api/v1/summaries/{summary_id}/approve` | signed-in user | approve summary |
+| POST | `/api/v1/summaries/{summary_id}/request-changes` | signed-in user | request summary changes |
+
+## synchronization
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/sync/operations` | signed-in user | submit operations |
+| GET | `/api/v1/sync/operations/{operation_id}` | signed-in user | get operation |
+| GET | `/api/v1/sync/pending` | signed-in user | list pending |
+
+## users
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/users/me` | signed-in user | read me |
+| PATCH | `/api/v1/users/me` | signed-in user | update me |
+| GET | `/api/v1/users/me/college-teachers` | signed-in user | Teachers in the student's own college, assigned to their college section or branch-wide. |
+| GET | `/api/v1/users/me/sessions` | signed-in user | For shared/public devices: shows every device currently signed in, so a student |
+| POST | `/api/v1/users/me/sessions/revoke-all` | signed-in user | Signs out every other device for this account, keeping the caller's own session. |
+| DELETE | `/api/v1/users/me/sessions/{session_id}` | signed-in user | revoke my session |
+| GET | `/api/v1/users/me/teaching-scope` | signed-in user | The branch / college section this teacher is assigned to ("none" for legacy or student accounts). |
+
+## webhooks
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/webhooks/livekit` | public | LiveKit -> us. Authenticated by LiveKit's signed JWT (not by a user session); an |
