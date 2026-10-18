@@ -59,6 +59,29 @@ export interface CollegeInput {
   status?: CollegeStatus
 }
 
+export interface CollegeRegistrationRequest {
+  id: string
+  college_name: string
+  location: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  admin_full_name: string
+  admin_email: string
+  status: 'pending' | 'approved' | 'rejected'
+  rejected_reason: string | null
+  resulting_college_id: string | null
+  created_at: string
+  decided_at: string | null
+}
+
+export interface CollegeDeletionRequest {
+  id: string
+  college_id: string
+  status: 'pending' | 'confirmed' | 'cancelled'
+  requested_at: string
+  confirmed_at: string | null
+}
+
 export class AdminApiError extends Error {
   status: number
   code?: string
@@ -126,4 +149,15 @@ export const adminApi = {
   createSection: (branchId: string, name: string) => request<CollegeSection>('POST', `/branches/${branchId}/sections`, { name }),
   updateSection: (id: string, name: string) => request<CollegeSection>('PATCH', `/sections/${id}`, { name }),
   setSectionStatus: (id: string, status: CollegeStatus) => request<CollegeSection>('POST', `/sections/${id}/status`, { status }),
+
+  // ---- self-service college registration requests ------------------------------------------
+  listCollegeRequests: (status?: 'pending' | 'approved' | 'rejected') =>
+    request<CollegeRegistrationRequest[]>('GET', `/college-requests${qs({ status })}`),
+  approveCollegeRequest: (requestId: string) => request<College>('POST', `/college-requests/${requestId}/approve`),
+  rejectCollegeRequest: (requestId: string, reason?: string) =>
+    request<CollegeRegistrationRequest>('POST', `/college-requests/${requestId}/reject`, { reason: reason || undefined }),
+
+  // ---- college deletion: the super admin may only REQUEST it -------------------------------
+  requestCollegeDeletion: (collegeId: string) => request<CollegeDeletionRequest>('POST', `/colleges/${collegeId}/deletion-requests`),
+  getDeletionRequestStatus: (collegeId: string) => request<CollegeDeletionRequest | null>('GET', `/colleges/${collegeId}/deletion-requests`),
 }

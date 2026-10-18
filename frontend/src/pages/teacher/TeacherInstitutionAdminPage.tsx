@@ -1,10 +1,331 @@
 import React, { useEffect, useState } from 'react'
-import { Building2, KeyRound, Layers, Pencil } from 'lucide-react'
+import { Building2, Check, KeyRound, Layers, Mail, Pencil, PauseCircle, PlayCircle, ShieldAlert, UserMinus, Users, X } from 'lucide-react'
 import { PageContainer } from '../../components/layout/PageContainer'
-import { Card, CardContent, Badge, Button, FormField, Input, LoadingState, ErrorState, EmptyState } from '../../components/ui'
+import { Card, CardContent, Badge, Button, Dialog, FormField, Input, LoadingState, ErrorState, EmptyState } from '../../components/ui'
 import { CollegeStructureDialog } from '../admin/CollegeStructureDialog'
-import { institutionAdminApi } from '../../services/institutionAdminApi'
+import { institutionAdminApi, type CollegeDeletionRequest, type PendingUser } from '../../services/institutionAdminApi'
 import type { College } from '../../services/adminApi'
+
+/** "Rural Science College" -> "RSC"; a single-word name falls back to its first few letters
+ * ("Harvard" -> "HARV") rather than a single, meaningless initial. */
+const shortForm = (name: string): string => {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length > 1) return words.map((w) => w[0]!.toUpperCase()).join('').slice(0, 6)
+  return (words[0] || '').slice(0, 4).toUpperCase()
+}
+
+/** The two-step confirmation a college administrator must complete before a super admin's
+ * deletion request actually takes effect: their own password, then an OTP emailed to the
+ * college's registered contact address. Nothing is deleted until both succeed. */
+const DeletionConfirmPanel: React.FC<{ college: College; request: CollegeDeletionRequest; onResolved: () => void }> = ({
+  college,
+  request,
+  onResolved,
+}) => {
+  const [otpSent, setOtpSent] = useState(false)
+  const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
+  const [devOtp, setDevOtp] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const sendOtp = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const res = await institutionAdminApi.requestDeletionOtp(college.id, request.id, password)
+      setOtpSent(true)
+      setDevOtp(res.dev_otp ?? null)
+    } catch (err: any) {
+      setError(err.message || 'Could not verify your password.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const confirm = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      await institutionAdminApi.confirmDeletion(college.id, request.id, otp)
+      onResolved()
+    } catch (err: any) {
+      setError(err.message || 'That code is incorrect or has expired.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const decline = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      await institutionAdminApi.declineDeletion(college.id, request.id)
+      onResolved()
+    } catch (err: any) {
+      setError(err.message || 'Could not decline the request.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="border border-[#B42318]/30 bg-[#FDE8E7] rounded-xl p-4 flex flex-col gap-3">
+      <div className="flex items-center gap-2 text-[#B42318] font-bold text-sm">
+        <ShieldAlert className="w-4 h-4" /> Deletion Requested
+      </div>
+      <p className="text-xs text-[#B42318] leading-relaxed">
+        A platform administrator has requested that <strong>{college.name}</strong> be permanently deleted — its
+        branches, sections and registration code will be removed (students' and teachers' accounts are kept, just
+        detached from this institution). As this institution's administrator, confirming requires your own password
+        plus a code emailed to the institution's registered contact address.
+      </p>
+      {error && <p className="text-xs text-[#B42318] font-semibold">{error}</p>}
+
+      {!otpSent ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <FormField label="Your password" htmlFor={`del-pw-${request.id}`} className="flex-1">
+            <Input
+              id={`del-pw-${request.id}`}
+              type="password"
+              isPassword
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </FormField>
+          <div className="flex gap-2">
+            <Button size="sm" variant="primary" isLoading={isSubmitting} disabled={!password} onClick={sendOtp} icon={<Mail className="w-3.5 h-3.5" />}>
+              Send Code
+            </Button>
+            <Button size="sm" variant="outline" disabled={isSubmitting} onClick={decline} icon={<X className="w-3.5 h-3.5" />}>
+              Decline
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {devOtp && (
+            <p className="text-xs text-[#8A5700] bg-[#FFF0CB] p-2 rounded-lg border border-[#8A5700]/30">
+              Development mode: email is not configured. Your code is <strong className="font-mono">{devOtp}</strong>.
+            </p>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <FormField label="Confirmation code" htmlFor={`del-otp-${request.id}`} className="flex-1">
+              <Input
+                id={`del-otp-${request.id}`}
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              />
+            </FormField>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="primary"
+                isLoading={isSubmitting}
+                disabled={otp.length !== 6}
+                onClick={confirm}
+                icon={<Check className="w-3.5 h-3.5" />}
+              >
+                Confirm Deletion
+              </Button>
+              <Button size="sm" variant="outline" disabled={isSubmitting} onClick={decline} icon={<X className="w-3.5 h-3.5" />}>
+                Decline
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Everyone already admitted to this college (active or suspended), with account-management
+ * actions. A college admin can never act on themselves or on a peer administrator of the same
+ * college through here (enforced server-side too — see college_service.suspend_member). */
+const MembersRosterSection: React.FC<{ collegeId: string; refreshKey: number }> = ({ collegeId, refreshKey }) => {
+  const [members, setMembers] = useState<PendingUser[] | null>(null)
+  const [actingOn, setActingOn] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<PendingUser | null>(null)
+
+  const load = async () => {
+    setError(null)
+    try {
+      setMembers(await institutionAdminApi.listMembers(collegeId))
+    } catch (err: any) {
+      setError(err.message || 'Could not load the student/teacher roster.')
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collegeId, refreshKey])
+
+  const toggleSuspend = async (m: PendingUser) => {
+    setActingOn(m.id)
+    setError(null)
+    try {
+      if (m.status === 'suspended') await institutionAdminApi.reactivateMember(collegeId, m.id)
+      else await institutionAdminApi.suspendMember(collegeId, m.id)
+      await load()
+    } catch (err: any) {
+      setError(err.message || 'Could not update this account.')
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  const confirmRemove = async () => {
+    if (!removing) return
+    setActingOn(removing.id)
+    setError(null)
+    try {
+      await institutionAdminApi.removeMember(collegeId, removing.id)
+      setRemoving(null)
+      await load()
+    } catch (err: any) {
+      setError(err.message || 'Could not remove this person from the institution.')
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  return (
+    <div className="border-t border-[#E1E8E4] pt-4 flex flex-col gap-2">
+      <p className="text-xs font-bold text-[#687775] uppercase tracking-wider flex items-center gap-1.5">
+        <Users className="w-3.5 h-3.5" /> Students & Teachers {members ? `(${members.length})` : ''}
+      </p>
+      {error && <p className="text-xs text-[#B42318]">{error}</p>}
+      {members === null ? (
+        <p className="text-xs text-[#687775]">Loading roster...</p>
+      ) : members.length === 0 ? (
+        <p className="text-xs text-[#687775] italic">No one has been admitted to this institution yet.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {members.map((m) => (
+            <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-[#F8FAF7] border border-[#E1E8E4] rounded-lg">
+              <div>
+                <p className="text-sm font-semibold text-[#202B2A]">{m.full_name}</p>
+                <p className="text-xs text-[#687775] flex items-center gap-1.5 flex-wrap">
+                  {m.email}
+                  <Badge variant="secondary" size="sm">{m.role}</Badge>
+                  <Badge variant={m.status === 'active' ? 'success' : 'warning'} size="sm">{m.status}</Badge>
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  isLoading={actingOn === m.id}
+                  onClick={() => toggleSuspend(m)}
+                  icon={m.status === 'suspended' ? <PlayCircle className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
+                >
+                  {m.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={actingOn === m.id}
+                  onClick={() => setRemoving(m)}
+                  icon={<UserMinus className="w-3.5 h-3.5" />}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog isOpen={!!removing} onClose={() => setRemoving(null)} title="Remove from institution?" description={removing?.full_name}>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-[#687775]">
+            {removing?.full_name} will be detached from this institution — their branch/section assignment is cleared. Their account, and
+            everything else tied to it (courses, submissions, recordings), is kept; they simply won't belong to this institution anymore.
+          </p>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setRemoving(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" isLoading={actingOn === removing?.id} onClick={confirmRemove}>
+              Remove
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </div>
+  )
+}
+
+const PendingRegistrationsSection: React.FC<{ collegeId: string; onChange: () => void }> = ({ collegeId, onChange }) => {
+  const [pending, setPending] = useState<PendingUser[] | null>(null)
+  const [actingOn, setActingOn] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = async () => {
+    try {
+      setPending(await institutionAdminApi.listPendingRegistrations(collegeId))
+    } catch (err: any) {
+      setError(err.message || 'Could not load pending registrations.')
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collegeId])
+
+  const act = async (userId: string, action: 'approve' | 'reject') => {
+    setActingOn(userId)
+    setError(null)
+    try {
+      if (action === 'approve') await institutionAdminApi.approveRegistration(collegeId, userId)
+      else await institutionAdminApi.rejectRegistration(collegeId, userId)
+      await load()
+      onChange()
+    } catch (err: any) {
+      setError(err.message || 'Could not update this registration.')
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  if (pending === null) return null
+  if (pending.length === 0) return null
+
+  return (
+    <div className="border-t border-[#E1E8E4] pt-4 flex flex-col gap-2">
+      <p className="text-xs font-bold text-[#687775] uppercase tracking-wider">
+        Pending Registrations ({pending.length})
+      </p>
+      {error && <p className="text-xs text-[#B42318]">{error}</p>}
+      <div className="flex flex-col gap-2">
+        {pending.map((u) => (
+          <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-[#F8FAF7] border border-[#E1E8E4] rounded-lg">
+            <div>
+              <p className="text-sm font-semibold text-[#202B2A]">{u.full_name}</p>
+              <p className="text-xs text-[#687775]">
+                {u.email} · <Badge variant="secondary" size="sm">{u.role}</Badge>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="primary" isLoading={actingOn === u.id} onClick={() => act(u.id, 'approve')} icon={<Check className="w-3.5 h-3.5" />}>
+                Approve
+              </Button>
+              <Button size="sm" variant="outline" disabled={actingOn === u.id} onClick={() => act(u.id, 'reject')} icon={<X className="w-3.5 h-3.5" />}>
+                Reject
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /**
  * Self-serve institution management for a teacher delegated as a college administrator (see
@@ -24,11 +345,18 @@ export const TeacherInstitutionAdminPage: React.FC = () => {
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [structureCollege, setStructureCollege] = useState<College | null>(null)
+  const [deletionRequests, setDeletionRequests] = useState<Record<string, CollegeDeletionRequest | null>>({})
+  const [refreshTick, setRefreshTick] = useState(0)
 
   const load = async () => {
     setError(null)
     try {
-      setColleges(await institutionAdminApi.myColleges())
+      const list = await institutionAdminApi.myColleges()
+      setColleges(list)
+      const entries = await Promise.all(
+        list.map(async (c) => [c.id, await institutionAdminApi.getDeletionRequest(c.id).catch(() => null)] as const)
+      )
+      setDeletionRequests(Object.fromEntries(entries))
     } catch (err: any) {
       setError(err.message || 'Could not load your institutions.')
     }
@@ -36,7 +364,8 @@ export const TeacherInstitutionAdminPage: React.FC = () => {
 
   useEffect(() => {
     void load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTick])
 
   const startEdit = (college: College) => {
     setEditing(college)
@@ -83,12 +412,14 @@ export const TeacherInstitutionAdminPage: React.FC = () => {
     }
   }
 
+  const pageTitle = colleges && colleges.length === 1 ? `${shortForm(colleges[0].name)} Console` : 'Institution Administration'
+  const pageSubtitle =
+    colleges && colleges.length === 1
+      ? `${colleges[0].name} — manage its branches, sections, registration code and student/teacher roster.`
+      : "Manage the branches, sections and registration code for the institution(s) you've been delegated to administer."
+
   return (
-    <PageContainer
-      title="Institution Administration"
-      subtitle="Manage the branches, sections and registration code for the institution(s) you've been delegated to administer."
-      maxWidth="lg"
-    >
+    <PageContainer title={pageTitle} subtitle={pageSubtitle} maxWidth="lg">
       {notice && (
         <div className="mb-4 p-3 rounded-lg bg-[#E5F5EB] border border-[#247A4D]/30 text-[#247A4D] text-xs" role="status">
           {notice}
@@ -112,6 +443,9 @@ export const TeacherInstitutionAdminPage: React.FC = () => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-mono font-bold text-[#0F5B57] bg-[#DDF3EA] border border-[#CBD7D1] rounded px-1.5 py-0.5">
+                        {shortForm(college.name)}
+                      </span>
                       <h3 className="text-base font-bold text-[#202B2A]">{college.name}</h3>
                       <Badge variant={college.status === 'active' ? 'success' : 'secondary'} size="sm">
                         {college.status === 'active' ? 'Active' : 'Inactive'}
@@ -163,6 +497,18 @@ export const TeacherInstitutionAdminPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {deletionRequests[college.id] && (
+                  <DeletionConfirmPanel
+                    college={college}
+                    request={deletionRequests[college.id]!}
+                    onResolved={() => setRefreshTick((t) => t + 1)}
+                  />
+                )}
+
+                <PendingRegistrationsSection collegeId={college.id} onChange={() => setRefreshTick((t) => t + 1)} />
+
+                <MembersRosterSection collegeId={college.id} refreshKey={refreshTick} />
               </CardContent>
             </Card>
           ))}

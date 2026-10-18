@@ -484,6 +484,8 @@ def test_student_and_teacher_accounts_use_the_identical_recovery_endpoints(clien
 
 
 def test_password_reset_does_not_touch_role_college_or_status(client, admin_user, db_session):
+    from sqlalchemy import select
+    from app.db.models.enums import UserStatus
     from app.db.models.user import User
     import secrets
 
@@ -506,8 +508,10 @@ def test_password_reset_does_not_touch_role_college_or_status(client, admin_user
             "college_id": college["id"], "college_code": college["code"], "branch_id": branch["id"], "section_id": section["id"],
         },
     )
-    assert reg.status_code == 201, reg.text
-    user_id = reg.json()["user"]["id"]
+    assert reg.status_code == 202, reg.text  # pending the college administrator's approval
+    user_id = db_session.execute(select(User.id).where(User.email == email)).scalar_one()
+    db_session.get(User, user_id).status = UserStatus.active  # approve directly: not what this test is about
+    db_session.commit()
 
     reset_token = _full_flow(client, email)
     assert client.post("/api/v1/auth/reset-password", json={"reset_token": reset_token, "new_password": "brand-new-password-1"}).status_code == 204

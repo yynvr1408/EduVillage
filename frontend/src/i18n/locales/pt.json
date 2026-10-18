@@ -30,6 +30,8 @@
     "studentAccountDesc": "Acesse cursos, aulas e downloads offline",
     "teacherAccount": "Conta de professor",
     "teacherAccountDesc": "Agende aulas, gerencie materiais e tarefas",
+    "institutionAccount": "Conta da instituição",
+    "institutionAccountDesc": "Registre sua instituição e gerencie suas filiais, seções e inscrições",
     "alreadyRegistered": "Já tem uma conta?",
     "signInHere": "Entre aqui"
   },

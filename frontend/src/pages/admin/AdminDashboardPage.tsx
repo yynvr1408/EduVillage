@@ -1,9 +1,34 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Building2, CheckCircle2, Copy, KeyRound, Layers, LogOut, Pencil, Plus, Power, RefreshCw, Search, XCircle } from 'lucide-react'
+import {
+  Building2,
+  Check,
+  CheckCircle2,
+  Copy,
+  KeyRound,
+  Layers,
+  LogOut,
+  Pencil,
+  Plus,
+  Power,
+  RefreshCw,
+  Search,
+  Trash2,
+  X,
+  XCircle,
+} from 'lucide-react'
 import { Badge, Button, Dialog, EmptyState, ErrorState, FormField, Input, LoadingState, Select } from '../../components/ui'
 import { Logo } from '../../components/ui/Logo'
 import { CollegeStructureDialog } from './CollegeStructureDialog'
-import { adminApi, AdminApiError, type AdminOverview, type College, type CollegeInput, type CollegeStatus } from '../../services/adminApi'
+import {
+  adminApi,
+  AdminApiError,
+  type AdminOverview,
+  type College,
+  type CollegeDeletionRequest,
+  type CollegeInput,
+  type CollegeRegistrationRequest,
+  type CollegeStatus,
+} from '../../services/adminApi'
 
 const PAGE_SIZE = 10
 
@@ -166,6 +191,85 @@ const CollegeFormDialog: React.FC<{
   )
 }
 
+/** Colleges that registered themselves (POST /registration/colleges/request) and are awaiting
+ * approval. Approving creates the real college AND delegates its founding admin in one step. */
+const PendingCollegeRequests: React.FC<{ onDecided: () => void; guard: (err: unknown) => boolean }> = ({ onDecided, guard }) => {
+  const [requests, setRequests] = useState<CollegeRegistrationRequest[] | null>(null)
+  const [actingOn, setActingOn] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      setRequests(await adminApi.listCollegeRequests('pending'))
+    } catch (err: any) {
+      if (!guard(err)) setError(err.message || 'Could not load pending institution requests.')
+    }
+  }, [guard])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const approve = async (r: CollegeRegistrationRequest) => {
+    setActingOn(r.id)
+    setError(null)
+    try {
+      await adminApi.approveCollegeRequest(r.id)
+      await load()
+      onDecided()
+    } catch (err: any) {
+      if (!guard(err)) setError(err.message || 'Could not approve this request.')
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  const reject = async (r: CollegeRegistrationRequest) => {
+    setActingOn(r.id)
+    setError(null)
+    try {
+      await adminApi.rejectCollegeRequest(r.id)
+      await load()
+    } catch (err: any) {
+      if (!guard(err)) setError(err.message || 'Could not reject this request.')
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  if (!requests || requests.length === 0) return null
+
+  return (
+    <section aria-label="Pending institution requests" className="flex flex-col gap-3">
+      <h2 className="text-lg font-bold text-[#202B2A]">Pending Institution Requests ({requests.length})</h2>
+      {error && <ErrorState message={error} onRetry={load} />}
+      <ul className="flex flex-col gap-3">
+        {requests.map((r) => (
+          <li key={r.id} className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl p-4 flex flex-col lg:flex-row lg:items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-semibold text-[#202B2A] break-words">{r.college_name}</h3>
+              <p className="text-xs text-[#687775] mt-1 break-words">
+                {[r.location, r.contact_email, r.contact_phone].filter(Boolean).join(' · ') || 'No contact details'}
+              </p>
+              <p className="text-xs text-[#687775] mt-1">
+                Founding admin: <strong className="text-[#202B2A]">{r.admin_full_name}</strong> ({r.admin_email})
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="primary" isLoading={actingOn === r.id} onClick={() => approve(r)} icon={<Check className="w-4 h-4" />}>
+                Approve
+              </Button>
+              <Button size="sm" variant="outline" disabled={actingOn === r.id} onClick={() => reject(r)} icon={<X className="w-4 h-4" />}>
+                Reject
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () => void; onSessionExpired: () => void }> = ({
   username,
   onSignedOut,
@@ -187,6 +291,8 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
   const [confirmRegen, setConfirmRegen] = useState<College | null>(null)
   const [sectionsFor, setSectionsFor] = useState<College | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<College | null>(null)
+  const [deletionRequests, setDeletionRequests] = useState<Record<string, CollegeDeletionRequest>>({})
   const requestSeq = useRef(0)
 
   const guard = useCallback(
@@ -266,6 +372,26 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
     }
   }
 
+  const requestDeletion = async () => {
+    const c = confirmDelete
+    if (!c) return
+    setConfirmDelete(null)
+    setBusyId(c.id)
+    setNotice(null)
+    try {
+      const req = await adminApi.requestCollegeDeletion(c.id)
+      setDeletionRequests((prev) => ({ ...prev, [c.id]: req }))
+      setNotice({
+        kind: 'success',
+        text: `Deletion of ${c.name} has been requested. It completes only once that institution's own administrator confirms it with their password and an emailed code.`,
+      })
+    } catch (err: any) {
+      if (!guard(err)) setNotice({ kind: 'error', text: err.message })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const signOut = async () => {
     try {
       await adminApi.logout()
@@ -331,6 +457,8 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
             <span>{notice.text}</span>
           </div>
         )}
+
+        <PendingCollegeRequests onDecided={load} guard={guard} />
 
         <section aria-label="Colleges" className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
@@ -403,6 +531,11 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
                       {[c.location, c.contact_email, c.contact_phone].filter(Boolean).join(' · ') || 'No contact details'} · Created{' '}
                       {formatDate(c.created_at)}
                     </p>
+                    {deletionRequests[c.id] && (
+                      <p className="text-xs text-[#B42318] font-semibold mt-1">
+                        Deletion requested — waiting on this institution's administrator to confirm.
+                      </p>
+                    )}
                   </div>
                   <CopyCode code={c.code} />
                   <div className="flex flex-wrap gap-2">
@@ -437,6 +570,15 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
                     </Button>
                     <Button size="sm" variant="outline" icon={<Layers className="w-4 h-4" />} onClick={() => setSectionsFor(c)}>
                       Branches
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      icon={<Trash2 className="w-4 h-4" />}
+                      disabled={busyId === c.id || !!deletionRequests[c.id]}
+                      onClick={() => setConfirmDelete(c)}
+                    >
+                      {deletionRequests[c.id] ? 'Deletion Requested' : 'Delete College'}
                     </Button>
                   </div>
                 </li>
@@ -498,6 +640,24 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
             </Button>
             <Button variant="destructive" onClick={regenerate}>
               Generate new code
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog isOpen={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Request college deletion?" description={confirmDelete?.name}>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-[#687775]">
+            This only <strong>requests</strong> deletion — nothing is removed yet. {confirmDelete?.name} will stay exactly as it is unless that
+            institution's own delegated administrator separately confirms with their own password and a code emailed to the institution's
+            registered contact address. If this college has no delegated administrator, the request cannot be confirmed until you delegate one.
+          </p>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={requestDeletion}>
+              Request Deletion
             </Button>
           </div>
         </div>

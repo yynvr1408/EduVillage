@@ -30,6 +30,8 @@
     "studentAccountDesc": "Access courses, classes and offline downloads",
     "teacherAccount": "Teacher Account",
     "teacherAccountDesc": "Schedule classes, manage materials and assignments",
+    "institutionAccount": "Institution Account",
+    "institutionAccountDesc": "Register your institution and manage its branches, sections and registrations",
     "alreadyRegistered": "Already registered?",
     "signInHere": "Sign in here"
   },

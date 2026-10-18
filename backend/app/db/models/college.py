@@ -4,7 +4,7 @@ from sqlalchemy import Enum, ForeignKey, ForeignKeyConstraint, String, UniqueCon
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
-from app.db.models.enums import CollegeStatus
+from app.db.models.enums import CollegeDeletionRequestStatus, CollegeRegistrationRequestStatus, CollegeStatus
 from app.db.models.user import User
 
 
@@ -113,13 +113,19 @@ class CollegeAdministrator(UUIDPrimaryKeyMixin, Base):
     admin's own auth system (UserRole.admin, a different session/cookie): this is checked as an
     additional permission layered on top of an ordinary teacher session. Granting/revoking it
     stays a platform-admin-only action (see college_service.assign_college_admin) — a teacher can
-    never make themselves one."""
+    never make themselves one.
+
+    A college has at most one administrator at a time (enforced by the unique constraint on
+    college_id alone, below) — delegating someone new requires removing the existing one first.
+    The reverse isn't restricted: the same teacher may administer several different colleges."""
 
     __tablename__ = "college_administrators"
-    __table_args__ = (UniqueConstraint("user_id", "college_id", name="uq_college_administrator"),)
+    __table_args__ = (UniqueConstraint("college_id", name="uq_college_administrator_one_per_college"),)
 
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    college_id: Mapped[str] = mapped_column(String(36), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    # No separate index=True here: the unique constraint above already indexes college_id, and a
+    # college has at most one row, so a plain lookup by college_id never needed a different index shape.
+    college_id: Mapped[str] = mapped_column(String(36), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
     assigned_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     assigned_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
 
@@ -132,3 +138,47 @@ class CollegeAdministrator(UUIDPrimaryKeyMixin, Base):
     @property
     def email(self) -> str:
         return self.user.email
+
+
+class CollegeRegistrationRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """A college that registered itself and is awaiting the platform administrator's approval.
+    Deliberately a separate table from College, not a College row with status=pending: a request
+    carries data a real College never should (a candidate admin's hashed password, a decision
+    trail) and must never be joinable as though it were a real, addressable institution."""
+
+    __tablename__ = "college_registration_requests"
+
+    college_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    location: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    contact_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # The person who will become this college's founding CollegeAdministrator once approved.
+    admin_full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    admin_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    admin_password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[CollegeRegistrationRequestStatus] = mapped_column(
+        Enum(CollegeRegistrationRequestStatus, native_enum=False), nullable=False, default=CollegeRegistrationRequestStatus.pending
+    )
+    rejected_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    resulting_college_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("colleges.id", ondelete="SET NULL"), nullable=True)
+
+
+class CollegeDeletionRequest(UUIDPrimaryKeyMixin, Base):
+    """The two-phase college-deletion flow: a super admin REQUESTS deletion here; the college's own
+    delegated CollegeAdministrator must separately confirm with their own password plus an OTP
+    emailed to the college's contact address (see auth_service.request_deletion_otp /
+    verify_deletion_otp) before anything is actually deleted. A super admin alone can never
+    complete a deletion through this path."""
+
+    __tablename__ = "college_deletion_requests"
+
+    college_id: Mapped[str] = mapped_column(String(36), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    requested_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
+    status: Mapped[CollegeDeletionRequestStatus] = mapped_column(
+        Enum(CollegeDeletionRequestStatus, native_enum=False), nullable=False, default=CollegeDeletionRequestStatus.pending
+    )
+    confirmed_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(nullable=True)

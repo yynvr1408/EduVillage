@@ -57,6 +57,14 @@ class AuthResponse(BaseModel):
     user: UserOut
 
 
+class RegistrationPendingOut(BaseModel):
+    """202 body: the account was created but needs the college administrator's approval before
+    it can sign in — no session is established."""
+
+    status: Literal["pending_approval"] = "pending_approval"
+    message: str
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 

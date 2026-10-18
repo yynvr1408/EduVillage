@@ -112,6 +112,15 @@ def send_registration_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
     )
 
 
+def send_college_deletion_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
+    """College-deletion confirmation OTP, sent to the college's own registered contact address
+    (not an account holder's email, unlike every other OTP in this module) as the second of two
+    required proofs — see auth_service.request_deletion_otp. Reuses the shared password-reset
+    template/account: this is a rare, low-volume flow that doesn't warrant its own EmailJS
+    template the way registration's higher-volume flow does."""
+    return _send(to_email=to, template_id=settings.emailjs_template_id, template_params={"otp": otp, "ttl_minutes": ttl_minutes})
+
+
 # No send_password_changed_email(): the EmailJS setup in this task configures exactly one
 # template, built for "your code is {{otp}}" — reusing it for a change-notification would send a
 # confusing, visibly-wrong email (an OTP template with no OTP in it). The password-change event

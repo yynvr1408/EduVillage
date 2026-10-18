@@ -104,6 +104,7 @@ describe('admin panel', () => {
       if (url.endsWith('/auth/me')) return { status: 200, body: { username: 'admin', display_name: 'Administrator' } }
       if (url.includes('/overview')) return { status: 200, body: { total_colleges: 0, active_colleges: 0, inactive_colleges: 0, total_codes_generated: 0 } }
       if (url.includes('/colleges') && method === 'POST') return { status: 409, body: { error: { code: 'COLLEGE_EXISTS', message: 'A college with this name and location already exists.' } } }
+      if (url.includes('/college-requests')) return { status: 200, body: [] }
       return { status: 200, body: { items: [], total: 0, limit: 10, offset: 0 } }
     }
     render(<AdminApp />)
@@ -125,6 +126,7 @@ describe('admin panel', () => {
       if (url.endsWith('/auth/me')) return { status: 200, body: { username: 'admin', display_name: 'Administrator' } }
       if (expired) return { status: 401, body: { error: { code: 'UNAUTHORIZED', message: 'Authentication required.' } } }
       if (url.includes('/overview')) return { status: 200, body: { total_colleges: 1, active_colleges: 1, inactive_colleges: 0, total_codes_generated: 1 } }
+      if (url.includes('/college-requests')) return { status: 200, body: [] }
       return { status: 200, body: { items: [college()], total: 1, limit: 10, offset: 0 } }
     }
     render(<AdminApp />)

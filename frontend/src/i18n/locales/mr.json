@@ -30,6 +30,8 @@
     "studentAccountDesc": "अभ्यासक्रम, वर्ग आणि ऑफलाइन डाउनलोड्समध्ये प्रवेश मिळवा",
     "teacherAccount": "शिक्षक खाते",
     "teacherAccountDesc": "वर्गांचे नियोजन करा, साहित्य आणि असाइनमेंट व्यवस्थापित करा",
+    "institutionAccount": "संस्था खाते",
+    "institutionAccountDesc": "तुमची संस्था नोंदणी करा आणि तिच्या शाखा, विभाग आणि नोंदणी व्यवस्थापित करा",
     "alreadyRegistered": "आधीच नोंदणी केली आहे?",
     "signInHere": "इथे साइन इन करा"
   },

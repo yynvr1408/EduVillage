@@ -30,6 +30,8 @@
     "studentAccountDesc": "الوصول إلى الدورات والحصص والتنزيلات دون اتصال",
     "teacherAccount": "حساب معلم",
     "teacherAccountDesc": "جدولة الحصص، إدارة المواد والواجبات",
+    "institutionAccount": "حساب المؤسسة",
+    "institutionAccountDesc": "سجّل مؤسستك وأدر فروعها وأقسامها وطلبات التسجيل فيها",
     "alreadyRegistered": "هل سجلت من قبل؟",
     "signInHere": "سجّل الدخول هنا"
   },

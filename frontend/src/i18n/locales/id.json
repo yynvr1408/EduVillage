@@ -30,6 +30,8 @@
     "studentAccountDesc": "Akses kursus, kelas, dan unduhan luring",
     "teacherAccount": "Akun Guru",
     "teacherAccountDesc": "Jadwalkan kelas, kelola materi dan tugas",
+    "institutionAccount": "Akun Institusi",
+    "institutionAccountDesc": "Daftarkan institusi Anda dan kelola cabang, bagian, serta pendaftarannya",
     "alreadyRegistered": "Sudah terdaftar?",
     "signInHere": "Masuk di sini"
   },

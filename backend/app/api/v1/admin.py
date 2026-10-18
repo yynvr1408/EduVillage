@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.db.models.enums import CollegeStatus
+from app.db.models.enums import CollegeRegistrationRequestStatus, CollegeStatus
 from app.db.models.user import User
 from app.dependencies import get_current_admin, get_db, require_admin_csrf
 from app.schemas.admin import (
@@ -11,8 +11,10 @@ from app.schemas.admin import (
     CollegeAdministratorCreate,
     CollegeAdministratorOut,
     CollegeCreate,
+    CollegeDeletionRequestOut,
     CollegeOut,
     CollegePage,
+    CollegeRegistrationRequestOut,
     BranchCreate,
     BranchOut,
     BranchUpdate,
@@ -21,6 +23,7 @@ from app.schemas.admin import (
     CollegeSectionUpdate,
     CollegeStatusChange,
     CollegeUpdate,
+    DecisionReject,
     OverviewOut,
 )
 from app.services import admin_service, auth_service, college_service
@@ -208,3 +211,47 @@ def remove_college_administrator(
 ):
     college = college_service.get_college_or_404(db, college_id)
     college_service.remove_college_admin(db, admin.id, college, user_id=user_id)
+
+
+# ---- self-service college registration requests ---------------------------------------------
+# A college registered itself (POST /registration/colleges/request, public); the platform admin
+# reviews and decides here. Approval creates the real college AND its founding administrator.
+
+
+@router.get("/college-requests", response_model=list[CollegeRegistrationRequestOut])
+def list_college_requests(
+    status: CollegeRegistrationRequestStatus | None = None, db: Session = Depends(get_db), _: User = Depends(get_current_admin)
+):
+    return college_service.list_college_requests(db, status=status)
+
+
+@router.post("/college-requests/{request_id}/approve", response_model=CollegeOut)
+def approve_college_request(request_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    request = college_service.get_college_request_or_404(db, request_id)
+    return college_service.approve_college_request(db, admin.id, request)
+
+
+@router.post("/college-requests/{request_id}/reject", response_model=CollegeRegistrationRequestOut)
+def reject_college_request(
+    request_id: str, payload: DecisionReject, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)
+):
+    request = college_service.get_college_request_or_404(db, request_id)
+    return college_service.reject_college_request(db, admin.id, request, reason=payload.reason)
+
+
+# ---- college deletion: the super admin may only REQUEST it ------------------------------------
+# Completing it needs the college's own delegated administrator to confirm, separately, with
+# their own password + an OTP emailed to the college — see institution_admin.py's
+# deletion-request endpoints, where the actual deletion happens.
+
+
+@router.post("/colleges/{college_id}/deletion-requests", response_model=CollegeDeletionRequestOut, status_code=201)
+def request_college_deletion(college_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    college = college_service.get_college_or_404(db, college_id)
+    return college_service.request_college_deletion(db, admin.id, college)
+
+
+@router.get("/colleges/{college_id}/deletion-requests", response_model=CollegeDeletionRequestOut | None)
+def get_college_deletion_request(college_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_admin)):
+    college_service.get_college_or_404(db, college_id)
+    return college_service.get_pending_deletion_request(db, college_id)

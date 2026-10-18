@@ -12,14 +12,23 @@ Code guarantees:
 import re
 import secrets
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.security import hash_password, verify_password
 from app.db.base import utcnow
-from app.db.models.college import College, CollegeAdministrator, CollegeCodeHistory
-from app.db.models.enums import CollegeStatus, UserRole
+from app.db.models.college import (
+    College,
+    CollegeAdministrator,
+    CollegeCodeHistory,
+    CollegeDeletionRequest,
+    CollegeRegistrationRequest,
+    UserBranchAssignment,
+    UserCollegeSection,
+)
+from app.db.models.enums import CollegeDeletionRequestStatus, CollegeRegistrationRequestStatus, CollegeStatus, UserRole, UserStatus
 from app.db.models.user import User
 from app.services import audit_service
 
@@ -149,6 +158,10 @@ def update_college(db: Session, admin_id: str, college: College, *, fields: dict
 
 
 def set_status(db: Session, admin_id: str, college: College, status: CollegeStatus) -> College:
+    if status == CollegeStatus.pending:
+        # Reachable only via the self-registration approval flow (approve_college_request), never
+        # as a manual target on an existing, real college.
+        raise ValidationFailedError("A college cannot be manually set to pending.", code="INVALID_STATUS")
     if college.status != status:
         college.status = status
         db.commit()
@@ -414,8 +427,10 @@ def list_college_admins(db: Session, college_id: str) -> list[CollegeAdministrat
 
 
 def assign_college_admin(db: Session, platform_admin_id: str, college: College, *, user_id: str) -> CollegeAdministrator:
-    """Platform-admin-only. Idempotent: delegating to an already-delegated teacher just returns
-    the existing record rather than erroring."""
+    """Platform-admin-only. Idempotent for the SAME teacher (delegating them again just returns
+    the existing record), but a college has at most one administrator at a time — delegating a
+    DIFFERENT teacher while one is already in place is rejected; remove the existing delegation
+    first (see remove_college_admin) to hand it to someone else."""
     target = db.get(User, user_id)
     if target is None:
         raise NotFoundError("User not found.")
@@ -423,24 +438,31 @@ def assign_college_admin(db: Session, platform_admin_id: str, college: College, 
         raise ValidationFailedError("Only a teacher can be made an institution administrator.", code="NOT_A_TEACHER")
 
     existing = db.execute(
-        select(CollegeAdministrator).where(
-            CollegeAdministrator.user_id == user_id, CollegeAdministrator.college_id == college.id
-        )
+        select(CollegeAdministrator).where(CollegeAdministrator.college_id == college.id)
     ).scalar_one_or_none()
     if existing:
-        return existing
+        if existing.user_id == user_id:
+            return existing
+        raise ConflictError(
+            "This institution already has an administrator. Remove them first before delegating someone new.",
+            code="COLLEGE_ALREADY_HAS_ADMINISTRATOR",
+        )
 
     admin_link = CollegeAdministrator(user_id=user_id, college_id=college.id, assigned_by=platform_admin_id)
     db.add(admin_link)
     try:
         db.commit()
     except IntegrityError:
-        db.rollback()  # a concurrent request granted the same delegation first
-        return db.execute(
-            select(CollegeAdministrator).where(
-                CollegeAdministrator.user_id == user_id, CollegeAdministrator.college_id == college.id
-            )
+        db.rollback()  # a concurrent request delegated someone to this college first
+        winner = db.execute(
+            select(CollegeAdministrator).where(CollegeAdministrator.college_id == college.id)
         ).scalar_one()
+        if winner.user_id != user_id:
+            raise ConflictError(
+                "This institution already has an administrator. Remove them first before delegating someone new.",
+                code="COLLEGE_ALREADY_HAS_ADMINISTRATOR",
+            ) from None
+        return winner
     db.refresh(admin_link)
     audit_service.record(
         db, actor_id=platform_admin_id, action="college_administrator_assigned", resource_type="college", resource_id=college.id
@@ -461,3 +483,298 @@ def remove_college_admin(db: Session, platform_admin_id: str, college: College, 
     audit_service.record(
         db, actor_id=platform_admin_id, action="college_administrator_removed", resource_type="college", resource_id=college.id
     )
+
+
+# ---- self-service college registration (super-admin approved) ----------------------------------
+# A college registers itself (public, no auth) instead of the platform admin creating it directly.
+# The request sits pending until a platform admin approves or rejects it; approval atomically
+# creates the real College AND its founding CollegeAdministrator in one step, so a newly-approved
+# college is never left with nobody able to approve its own first students/teachers.
+
+
+def submit_college_registration_request(
+    db: Session, *, college_name: str, location: str | None, contact_email: str | None, contact_phone: str | None,
+    admin_full_name: str, admin_email: str, admin_password: str, verification_token: str,
+) -> CollegeRegistrationRequest:
+    from app.services import auth_service
+
+    normalized_admin_email = admin_email.strip().lower()
+    # Proves control of the founding admin's own mailbox, exactly like student/teacher
+    # registration — reuses the same email-verification mechanism and token, no new OTP code.
+    auth_service.consume_registration_verification(db, email=normalized_admin_email, verification_token=verification_token)
+
+    if db.execute(select(User.id).where(User.email == normalized_admin_email)).first() is not None:
+        raise ConflictError("An account with this email already exists.", code="EMAIL_TAKEN")
+
+    request = CollegeRegistrationRequest(
+        college_name=college_name,
+        location=location,
+        contact_email=str(contact_email) if contact_email else None,
+        contact_phone=contact_phone,
+        admin_full_name=admin_full_name.strip(),
+        admin_email=normalized_admin_email,
+        admin_password_hash=hash_password(admin_password),
+        status=CollegeRegistrationRequestStatus.pending,
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    audit_service.record(db, actor_id=None, action="college_registration_requested", resource_type="college_registration_request", resource_id=request.id)
+    return request
+
+
+def list_college_requests(db: Session, *, status: CollegeRegistrationRequestStatus | None = None) -> list[CollegeRegistrationRequest]:
+    stmt = select(CollegeRegistrationRequest)
+    if status:
+        stmt = stmt.where(CollegeRegistrationRequest.status == status)
+    return list(db.execute(stmt.order_by(CollegeRegistrationRequest.created_at.desc())).scalars())
+
+
+def get_college_request_or_404(db: Session, request_id: str) -> CollegeRegistrationRequest:
+    request = db.get(CollegeRegistrationRequest, request_id)
+    if not request:
+        raise NotFoundError("College registration request not found.")
+    return request
+
+
+def approve_college_request(db: Session, platform_admin_id: str, request: CollegeRegistrationRequest) -> College:
+    if request.status != CollegeRegistrationRequestStatus.pending:
+        raise ConflictError("This request has already been decided.", code="REQUEST_ALREADY_DECIDED")
+    if db.execute(select(User.id).where(User.email == request.admin_email)).first() is not None:
+        raise ConflictError("An account with this email already exists.", code="EMAIL_TAKEN")
+
+    college = create_college(
+        db, platform_admin_id, name=request.college_name, location=request.location,
+        contact_email=request.contact_email, contact_phone=request.contact_phone,
+        status=CollegeStatus.active, code=None,
+    )
+    admin_user = User(
+        full_name=request.admin_full_name,
+        email=request.admin_email,
+        password_hash=request.admin_password_hash,  # already hashed at submission time
+        role=UserRole.teacher,
+        status=UserStatus.active,  # vetted by the super-admin's approval of the whole request; no further gate
+    )
+    db.add(admin_user)
+    db.flush()
+    assign_college_admin(db, platform_admin_id, college, user_id=admin_user.id)
+
+    request.status = CollegeRegistrationRequestStatus.approved
+    request.decided_by = platform_admin_id
+    request.decided_at = utcnow()
+    request.resulting_college_id = college.id
+    db.commit()
+    audit_service.record(
+        db, actor_id=platform_admin_id, action="college_registration_approved", resource_type="college_registration_request", resource_id=request.id
+    )
+    return college
+
+
+def reject_college_request(db: Session, platform_admin_id: str, request: CollegeRegistrationRequest, *, reason: str | None) -> CollegeRegistrationRequest:
+    if request.status != CollegeRegistrationRequestStatus.pending:
+        raise ConflictError("This request has already been decided.", code="REQUEST_ALREADY_DECIDED")
+    request.status = CollegeRegistrationRequestStatus.rejected
+    request.rejected_reason = reason
+    request.decided_by = platform_admin_id
+    request.decided_at = utcnow()
+    db.commit()
+    db.refresh(request)
+    audit_service.record(
+        db, actor_id=platform_admin_id, action="college_registration_rejected", resource_type="college_registration_request", resource_id=request.id
+    )
+    return request
+
+
+# ---- student/teacher registration approval (the college administrator's own queue) --------------
+
+
+def list_pending_registrations(db: Session, college_id: str) -> list[User]:
+    stmt = (
+        select(User)
+        .where(User.college_id == college_id, User.status == UserStatus.pending)
+        .order_by(User.created_at)
+    )
+    return list(db.execute(stmt).scalars())
+
+
+def _get_pending_registration_or_404(db: Session, college_id: str, user_id: str) -> User:
+    user = db.get(User, user_id)
+    if not user or user.college_id != college_id or user.status != UserStatus.pending:
+        raise NotFoundError("Pending registration not found.")
+    return user
+
+
+def approve_registration(db: Session, college_admin_id: str, college_id: str, user_id: str) -> User:
+    user = _get_pending_registration_or_404(db, college_id, user_id)
+    user.status = UserStatus.active
+    db.commit()
+    db.refresh(user)
+    audit_service.record(db, actor_id=college_admin_id, action="registration_approved", resource_type="user", resource_id=user.id)
+    return user
+
+
+def reject_registration(db: Session, college_admin_id: str, college_id: str, user_id: str, *, reason: str | None) -> User:
+    user = _get_pending_registration_or_404(db, college_id, user_id)
+    user.status = UserStatus.rejected
+    db.commit()
+    db.refresh(user)
+    audit_service.record(db, actor_id=college_admin_id, action="registration_rejected", resource_type="user", resource_id=user.id)
+    return user
+
+
+# ---- the college admin's student/teacher roster --------------------------------------------
+# Distinct from the pending-registration queue above: this is everyone already admitted
+# (active or suspended), with account-management actions scoped to this one college. A college
+# admin can never act on another CollegeAdministrator of the same college (or on themselves)
+# through here — that delegation is a platform-admin-only decision (see assign/remove_college_admin).
+
+
+def list_college_members(db: Session, college_id: str) -> list[User]:
+    stmt = (
+        select(User)
+        .where(User.college_id == college_id, User.status.in_([UserStatus.active, UserStatus.suspended]))
+        .order_by(User.role, User.full_name)
+    )
+    return list(db.execute(stmt).scalars())
+
+
+def _get_member_or_404(db: Session, college_id: str, user_id: str) -> User:
+    user = db.get(User, user_id)
+    if not user or user.college_id != college_id or user.status not in (UserStatus.active, UserStatus.suspended):
+        raise NotFoundError("Member not found.")
+    return user
+
+
+def _assert_not_self(acting_college_admin_id: str, target: User) -> None:
+    if target.id == acting_college_admin_id:
+        raise ForbiddenError("You cannot take this action on your own account.", code="CANNOT_ACT_ON_SELF")
+
+
+def suspend_member(db: Session, college_admin_id: str, college_id: str, user_id: str) -> User:
+    user = _get_member_or_404(db, college_id, user_id)
+    _assert_not_self(college_admin_id, user)
+    if user.status != UserStatus.suspended:
+        user.status = UserStatus.suspended
+        db.commit()
+        db.refresh(user)
+        audit_service.record(db, actor_id=college_admin_id, action="member_suspended", resource_type="user", resource_id=user.id)
+    return user
+
+
+def reactivate_member(db: Session, college_admin_id: str, college_id: str, user_id: str) -> User:
+    user = _get_member_or_404(db, college_id, user_id)
+    _assert_not_self(college_admin_id, user)
+    if user.status != UserStatus.active:
+        user.status = UserStatus.active
+        db.commit()
+        db.refresh(user)
+        audit_service.record(db, actor_id=college_admin_id, action="member_reactivated", resource_type="user", resource_id=user.id)
+    return user
+
+
+def remove_member_from_college(db: Session, college_admin_id: str, college_id: str, user_id: str) -> User:
+    """Detaches the account from this college — the account itself, its role and its own data
+    (courses, submissions, recordings, ...) are untouched; only the college/section/branch
+    affiliation is cleared, exactly as a college deletion detaches everyone (see
+    confirm_college_deletion)."""
+    user = _get_member_or_404(db, college_id, user_id)
+    _assert_not_self(college_admin_id, user)
+    db.execute(delete(UserCollegeSection).where(UserCollegeSection.user_id == user.id))
+    db.execute(delete(UserBranchAssignment).where(UserBranchAssignment.user_id == user.id))
+    user.college_id = None
+    db.commit()
+    db.refresh(user)
+    audit_service.record(db, actor_id=college_admin_id, action="member_removed_from_college", resource_type="user", resource_id=user.id)
+    return user
+
+
+# ---- two-phase college deletion -------------------------------------------------------------
+# The super admin can only REQUEST deletion; the college's own delegated administrator must
+# separately confirm with their own password plus an OTP emailed to the college's contact
+# address (see auth_service.request_deletion_otp / verify_deletion_otp) before anything is
+# actually deleted — a super admin alone can never complete this unilaterally.
+
+
+def request_college_deletion(db: Session, platform_admin_id: str, college: College) -> CollegeDeletionRequest:
+    existing = db.execute(
+        select(CollegeDeletionRequest).where(
+            CollegeDeletionRequest.college_id == college.id, CollegeDeletionRequest.status == CollegeDeletionRequestStatus.pending
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+    if not list_college_admins(db, college.id):
+        raise ConflictError(
+            "This college has no delegated administrator to confirm the deletion. Delegate one first.", code="NO_COLLEGE_ADMIN"
+        )
+    request = CollegeDeletionRequest(college_id=college.id, requested_by=platform_admin_id, status=CollegeDeletionRequestStatus.pending)
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    audit_service.record(db, actor_id=platform_admin_id, action="college_deletion_requested", resource_type="college", resource_id=college.id)
+    return request
+
+
+def get_pending_deletion_request(db: Session, college_id: str) -> CollegeDeletionRequest | None:
+    return db.execute(
+        select(CollegeDeletionRequest).where(
+            CollegeDeletionRequest.college_id == college_id, CollegeDeletionRequest.status == CollegeDeletionRequestStatus.pending
+        )
+    ).scalar_one_or_none()
+
+
+def get_deletion_request_or_404(db: Session, college_id: str, request_id: str) -> CollegeDeletionRequest:
+    request = db.get(CollegeDeletionRequest, request_id)
+    if not request or request.college_id != college_id:
+        raise NotFoundError("Deletion request not found.")
+    return request
+
+
+def request_deletion_confirmation_otp(
+    db: Session, college: College, deletion_request: CollegeDeletionRequest, confirming_user: User, *, password: str, ip: str | None = None,
+) -> tuple[bool, str | None]:
+    from app.services import auth_service
+
+    assert_can_manage_college(db, confirming_user, college)
+    if deletion_request.status != CollegeDeletionRequestStatus.pending:
+        raise ConflictError("This deletion request is no longer pending.", code="REQUEST_ALREADY_DECIDED")
+    if not verify_password(password, confirming_user.password_hash):
+        raise ForbiddenError("Incorrect password.", code="INVALID_CREDENTIALS")
+    if not college.contact_email:
+        raise ConflictError("This college has no registered contact email to send the confirmation code to.", code="NO_CONTACT_EMAIL")
+    return auth_service.request_deletion_otp(db, confirming_user, send_to_email=college.contact_email, ip=ip)
+
+
+def confirm_college_deletion(
+    db: Session, college: College, deletion_request: CollegeDeletionRequest, confirming_user: User, *, otp: str, ip: str | None = None,
+) -> None:
+    from app.services import auth_service
+
+    assert_can_manage_college(db, confirming_user, college)
+    if deletion_request.status != CollegeDeletionRequestStatus.pending:
+        raise ConflictError("This deletion request is no longer pending.", code="REQUEST_ALREADY_DECIDED")
+    auth_service.verify_deletion_otp(db, confirming_user, otp=otp, ip=ip)
+
+    deletion_request.status = CollegeDeletionRequestStatus.confirmed
+    deletion_request.confirmed_by = confirming_user.id
+    deletion_request.confirmed_at = utcnow()
+    college_id = college.id
+    # Branches/sections/administrators cascade (ondelete="CASCADE"); affected students'/teachers'
+    # college_id is set to NULL (ondelete="SET NULL") — their accounts are never deleted, just
+    # detached from the college.
+    db.delete(college)
+    db.commit()
+    audit_service.record(db, actor_id=confirming_user.id, action="college_deleted", resource_type="college", resource_id=college_id)
+
+
+def decline_college_deletion(db: Session, college: College, deletion_request: CollegeDeletionRequest, confirming_user: User) -> CollegeDeletionRequest:
+    assert_can_manage_college(db, confirming_user, college)
+    if deletion_request.status != CollegeDeletionRequestStatus.pending:
+        raise ConflictError("This deletion request is no longer pending.", code="REQUEST_ALREADY_DECIDED")
+    deletion_request.status = CollegeDeletionRequestStatus.cancelled
+    deletion_request.confirmed_by = confirming_user.id
+    deletion_request.confirmed_at = utcnow()
+    db.commit()
+    db.refresh(deletion_request)
+    audit_service.record(db, actor_id=confirming_user.id, action="college_deletion_declined", resource_type="college", resource_id=college.id)
+    return deletion_request

@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.db.models.enums import UserStatus
 from app.dependencies import get_current_user, get_db
 from app.db.models.user import User
 from app.schemas.auth import (
@@ -11,6 +12,7 @@ from app.schemas.auth import (
     LoginOtpRequired,
     LoginRequest,
     RegisterRequest,
+    RegistrationPendingOut,
     RegistrationVerificationOut,
     RequestRegistrationOtpRequest,
     ResetAuthorizationOut,
@@ -70,7 +72,7 @@ def register_verify_otp(
     return RegistrationVerificationOut(verification_token=verification_token, expires_in_minutes=settings.reset_token_ttl_minutes)
 
 
-@router.post("/register", response_model=AuthResponse, status_code=201)
+@router.post("/register", response_model=AuthResponse, status_code=201, responses={202: {"model": RegistrationPendingOut}})
 def register(
     payload: RegisterRequest,
     response: Response,
@@ -83,6 +85,14 @@ def register(
         section_id=payload.section_id, branch_id=payload.branch_id, all_sections=payload.all_sections,
         verification_token=payload.verification_token,
     )
+    if user.status == UserStatus.pending:
+        # Awaiting the college administrator's approval: no session until they approve it.
+        return JSONResponse(
+            status_code=202,
+            content=RegistrationPendingOut(
+                message="Your registration has been submitted and is awaiting approval from your institution's administrator."
+            ).model_dump(),
+        )
     token = auth_service.create_session(db, user)
     _set_session_cookie(response, token, settings)
     return AuthResponse(user=UserOut.model_validate(user))

@@ -30,6 +30,8 @@
     "studentAccountDesc": "コース、授業、オフラインダウンロードにアクセス",
     "teacherAccount": "教師アカウント",
     "teacherAccountDesc": "授業を予定し、教材と課題を管理",
+    "institutionAccount": "機関アカウント",
+    "institutionAccountDesc": "機関を登録し、その学部・セクション・登録を管理する",
     "alreadyRegistered": "すでに登録済みですか?",
     "signInHere": "こちらからサインイン"
   },

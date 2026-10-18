@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { GraduationCap, BookOpen, ArrowRight } from 'lucide-react'
+import { GraduationCap, BookOpen, Building2, ArrowRight } from 'lucide-react'
 import { Logo } from '../../components/ui/Logo'
 import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher'
 
@@ -51,6 +51,20 @@ export const RegisterChoicePage: React.FC = () => {
             <div className="flex-1 text-left">
               <h2 className="text-sm font-bold text-[#202B2A]">{t('auth.teacherAccount')}</h2>
               <p className="text-xs text-[#687775]">{t('auth.teacherAccountDesc')}</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-[#CBD7D1] group-hover:text-[#0F5B57] transition-colors shrink-0" />
+          </Link>
+
+          <Link
+            to="/register/college"
+            className="group bg-[#FFFFFF] border border-[#E1E8E4] hover:border-[#0F5B57] rounded-2xl p-5 flex items-center gap-4 shadow-xs transition-colors"
+          >
+            <div className="w-11 h-11 shrink-0 rounded-xl bg-[#DDF3EA] text-[#0F5B57] flex items-center justify-center">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <div className="flex-1 text-left">
+              <h2 className="text-sm font-bold text-[#202B2A]">{t('auth.institutionAccount')}</h2>
+              <p className="text-xs text-[#687775]">{t('auth.institutionAccountDesc')}</p>
             </div>
             <ArrowRight className="w-4 h-4 text-[#CBD7D1] group-hover:text-[#0F5B57] transition-colors shrink-0" />
           </Link>

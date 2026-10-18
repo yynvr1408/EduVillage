@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { FormField } from '../../components/ui/FormField'
 import { Logo } from '../../components/ui/Logo'
+import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher'
 
 export interface LoginPageProps {
   /** Set by the /login/student and /login/teacher routes to theme the form and enforce that the
@@ -132,6 +133,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
   return (
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
+        <div className="flex justify-end mb-3">
+          <LanguageSwitcher />
+        </div>
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-6">
           <Logo size={48} className="mb-3" />

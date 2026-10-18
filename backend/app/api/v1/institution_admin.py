@@ -9,7 +9,7 @@ Creating a new college, or suspending/activating one, stays platform-admin-only 
 deliberately not exposed here.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_role
@@ -20,12 +20,17 @@ from app.schemas.admin import (
     BranchCreate,
     BranchOut,
     BranchUpdate,
+    CollegeDeletionRequestOut,
     CollegeOut,
     CollegeSectionCreate,
     CollegeSectionOut,
     CollegeSectionUpdate,
     CollegeStatusChange,
     CollegeUpdate,
+    DecisionReject,
+    DeletionOtpRequest,
+    DeletionOtpVerify,
+    PendingUserOut,
 )
 from app.services import college_service
 
@@ -154,3 +159,126 @@ def change_my_section_status(
     college = college_service.get_college_or_404(db, section.college_id)
     college_service.assert_can_manage_college(db, user, college)
     return college_service.set_section_status(db, user.id, section, payload.status)
+
+
+# ---- student/teacher registration review -------------------------------------------------------
+# Replaces instant self-registration: a student/teacher who registers against this college now
+# waits here until the delegated administrator approves or rejects them.
+
+
+@router.get("/colleges/{college_id}/registrations", response_model=list[PendingUserOut])
+def list_pending_registrations(college_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.list_pending_registrations(db, college_id)
+
+
+@router.post("/colleges/{college_id}/registrations/{user_id}/approve", response_model=PendingUserOut)
+def approve_registration(
+    college_id: str, user_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.approve_registration(db, user.id, college_id, user_id)
+
+
+@router.post("/colleges/{college_id}/registrations/{user_id}/reject", response_model=PendingUserOut)
+def reject_registration(
+    college_id: str, user_id: str, payload: DecisionReject, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.reject_registration(db, user.id, college_id, user_id, reason=payload.reason)
+
+
+# ---- the student/teacher roster: everyone already admitted (active or suspended) ----------------
+
+
+@router.get("/colleges/{college_id}/members", response_model=list[PendingUserOut])
+def list_members(college_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.list_college_members(db, college_id)
+
+
+@router.post("/colleges/{college_id}/members/{user_id}/suspend", response_model=PendingUserOut)
+def suspend_member(college_id: str, user_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.suspend_member(db, user.id, college_id, user_id)
+
+
+@router.post("/colleges/{college_id}/members/{user_id}/reactivate", response_model=PendingUserOut)
+def reactivate_member(college_id: str, user_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.reactivate_member(db, user.id, college_id, user_id)
+
+
+@router.post("/colleges/{college_id}/members/{user_id}/remove", response_model=PendingUserOut)
+def remove_member(college_id: str, user_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.remove_member_from_college(db, user.id, college_id, user_id)
+
+
+# ---- college deletion: the delegated administrator's confirmation side --------------------------
+# The super admin can only REQUEST deletion (POST /admin/colleges/{id}/deletion-requests); it is
+# completed only here, by the college's own administrator, with their own password + an OTP
+# emailed to the college's contact address.
+
+
+@router.get("/colleges/{college_id}/deletion-requests", response_model=CollegeDeletionRequestOut | None)
+def get_my_college_deletion_request(college_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.get_pending_deletion_request(db, college_id)
+
+
+@router.post("/colleges/{college_id}/deletion-requests/{request_id}/request-otp", status_code=202)
+def request_my_deletion_otp(
+    college_id: str, request_id: str, payload: DeletionOtpRequest, request: Request,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    deletion_request = college_service.get_deletion_request_or_404(db, college_id, request_id)
+    ip = request.client.host if request.client else None
+    sent, dev_otp = college_service.request_deletion_confirmation_otp(
+        db, college, deletion_request, user, password=payload.password, ip=ip
+    )
+    body = {"message": "A confirmation code has been sent to this college's registered contact email."}
+    if dev_otp:
+        body["dev_otp"] = dev_otp
+    return body
+
+
+@router.post("/colleges/{college_id}/deletion-requests/{request_id}/confirm", status_code=204)
+def confirm_my_college_deletion(
+    college_id: str, request_id: str, payload: DeletionOtpVerify, request: Request,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    deletion_request = college_service.get_deletion_request_or_404(db, college_id, request_id)
+    ip = request.client.host if request.client else None
+    college_service.confirm_college_deletion(db, college, deletion_request, user, otp=payload.otp, ip=ip)
+    return None
+
+
+@router.post("/colleges/{college_id}/deletion-requests/{request_id}/decline", response_model=CollegeDeletionRequestOut)
+def decline_my_college_deletion(
+    college_id: str, request_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    deletion_request = college_service.get_deletion_request_or_404(db, college_id, request_id)
+    return college_service.decline_college_deletion(db, college, deletion_request, user)

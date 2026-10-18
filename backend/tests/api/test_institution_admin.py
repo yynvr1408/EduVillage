@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from tests.api.test_admin import BASE as ADMIN_BASE
 from tests.api.test_admin import CSRF, admin_client, admin_creds  # noqa: F401 - fixtures
+from tests.api.test_college_registration import register_active
 
 INST_BASE = "/api/v1/institution-admin"
 
@@ -176,3 +177,120 @@ def test_institution_admins_cannot_create_or_delete_colleges(college, teacher, a
 
     create = tclient.post(f"{INST_BASE}/colleges", json={"name": "A New College"})
     assert create.status_code in (404, 405)  # the route simply doesn't exist here
+
+
+# ---- the student/teacher roster ------------------------------------------------------------------
+
+
+def _branch_and_section(admin_client, college):
+    branch = admin_client.post(f"{ADMIN_BASE}/colleges/{college['id']}/branches", json={"name": "Computer Science"})
+    assert branch.status_code == 201, branch.text
+    branch = branch.json()
+    section = admin_client.post(f"{ADMIN_BASE}/branches/{branch['id']}/sections", json={"name": "Section A"})
+    assert section.status_code == 201, section.text
+    return branch, section.json()
+
+
+def test_roster_lists_only_active_and_suspended_members_of_this_college(admin_client, college, teacher):
+    tclient, tuser = teacher
+    _delegate(admin_client, college["id"], tuser["id"])
+    _branch, section = _branch_and_section(admin_client, college)
+
+    student_client, student_resp = register_active(college, section, role="student")
+    assert student_resp.status_code == 201, student_resp.text
+    member_id = student_resp.json()["user"]["id"]
+
+    roster = tclient.get(f"{INST_BASE}/colleges/{college['id']}/members")
+    assert roster.status_code == 200
+    assert [m["id"] for m in roster.json()] == [member_id]
+    assert roster.json()[0]["status"] == "active"
+
+
+def test_suspending_a_member_blocks_their_login_and_can_be_reversed(admin_client, college, teacher):
+    tclient, tuser = teacher
+    _delegate(admin_client, college["id"], tuser["id"])
+    _branch, section = _branch_and_section(admin_client, college)
+
+    email = f"roster-{secrets.token_hex(4)}@example.com"
+    _student_client, student_resp = register_active(college, section, role="student", email=email)
+    member_id = student_resp.json()["user"]["id"]
+
+    suspended = tclient.post(f"{INST_BASE}/colleges/{college['id']}/members/{member_id}/suspend")
+    assert suspended.status_code == 200 and suspended.json()["status"] == "suspended"
+
+    blocked_login = TestClient(app).post("/api/v1/auth/login", json={"email": email, "password": "password123"})
+    assert blocked_login.status_code == 401
+    assert blocked_login.json()["error"]["code"] == "ACCOUNT_INACTIVE"
+
+    reactivated = tclient.post(f"{INST_BASE}/colleges/{college['id']}/members/{member_id}/reactivate")
+    assert reactivated.status_code == 200 and reactivated.json()["status"] == "active"
+
+    ok_login = TestClient(app).post("/api/v1/auth/login", json={"email": email, "password": "password123"})
+    assert ok_login.status_code == 200
+
+
+def test_removing_a_member_detaches_them_without_deleting_the_account(admin_client, college, teacher, db_session):
+    from sqlalchemy import select as sa_select
+    from app.db.models.college import UserCollegeSection
+    from app.db.models.user import User
+
+    tclient, tuser = teacher
+    _delegate(admin_client, college["id"], tuser["id"])
+    _branch, section = _branch_and_section(admin_client, college)
+
+    _student_client, student_resp = register_active(college, section, role="student")
+    member_id = student_resp.json()["user"]["id"]
+
+    removed = tclient.post(f"{INST_BASE}/colleges/{college['id']}/members/{member_id}/remove")
+    assert removed.status_code == 200
+
+    db_session.expire_all()
+    row = db_session.get(User, member_id)
+    assert row is not None  # the account itself survives
+    assert row.college_id is None
+    links = db_session.execute(sa_select(UserCollegeSection).where(UserCollegeSection.user_id == member_id)).scalars().all()
+    assert links == []
+
+    roster = tclient.get(f"{INST_BASE}/colleges/{college['id']}/members")
+    assert roster.json() == []
+
+
+def test_a_college_admin_cannot_act_on_their_own_roster_entry(admin_client, college):
+    """The administrator here is themselves a roster member of this college (registered through
+    the normal flow, college_id set) - the generic `teacher` fixture isn't, since it's never tied
+    to any particular college, so it wouldn't exercise this guard meaningfully."""
+    _branch, section = _branch_and_section(admin_client, college)
+
+    self_client, self_resp = register_active(college, section, role="teacher")
+    self_id = self_resp.json()["user"]["id"]
+    _delegate(admin_client, college["id"], self_id)
+
+    self_action = self_client.post(f"{INST_BASE}/colleges/{college['id']}/members/{self_id}/suspend")
+    assert self_action.status_code == 403 and self_action.json()["error"]["code"] == "CANNOT_ACT_ON_SELF"
+
+
+def test_a_college_has_at_most_one_administrator(admin_client, college, teacher):
+    """Delegating a second, different teacher to a college that already has one is rejected -
+    the platform admin must remove the existing delegation first to hand it to someone else."""
+    tclient, tuser = teacher
+    _delegate(admin_client, college["id"], tuser["id"])
+
+    second = admin_client.post(f"{ADMIN_BASE}/colleges/{college['id']}/administrators", json={"user_id": tuser["id"]})
+    assert second.status_code == 201  # same teacher again: idempotent, not a second administrator
+
+    _other_client, other_resp = register_active(role="teacher")  # no college: a plain second teacher account
+    other_id = other_resp.json()["user"]["id"]
+    conflict = admin_client.post(f"{ADMIN_BASE}/colleges/{college['id']}/administrators", json={"user_id": other_id})
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "COLLEGE_ALREADY_HAS_ADMINISTRATOR"
+
+    # Removing the first, THEN delegating someone else, works.
+    admin_client.delete(f"{ADMIN_BASE}/colleges/{college['id']}/administrators/{tuser['id']}")
+    replaced = admin_client.post(f"{ADMIN_BASE}/colleges/{college['id']}/administrators", json={"user_id": other_id})
+    assert replaced.status_code == 201
+
+
+def test_a_non_delegated_teacher_cannot_touch_the_roster(college, teacher):
+    tclient, _tuser = teacher
+    resp = tclient.get(f"{INST_BASE}/colleges/{college['id']}/members")
+    assert resp.status_code == 403

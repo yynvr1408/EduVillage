@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Clock, ShieldCheck, UserPlus } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Clock, Mail, ShieldCheck, UserPlus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import type { Role } from '../../types'
-import { authService } from '../../services/authService'
+import { authService, isRegistrationPending } from '../../services/authService'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { FormField } from '../../components/ui/FormField'
 import { Select } from '../../components/ui/Select'
 import { Logo } from '../../components/ui/Logo'
+import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher'
 import { registrationApi, type RegistrationBranch, type RegistrationCollege, type RegistrationSection } from '../../services/registrationApi'
 
 const OTP_TTL_SECONDS = 5 * 60
@@ -67,7 +68,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
 
   // Step 2: email verification. The form above is validated and held in state; nothing is
   // registered until the OTP sent to `email` is verified (see auth_service.register_user).
-  const [step, setStep] = useState<'form' | 'otp'>('form')
+  // Step 3 ('pending') only happens for a college-scoped registration: the account exists but
+  // waits for that college's administrator to approve it before it can sign in.
+  const [step, setStep] = useState<'form' | 'otp' | 'pending'>('form')
   const [otp, setOtp] = useState('')
   const [otpError, setOtpError] = useState<string | null>(null)
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
@@ -216,8 +219,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
       const selection = collegeId
         ? { collegeId, branchId, sectionId: allSections ? undefined : sectionId, allSections, collegeCode: collegeCode.trim() }
         : undefined
-      const user = await register(email, fullName, password, role, undefined, selection, verificationToken)
-      navigate(user.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', { replace: true })
+      const result = await register(email, fullName, password, role, undefined, selection, verificationToken)
+      if (isRegistrationPending(result)) {
+        setStep('pending')
+        return
+      }
+      navigate(result.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', { replace: true })
     } catch (err: any) {
       const field = SERVER_FIELD[err?.code as string]
       if (field) {
@@ -276,11 +283,42 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
     ...(isTeacher && branchId && sections.status === 'ready' ? [{ value: ALL_SECTIONS, label: 'All Sections' }] : []),
   ]
 
+  if (step === 'pending') {
+    return (
+      <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
+          <div className="flex justify-end mb-3">
+            <LanguageSwitcher />
+          </div>
+          <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs text-center">
+            <div className="w-12 h-12 rounded-full bg-[#DDF3EA] border border-[#CBD7D1] flex items-center justify-center text-[#0F5B57] mx-auto mb-4">
+              <Mail className="w-5 h-5" />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-[#202B2A] mb-2">Registration Submitted</h1>
+            <p className="text-xs sm:text-sm text-[#687775] leading-relaxed">
+              Your account has been created and is waiting for your institution's administrator to approve it.
+              You'll be able to sign in once they do.
+            </p>
+            <Link
+              to={portal ? `/login/${portal}` : '/login'}
+              className="mt-6 inline-block text-xs font-semibold text-[#0F5B57] hover:underline"
+            >
+              Back to sign in
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (step === 'otp') {
     const expired = secondsLeft <= 0
     return (
       <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
+          <div className="flex justify-end mb-3">
+            <LanguageSwitcher />
+          </div>
           <div className="flex flex-col items-center text-center mb-6">
             <Logo size={48} className="mb-3" />
             <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">Verify Your Email</h1>
@@ -355,6 +393,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
   return (
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
+        <div className="flex justify-end mb-3">
+          <LanguageSwitcher />
+        </div>
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-6">
           <Logo size={48} className="mb-3" />

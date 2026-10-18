@@ -17,6 +17,23 @@ const qs = (params: Record<string, string | undefined>) => {
   return s ? `?${s}` : ''
 }
 
+export interface PendingUser {
+  id: string
+  full_name: string
+  email: string
+  role: 'student' | 'teacher'
+  status: 'pending' | 'active' | 'suspended' | 'rejected'
+  created_at: string
+}
+
+export interface CollegeDeletionRequest {
+  id: string
+  college_id: string
+  status: 'pending' | 'confirmed' | 'cancelled'
+  requested_at: string
+  confirmed_at: string | null
+}
+
 export const institutionAdminApi = {
   myColleges: () => apiRequest<College[]>('/institution-admin/colleges'),
   getCollege: (id: string) => apiRequest<College>(`/institution-admin/colleges/${id}`),
@@ -42,4 +59,40 @@ export const institutionAdminApi = {
     apiRequest<CollegeSection>(`/institution-admin/sections/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
   setSectionStatus: (id: string, status: CollegeStatus) =>
     apiRequest<CollegeSection>(`/institution-admin/sections/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+
+  // ---- student/teacher registration review ------------------------------------------------
+  listPendingRegistrations: (collegeId: string) =>
+    apiRequest<PendingUser[]>(`/institution-admin/colleges/${collegeId}/registrations?status=pending`),
+  approveRegistration: (collegeId: string, userId: string) =>
+    apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/registrations/${userId}/approve`, { method: 'POST' }),
+  rejectRegistration: (collegeId: string, userId: string, reason?: string) =>
+    apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/registrations/${userId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || undefined }),
+    }),
+
+  // ---- college deletion: this administrator's confirmation side ---------------------------
+  getDeletionRequest: (collegeId: string) =>
+    apiRequest<CollegeDeletionRequest | null>(`/institution-admin/colleges/${collegeId}/deletion-requests`),
+  requestDeletionOtp: (collegeId: string, requestId: string, password: string) =>
+    apiRequest<{ message: string; dev_otp?: string }>(`/institution-admin/colleges/${collegeId}/deletion-requests/${requestId}/request-otp`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  confirmDeletion: (collegeId: string, requestId: string, otp: string) =>
+    apiRequest<void>(`/institution-admin/colleges/${collegeId}/deletion-requests/${requestId}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ otp }),
+    }),
+  declineDeletion: (collegeId: string, requestId: string) =>
+    apiRequest<CollegeDeletionRequest>(`/institution-admin/colleges/${collegeId}/deletion-requests/${requestId}/decline`, { method: 'POST' }),
+
+  // ---- the student/teacher roster: everyone already admitted (active or suspended) --------
+  listMembers: (collegeId: string) => apiRequest<PendingUser[]>(`/institution-admin/colleges/${collegeId}/members`),
+  suspendMember: (collegeId: string, userId: string) =>
+    apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/members/${userId}/suspend`, { method: 'POST' }),
+  reactivateMember: (collegeId: string, userId: string) =>
+    apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/members/${userId}/reactivate`, { method: 'POST' }),
+  removeMember: (collegeId: string, userId: string) =>
+    apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/members/${userId}/remove`, { method: 'POST' }),
 }

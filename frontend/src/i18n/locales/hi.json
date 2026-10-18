@@ -30,6 +30,8 @@
     "studentAccountDesc": "कोर्स, कक्षाओं और ऑफ़लाइन डाउनलोड तक पहुंचें",
     "teacherAccount": "शिक्षक खाता",
     "teacherAccountDesc": "कक्षाएं निर्धारित करें, सामग्री और असाइनमेंट प्रबंधित करें",
+    "institutionAccount": "संस्थान खाता",
+    "institutionAccountDesc": "अपने संस्थान को पंजीकृत करें और इसकी शाखाओं, अनुभागों और पंजीकरणों का प्रबंधन करें",
     "alreadyRegistered": "पहले से रजिस्टर्ड हैं?",
     "signInHere": "यहां साइन इन करें"
   },

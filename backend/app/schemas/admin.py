@@ -2,7 +2,7 @@ import re
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.db.models.enums import CollegeStatus
+from app.db.models.enums import CollegeDeletionRequestStatus, CollegeRegistrationRequestStatus, CollegeStatus, UserRole, UserStatus
 from app.schemas.common import UtcDatetime
 
 
@@ -187,6 +187,79 @@ class StudentVisibleTeacherSectionOut(BaseModel):
 class StudentVisibleCourseOut(BaseModel):
     id: str
     title: str
+
+
+class CollegeRegistrationRequestCreate(BaseModel):
+    """Public, unauthenticated: a college registering itself, pending platform-admin approval."""
+
+    college_name: str = Field(min_length=2, max_length=160)
+    location: str | None = Field(default=None, max_length=160)
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(default=None, max_length=40)
+    admin_full_name: str = Field(min_length=1, max_length=255)
+    admin_email: EmailStr
+    admin_password: str = Field(min_length=8, max_length=256)
+    # Proves control of admin_email — see POST /auth/register/verify-otp, reused as-is.
+    verification_token: str = Field(min_length=1, max_length=128)
+
+    @field_validator("college_name", "location", "contact_phone", "admin_full_name")
+    @classmethod
+    def _tidy(cls, v):
+        return _clean(v)
+
+
+class CollegeRegistrationRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    college_name: str
+    location: str | None
+    contact_email: str | None
+    contact_phone: str | None
+    admin_full_name: str
+    admin_email: str
+    status: CollegeRegistrationRequestStatus
+    rejected_reason: str | None
+    resulting_college_id: str | None
+    created_at: UtcDatetime
+    decided_at: UtcDatetime | None
+
+
+class DecisionReject(BaseModel):
+    """Shared by college-registration-request rejection and student/teacher registration rejection."""
+
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class PendingUserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    full_name: str
+    email: str
+    role: UserRole
+    status: UserStatus
+    created_at: UtcDatetime
+
+
+class CollegeDeletionRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    college_id: str
+    status: CollegeDeletionRequestStatus
+    requested_at: UtcDatetime
+    confirmed_at: UtcDatetime | None
+
+
+class DeletionOtpRequest(BaseModel):
+    """The confirming college administrator's own password — step 1 of the two-step confirmation."""
+
+    password: str = Field(min_length=1, max_length=256)
+
+
+class DeletionOtpVerify(BaseModel):
+    otp: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
 class StudentVisibleTeacherOut(BaseModel):

@@ -9,15 +9,33 @@ from sqlalchemy import func, select
 from app.config import get_settings
 from app.db.models.college import College, UserCollegeSection
 from app.db.models.course import CourseEnrollment
-from app.db.models.enums import UserRole
+from app.db.models.enums import UserRole, UserStatus
 from app.db.models.section import SectionMember
 from app.db.models.user import User
+from app.db.session import SessionLocal
 from app.main import app
 from app.services import admin_service
 
 from tests.api.test_admin import BASE, CSRF, _remove_admins  # noqa: F401
 
 REG = "/api/v1/registration"
+
+
+class _ResolvedRegistration:
+    """A stand-in for the httpx response `register()` would have returned if the account had come
+    back active immediately — so callers that only care about "I registered successfully" (not
+    about testing the approval gate itself) don't need to change their assertions."""
+
+    def __init__(self, status_code: int, body: dict):
+        self.status_code = status_code
+        self._body = body
+
+    def json(self):
+        return self._body
+
+    @property
+    def text(self):
+        return str(self._body)
 
 
 @pytest.fixture
@@ -61,13 +79,36 @@ def register(college=None, section=None, code="__use_college__", role="teacher",
     return c, c.post("/api/v1/auth/register", json=body)
 
 
+def register_active(college=None, section=None, code="__use_college__", role="teacher", email=None, password="password123", all_sections=False, **extra):
+    """Like register(), but for tests that just need a working logged-in client and aren't
+    testing the approval gate itself: a college-scoped registration now comes back pending, so
+    this approves it directly (bypassing the real college-admin review, which has its own
+    dedicated tests) and logs in for real, returning a response shaped like the old instant-201
+    one so existing call sites' assertions keep working unchanged."""
+    email = email or f"reg-{secrets.token_hex(4)}@example.com"
+    client, r = register(college, section, code=code, role=role, email=email, password=password, all_sections=all_sections, **extra)
+    if r.status_code != 202:
+        return client, r  # already active (e.g. no college required) or a genuine failure: pass through
+    db = SessionLocal()
+    try:
+        user = db.execute(select(User).where(User.email == email)).scalar_one()
+        user.status = UserStatus.active
+        db.commit()
+    finally:
+        db.close()
+    login_client = TestClient(app)
+    login_r = login_client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert login_r.status_code == 200, login_r.text
+    return login_client, _ResolvedRegistration(201, {"user": login_r.json()["user"]})
+
+
 # ---- registration lookups --------------------------------------------------------------------------
 
 # ---- teachers --------------------------------------------------------------------------------------
 
 def test_teacher_registers_with_college_code_and_section_and_it_persists(admin, db_session):
     college, secs = make_college(admin)
-    client, r = register(college, secs[1])
+    client, r = register_active(college, secs[1])
     assert r.status_code == 201, r.text
     user = r.json()["user"]
     assert user["role"] == "teacher"
@@ -81,7 +122,7 @@ def test_teacher_registers_with_college_code_and_section_and_it_persists(admin, 
 
 def test_code_is_case_and_spacing_tolerant(admin):
     college, secs = make_college(admin)
-    _, r = register(college, secs[0], code=college["code"].lower().replace("-", " "))
+    _, r = register_active(college, secs[0], code=college["code"].lower().replace("-", " "))
     assert r.status_code == 201, r.text
 
 
@@ -155,7 +196,7 @@ def test_missing_section_or_college_rejected(admin):
 def test_duplicate_email_conflicts_and_leaves_existing_account_untouched(admin, db_session):
     college, secs = make_college(admin)
     email = f"dupe-{secrets.token_hex(4)}@example.com"
-    assert register(college, secs[0], email=email)[1].status_code == 201
+    assert register(college, secs[0], email=email)[1].status_code == 202  # pending the college admin's approval
     _, again = register(college, secs[1], email=email)
     assert again.status_code == 409 and again.json()["error"]["code"] == "EMAIL_TAKEN"
     user = db_session.execute(select(User).where(User.email == email)).scalar_one()
@@ -174,7 +215,7 @@ def test_role_and_college_cannot_be_forged(admin, db_session):
     _, as_admin = register(college, secs[0], role="admin")
     assert as_admin.status_code == 422
     # A college code never turns into admin rights.
-    client, ok = register(college, secs[0])
+    client, ok = register_active(college, secs[0])
     assert ok.status_code == 201
     client.headers.update(CSRF)
     assert client.get(f"{BASE}/overview").status_code == 401
@@ -207,7 +248,7 @@ def test_students_and_teachers_share_one_college_code_not_separate_systems(admin
     _, r = register(college, secs[0], code=other["code"], role="student")
     assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_COLLEGE_CODE"
     # The college's own real code works for a student, same as for a teacher.
-    _, ok = register(college, secs[0], role="student")
+    _, ok = register_active(college, secs[0], role="student")
     assert ok.status_code == 201
 
 
@@ -228,7 +269,7 @@ def test_student_cannot_register_for_all_sections(admin):
 
 def test_student_registers_with_college_code_and_section_and_is_not_enrolled_anywhere(admin, db_session):
     college, secs = make_college(admin)
-    client, r = register(college, secs[0], role="student")
+    client, r = register_active(college, secs[0], role="student")
     assert r.status_code == 201, r.text
     uid = r.json()["user"]["id"]
     db_session.expire_all()
@@ -243,8 +284,8 @@ def test_student_registers_with_college_code_and_section_and_is_not_enrolled_any
 
 def test_teacher_in_a_section_does_not_gain_access_to_students_or_their_course_data(published_course, admin):
     college, secs = make_college(admin)
-    teacher_client, _ = register(college, secs[0])
-    student_client, _ = register(college, secs[0], role="student")
+    teacher_client, _ = register_active(college, secs[0])
+    student_client, _ = register_active(college, secs[0], role="student")
     assert student_client.post(f"/api/v1/courses/{published_course['id']}/enrollments", json={}).status_code == 201  # normal rules
     # Sharing a college section gives the new teacher no rights over another teacher's course or students.
     me = student_client.get("/api/v1/users/me").json()
@@ -268,14 +309,14 @@ def test_student_cross_college_section_rejected(admin):
 def test_existing_login_still_works_for_college_users(admin):
     college, secs = make_college(admin)
     email = f"login-{secrets.token_hex(4)}@example.com"
-    assert register(college, secs[0], email=email)[1].status_code == 201
+    assert register_active(college, secs[0], email=email)[1].status_code == 201
     r = TestClient(app).post("/api/v1/auth/login", json={"email": email, "password": "password123"})
     assert r.status_code == 200 and r.json()["user"]["role"] == "teacher"
 
 
 def test_deactivating_a_college_keeps_existing_users_and_links(admin, db_session):
     college, secs = make_college(admin)
-    _, r = register(college, secs[0])
+    _, r = register_active(college, secs[0])
     uid = r.json()["user"]["id"]
     admin.post(f"{BASE}/colleges/{college['id']}/status", json={"status": "inactive"})
     db_session.expire_all()

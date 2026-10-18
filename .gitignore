@@ -29,6 +29,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude Code: personal/local overrides, never shared
+.claude/settings.local.json
+
 # Scratch / non-repo artifacts (slide deck, template working files)
 *.pptx
 template_src/

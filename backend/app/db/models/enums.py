@@ -10,12 +10,26 @@ class UserRole(str, enum.Enum):
 class CollegeStatus(str, enum.Enum):
     active = "active"
     inactive = "inactive"
+    pending = "pending"  # a self-registered college awaiting platform-admin approval; never assignable via set_status
 
 
 class UserStatus(str, enum.Enum):
     active = "active"
-    pending = "pending"
+    pending = "pending"  # awaiting the student/teacher's college administrator's approval
     suspended = "suspended"
+    rejected = "rejected"  # a college administrator declined this registration
+
+
+class CollegeRegistrationRequestStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
+class CollegeDeletionRequestStatus(str, enum.Enum):
+    pending = "pending"  # awaiting the college administrator's password + OTP confirmation
+    confirmed = "confirmed"
+    cancelled = "cancelled"
 
 
 class CourseStatus(str, enum.Enum):

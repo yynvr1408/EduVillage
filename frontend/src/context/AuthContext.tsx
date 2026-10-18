@@ -1,7 +1,7 @@
 import type { CollegeSelection } from '../services/registrationApi'
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { User, Role } from '../types'
-import { authService, isOtpChallenge, type LoginOtpChallenge } from '../services/authService'
+import { authService, isOtpChallenge, isRegistrationPending, type LoginOtpChallenge, type RegistrationPending } from '../services/authService'
 import { assignmentService } from '../services/assignmentService'
 import { db } from '../db/db'
 import { ApiError } from '../services/apiClient'
@@ -24,7 +24,7 @@ interface AuthContextType {
     inviteCode?: string,
     college?: CollegeSelection,
     verificationToken?: string
-  ) => Promise<User>
+  ) => Promise<User | RegistrationPending>
   logout: () => Promise<void>
   switchUser: () => Promise<void>
   checkUnsavedWork: () => Promise<{ hasUnsaved: boolean; count: number; draftTitles: string[] }>
@@ -101,8 +101,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     inviteCode?: string,
     college?: CollegeSelection,
     verificationToken?: string
-  ): Promise<User> => {
+  ): Promise<User | RegistrationPending> => {
     const res = await authService.register(email, fullName, password, role, inviteCode, college, verificationToken)
+    if (isRegistrationPending(res)) return res
     setUser(res.user)
     return res.user
   }

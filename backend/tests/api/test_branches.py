@@ -16,8 +16,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.config import get_settings
 from app.db.models.college import CollegeBranch, CollegeSection, UserBranchAssignment, UserCollegeSection
+from app.db.models.enums import UserStatus
 from app.db.models.section import Section, SectionMember
 from app.db.models.user import User
+from app.db.session import SessionLocal
 from app.main import app
 from app.services import admin_service
 
@@ -69,9 +71,37 @@ def teacher_payload(college, branch, section=None, all_sections=False, code=None
 
 
 def sign_up(payload):
+    """Registers, then — for tests that just need a working logged-in client, not ones testing the
+    approval gate itself — approves directly and logs in, returning a response shaped like the old
+    instant-201 one so existing call sites' assertions keep working unchanged."""
     c = TestClient(app)
     r = c.post("/api/v1/auth/register", json=payload)
-    return c, r
+    if r.status_code != 202:
+        return c, r
+    db = SessionLocal()
+    try:
+        user = db.execute(select(User).where(User.email == payload["email"])).scalar_one()
+        user.status = UserStatus.active
+        db.commit()
+    finally:
+        db.close()
+    login_client = TestClient(app)
+    login_r = login_client.post("/api/v1/auth/login", json={"email": payload["email"], "password": payload["password"]})
+    assert login_r.status_code == 200, login_r.text
+    return login_client, _Resolved(201, {"user": login_r.json()["user"]})
+
+
+class _Resolved:
+    def __init__(self, status_code, body):
+        self.status_code = status_code
+        self._body = body
+
+    def json(self):
+        return self._body
+
+    @property
+    def text(self):
+        return str(self._body)
 
 
 # ---- admin: branches and sections ------------------------------------------------------------------

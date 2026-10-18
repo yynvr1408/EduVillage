@@ -19,6 +19,16 @@ export interface LoginOtpChallenge {
 
 export const isOtpChallenge = (r: AuthResponse | User | LoginOtpChallenge): r is LoginOtpChallenge => 'otp_required' in r
 
+/** 202 from /auth/register: a college-scoped registration now waits for that college's
+ * administrator to approve it — no session is established yet. */
+export interface RegistrationPending {
+  status: 'pending_approval'
+  message: string
+}
+
+export const isRegistrationPending = (r: AuthResponse | User | RegistrationPending): r is RegistrationPending =>
+  'status' in r && r.status === 'pending_approval'
+
 export const authService = {
   isSharedDevice(): boolean {
     return localStorage.getItem('eduvillage_shared_device') === 'true'
@@ -82,8 +92,8 @@ export const authService = {
     inviteCode?: string,
     college?: CollegeSelection,
     verificationToken?: string
-  ): Promise<AuthResponse> {
-    const data = await apiRequest<AuthResponse>('/auth/register', {
+  ): Promise<AuthResponse | RegistrationPending> {
+    const data = await apiRequest<AuthResponse | RegistrationPending>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         email,
@@ -99,6 +109,7 @@ export const authService = {
         verification_token: verificationToken || undefined,
       }),
     })
+    if (isRegistrationPending(data)) return data
     this.cacheUser(data.user)
     return data
   },

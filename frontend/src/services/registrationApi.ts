@@ -38,6 +38,25 @@ export interface CollegeTeacher {
   courses: { id: string; title: string }[]
 }
 
+export interface CollegeRegistrationRequestInput {
+  collegeName: string
+  location?: string
+  contactEmail?: string
+  contactPhone?: string
+  adminFullName: string
+  adminEmail: string
+  adminPassword: string
+  /** From the registration email-verification step (authService.verifyRegistrationOtp). */
+  verificationToken: string
+}
+
+export interface CollegeRegistrationRequestResult {
+  id: string
+  college_name: string
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+}
+
 /** Public, read live from the administrator-managed records: nothing here is hardcoded. */
 export const registrationApi = {
   listColleges: () => apiRequest<RegistrationCollege[]>('/registration/colleges', { cache: 'no-store' }),
@@ -48,4 +67,19 @@ export const registrationApi = {
   /** Authenticated, student-only: teachers in the signed-in student's own college/section (or
    * branch-wide). Discovery only — never implies enrollment or course access. */
   listMyCollegeTeachers: () => apiRequest<CollegeTeacher[]>('/users/me/college-teachers'),
+  /** Public: a college registering itself, pending platform-admin approval. */
+  requestCollegeRegistration: (input: CollegeRegistrationRequestInput) =>
+    apiRequest<CollegeRegistrationRequestResult>('/registration/colleges/request', {
+      method: 'POST',
+      body: JSON.stringify({
+        college_name: input.collegeName,
+        location: input.location || undefined,
+        contact_email: input.contactEmail || undefined,
+        contact_phone: input.contactPhone || undefined,
+        admin_full_name: input.adminFullName,
+        admin_email: input.adminEmail,
+        admin_password: input.adminPassword,
+        verification_token: input.verificationToken,
+      }),
+    }),
 }

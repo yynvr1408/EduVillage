@@ -30,6 +30,8 @@
     "studentAccountDesc": "Fikia kozi, madarasa na vipakuliwa nje ya mtandao",
     "teacherAccount": "Akaunti ya Mwalimu",
     "teacherAccountDesc": "Panga madarasa, simamia vifaa na kazi",
+    "institutionAccount": "Akaunti ya Taasisi",
+    "institutionAccountDesc": "Sajili taasisi yako na simamia matawi, sehemu na usajili wake",
     "alreadyRegistered": "Tayari umejisajili?",
     "signInHere": "Ingia hapa"
   },

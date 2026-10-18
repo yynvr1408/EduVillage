@@ -101,7 +101,12 @@ def register_user(
         email=normalized_email,
         password_hash=hash_password(password),
         role=role,
-        status=UserStatus.active,
+        # A college-scoped registration awaits that college's delegated administrator's approval
+        # (see institution_admin.py's registration-review endpoints and authenticate_user below).
+        # A collegeless registration (only reachable when *_college_required is off — a dev/test
+        # convenience, see config.py) has no administrator who could ever approve it, so it stays
+        # active immediately, exactly as before this feature existed.
+        status=UserStatus.pending if target is not None else UserStatus.active,
     )
     if target is not None:
         user.college_id = target[0].id
@@ -128,6 +133,14 @@ def authenticate_user(db: Session, *, email: str, password: str) -> User:
         raise UnauthorizedError("Incorrect email or password.", code="INVALID_CREDENTIALS")
     if user.role == UserRole.admin:  # administrators sign in only through the admin endpoint
         raise UnauthorizedError("Incorrect email or password.", code="INVALID_CREDENTIALS")
+    if user.status == UserStatus.pending:
+        raise UnauthorizedError(
+            "Your registration is awaiting approval from your institution's administrator.", code="REGISTRATION_PENDING"
+        )
+    if user.status == UserStatus.rejected:
+        raise UnauthorizedError(
+            "Your registration was declined by your institution. Contact them for details.", code="REGISTRATION_REJECTED"
+        )
     if user.status != UserStatus.active:
         raise UnauthorizedError("This account is not active.", code="ACCOUNT_INACTIVE")
     audit_service.record(db, actor_id=user.id, action="login", resource_type="user", resource_id=user.id)
@@ -682,3 +695,65 @@ def consume_registration_verification(db: Session, *, email: str, verification_t
     db.commit()
     if claimed.rowcount != 1:
         raise ForbiddenError("Email verification is required and must match the email you're registering with.", code="EMAIL_NOT_VERIFIED")
+
+
+# ---- two-phase college deletion confirmation ---------------------------------------------------
+# A super admin can only REQUEST a college's deletion (see college_service.request_college_deletion);
+# completing it needs the college's own delegated administrator to separately prove (a) their own
+# password and (b) control of the college's registered contact mailbox, via this OTP, reusing the
+# exact same _generate_otp/_hash_otp/_claim_otp primitives as every other OTP purpose above — just a
+# new purpose string and, unlike every other purpose here, an email recipient the caller chooses
+# (the college's contact_email) rather than the confirming user's own address.
+
+DELETION_PURPOSE = "college_deletion"
+
+
+def request_deletion_otp(db: Session, confirming_user: User, *, send_to_email: str, ip: str | None = None) -> tuple[bool, str | None]:
+    """Emails a college-deletion confirmation code to `send_to_email` (the college's own contact
+    address, not the confirming user's). Returns (code_was_sent, raw_otp_for_development), same
+    convention as request_login_otp."""
+    from app.integrations import email as email_integration
+
+    _check_rate_limit(db, f"deletion-otp-req:{confirming_user.id}")
+    if ip:
+        _check_rate_limit(db, f"deletion-otp-req-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+
+    now = utcnow()
+    latest = db.execute(
+        select(PasswordResetOtpChallenge)
+        .where(PasswordResetOtpChallenge.user_id == confirming_user.id, PasswordResetOtpChallenge.purpose == DELETION_PURPOSE)
+        .order_by(PasswordResetOtpChallenge.created_at.desc())
+    ).scalars().first()
+    if latest and (now - latest.created_at) < timedelta(seconds=settings.otp_request_cooldown_seconds):
+        return False, None  # the code already sent is still valid; do not email again inside the cooldown
+
+    db.execute(
+        update(PasswordResetOtpChallenge)
+        .where(
+            PasswordResetOtpChallenge.user_id == confirming_user.id,
+            PasswordResetOtpChallenge.purpose == DELETION_PURPOSE,
+            PasswordResetOtpChallenge.verified_at.is_(None),
+            PasswordResetOtpChallenge.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+    otp = _generate_otp()
+    challenge = PasswordResetOtpChallenge(
+        user_id=confirming_user.id,
+        otp_hash=_hash_otp(otp),
+        purpose=DELETION_PURPOSE,
+        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        max_attempts=settings.otp_max_attempts,
+    )
+    db.add(challenge)
+    db.commit()
+
+    sent = email_integration.send_college_deletion_otp_email(to=send_to_email, otp=otp, ttl_minutes=settings.otp_ttl_minutes)
+    return sent, (None if settings.is_production or settings.emailjs_configured else otp)
+
+
+def verify_deletion_otp(db: Session, confirming_user: User, *, otp: str, ip: str | None = None) -> None:
+    _check_rate_limit(db, f"deletion-otp-verify:{confirming_user.id}")
+    if ip:
+        _check_rate_limit(db, f"deletion-otp-verify-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+    _claim_otp(db, confirming_user, DELETION_PURPOSE, otp)

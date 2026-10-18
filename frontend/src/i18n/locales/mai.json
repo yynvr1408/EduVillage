@@ -30,6 +30,8 @@
     "studentAccountDesc": "कोर्स, कक्षा आ ऑफलाइन डाउनलोड प्राप्त करू",
     "teacherAccount": "शिक्षक खाता",
     "teacherAccountDesc": "कक्षाक समय निर्धारित करू, सामग्री आ असाइनमेंट प्रबंधित करू",
+    "institutionAccount": "संस्थान खाता",
+    "institutionAccountDesc": "अपन संस्थानक पंजीकरण करू आ ओकर शाखा, विभाग आ पंजीकरण प्रबंधित करू",
     "alreadyRegistered": "पहिनेसँ पंजीकृत छी?",
     "signInHere": "एतय साइन इन करू"
   },

@@ -7,7 +7,7 @@ import secrets
 from fastapi.testclient import TestClient
 
 from app.main import app
-from tests.api.test_college_registration import BASE, admin, make_college, register  # noqa: F401  (fixture reuse)
+from tests.api.test_college_registration import BASE, admin, make_college, register_active as register  # noqa: F401  (fixture reuse)
 
 ME_TEACHERS = "/api/v1/users/me/college-teachers"
 
@@ -45,24 +45,10 @@ def test_student_does_not_see_teachers_from_an_unrelated_college(admin):
 
 def test_branch_wide_teacher_is_visible_to_every_section_of_that_branch_but_not_other_branches(admin):
     college, secs = make_college(admin)  # branch "Computer Science" with sections CSE-A, CSE-B
-    branch_id = secs[0]["branch_id"]
     other_branch = admin.post(f"{BASE}/colleges/{college['id']}/branches", json={"name": "Other Dept", "short_code": "OTH"}).json()
     other_sec = admin.post(f"{BASE}/branches/{other_branch['id']}/sections", json={"name": "Section X"}).json()
 
-    wide_client = TestClient(app)
-    wide_resp = wide_client.post(
-        "/api/v1/auth/register",
-        json={
-            "full_name": "Branch Wide Teacher",
-            "email": f"wide-{secrets.token_hex(4)}@example.com",
-            "password": "password123",
-            "role": "teacher",
-            "college_id": college["id"],
-            "college_code": college["code"],
-            "branch_id": branch_id,
-            "all_sections": True,
-        },
-    )
+    wide_client, wide_resp = register(college, None, role="teacher", all_sections=True)
     assert wide_resp.status_code == 201, wide_resp.text
     wide_teacher_id = wide_resp.json()["user"]["id"]
 

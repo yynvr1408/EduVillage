@@ -2,7 +2,7 @@
 
 Generated from the SQLAlchemy models by `backend/scripts/generate_docs.py`; do not edit by hand. Migrations live in `backend/alembic/versions/` (one linear chain; `alembic heads` shows one head). Production uses PostgreSQL (Neon); development and most tests use SQLite.
 
-36 tables. Primary keys are 36-character UUID strings. Timestamps are stored as naive UTC.
+38 tables. Primary keys are 36-character UUID strings. Timestamps are stored as naive UTC.
 
 ## `assignment_submissions`
 
@@ -126,12 +126,10 @@ Constraints: unique (assignment_id, student_id).
 | Column | Type | Null | Notes |
 |---|---|---|---|
 | `user_id` | VARCHAR(36) | no | -> `users.id`, indexed |
-| `college_id` | VARCHAR(36) | no | -> `colleges.id`, indexed |
+| `college_id` | VARCHAR(36) | no | -> `colleges.id` |
 | `assigned_by` | VARCHAR(36) | yes | -> `users.id` |
 | `assigned_at` | DATETIME | no |  |
 | `id` | VARCHAR(36) | no | primary key |
-
-Constraints: unique (user_id, college_id).
 
 ## `college_branches`
 
@@ -146,7 +144,7 @@ Constraints: unique (user_id, college_id).
 | `created_at` | DATETIME | no |  |
 | `updated_at` | DATETIME | no |  |
 
-Constraints: unique (college_id, name_key); unique (id, college_id).
+Constraints: unique (id, college_id); unique (college_id, name_key).
 
 ## `college_code_history`
 
@@ -158,11 +156,43 @@ Constraints: unique (college_id, name_key); unique (id, college_id).
 | `replaced_by` | VARCHAR(36) | yes | -> `users.id` |
 | `id` | VARCHAR(36) | no | primary key |
 
-## `college_sections`
+## `college_deletion_requests`
 
 | Column | Type | Null | Notes |
 |---|---|---|---|
 | `college_id` | VARCHAR(36) | no | -> `colleges.id`, indexed |
+| `requested_by` | VARCHAR(36) | yes | -> `users.id` |
+| `requested_at` | DATETIME | no |  |
+| `status` | VARCHAR(9) | no |  |
+| `confirmed_by` | VARCHAR(36) | yes | -> `users.id` |
+| `confirmed_at` | DATETIME | yes |  |
+| `id` | VARCHAR(36) | no | primary key |
+
+## `college_registration_requests`
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `college_name` | VARCHAR(160) | no |  |
+| `location` | VARCHAR(160) | yes |  |
+| `contact_email` | VARCHAR(320) | yes |  |
+| `contact_phone` | VARCHAR(40) | yes |  |
+| `admin_full_name` | VARCHAR(255) | no |  |
+| `admin_email` | VARCHAR(320) | no | indexed |
+| `admin_password_hash` | VARCHAR(255) | no |  |
+| `status` | VARCHAR(8) | no |  |
+| `rejected_reason` | VARCHAR(500) | yes |  |
+| `decided_by` | VARCHAR(36) | yes | -> `users.id` |
+| `decided_at` | DATETIME | yes |  |
+| `resulting_college_id` | VARCHAR(36) | yes | -> `colleges.id` |
+| `id` | VARCHAR(36) | no | primary key |
+| `created_at` | DATETIME | no |  |
+| `updated_at` | DATETIME | no |  |
+
+## `college_sections`
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `college_id` | VARCHAR(36) | no | -> `college_branches.college_id`, indexed |
 | `branch_id` | VARCHAR(36) | no | -> `college_branches.id`, indexed |
 | `name` | VARCHAR(80) | no |  |
 | `name_key` | VARCHAR(80) | no |  |

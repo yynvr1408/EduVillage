@@ -2,7 +2,7 @@
 
 Generated from the running application by `backend/scripts/generate_docs.py`; do not edit by hand. Interactive documentation is served by the backend at `/docs` (Swagger) and `/openapi.json`.
 
-145 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
+162 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
 
 **Authentication.** Students and teachers authenticate with an httpOnly session cookie (`eduvillage_session`). The administrator uses a separate cookie (`eduvillage_admin_session`) and must send `X-EduVillage-Admin: 1` on every request that changes data. "public" means no session is required.
 
@@ -18,6 +18,9 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 | GET | `/api/v1/admin/branches/{branch_id}/sections` | administrator session | list branch sections |
 | POST | `/api/v1/admin/branches/{branch_id}/sections` | administrator session | create branch section |
 | POST | `/api/v1/admin/branches/{branch_id}/status` | administrator session | change branch status |
+| GET | `/api/v1/admin/college-requests` | administrator session | list college requests |
+| POST | `/api/v1/admin/college-requests/{request_id}/approve` | administrator session | approve college request |
+| POST | `/api/v1/admin/college-requests/{request_id}/reject` | administrator session | reject college request |
 | GET | `/api/v1/admin/colleges` | administrator session | list colleges |
 | POST | `/api/v1/admin/colleges` | administrator session | create college |
 | GET | `/api/v1/admin/colleges/{college_id}` | administrator session | get college |
@@ -27,6 +30,8 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 | DELETE | `/api/v1/admin/colleges/{college_id}/administrators/{user_id}` | administrator session | remove college administrator |
 | GET | `/api/v1/admin/colleges/{college_id}/branches` | administrator session | list branches |
 | POST | `/api/v1/admin/colleges/{college_id}/branches` | administrator session | create branch |
+| GET | `/api/v1/admin/colleges/{college_id}/deletion-requests` | administrator session | get college deletion request |
+| POST | `/api/v1/admin/colleges/{college_id}/deletion-requests` | administrator session | request college deletion |
 | POST | `/api/v1/admin/colleges/{college_id}/regenerate-code` | administrator session | regenerate code |
 | POST | `/api/v1/admin/colleges/{college_id}/status` | administrator session | change status |
 | GET | `/api/v1/admin/overview` | administrator session | overview |
@@ -140,7 +145,18 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 | PATCH | `/api/v1/institution-admin/colleges/{college_id}` | signed-in user | update my college |
 | GET | `/api/v1/institution-admin/colleges/{college_id}/branches` | signed-in user | list my branches |
 | POST | `/api/v1/institution-admin/colleges/{college_id}/branches` | signed-in user | create my branch |
+| GET | `/api/v1/institution-admin/colleges/{college_id}/deletion-requests` | signed-in user | get my college deletion request |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/deletion-requests/{request_id}/confirm` | signed-in user | confirm my college deletion |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/deletion-requests/{request_id}/decline` | signed-in user | decline my college deletion |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/deletion-requests/{request_id}/request-otp` | signed-in user | request my deletion otp |
+| GET | `/api/v1/institution-admin/colleges/{college_id}/members` | signed-in user | list members |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/members/{user_id}/reactivate` | signed-in user | reactivate member |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/members/{user_id}/remove` | signed-in user | remove member |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/members/{user_id}/suspend` | signed-in user | suspend member |
 | POST | `/api/v1/institution-admin/colleges/{college_id}/regenerate-code` | signed-in user | regenerate my college code |
+| GET | `/api/v1/institution-admin/colleges/{college_id}/registrations` | signed-in user | list pending registrations |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/registrations/{user_id}/approve` | signed-in user | approve registration |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/registrations/{user_id}/reject` | signed-in user | reject registration |
 | PATCH | `/api/v1/institution-admin/sections/{section_id}` | signed-in user | update my section |
 | POST | `/api/v1/institution-admin/sections/{section_id}/status` | signed-in user | change my section status |
 
@@ -164,6 +180,7 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 |---|---|---|---|
 | GET | `/api/v1/registration/branches/{branch_id}/sections` | public | registerable sections |
 | GET | `/api/v1/registration/colleges` | public | Active colleges only, read live from the admin-managed table. Public, and never includes college codes. |
+| POST | `/api/v1/registration/colleges/request` | public | Public: a college registering itself. Pending platform-admin approval — see |
 | GET | `/api/v1/registration/colleges/{college_id}/branches` | public | registerable branches |
 
 ## resources
