@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "Nyumbani",
+    "dashboard": "Dashibodi",
+    "classes": "Madarasa",
+    "recordedLessons": "Masomo Yaliyorekodiwa",
+    "coursesAndLessons": "Kozi na Masomo",
+    "myCourses": "Kozi Zangu",
+    "assignments": "Kazi",
+    "teachingResources": "Rasilimali za Ufundishaji",
+    "aiSummaries": "Muhtasari wa AI",
+    "downloads": "Vipakuliwa",
+    "profile": "Wasifu",
+    "institutionAdmin": "Msimamizi wa Taasisi"
+  },
+  "navMobile": {
+    "recorded": "Zilizorekodiwa",
+    "tasks": "Kazi",
+    "offline": "Nje ya Mtandao"
+  },
+  "auth": {
+    "tagline": "Jukwaa la kielimu linalotanguliza matumizi nje ya mtandao kwa kujifunza kwa kutegemewa katika maeneo yenye kasi ndogo ya intaneti.",
+    "howSigningIn": "Unataka kuingia kwa njia gani?",
+    "whatAccount": "Unahitaji aina gani ya akaunti?",
+    "studentPortal": "Mlango wa Mwanafunzi",
+    "studentPortalDesc": "Hudhuria madarasa, soma nje ya mtandao, wasilisha kazi",
+    "teacherPortal": "Mlango wa Mwalimu",
+    "teacherPortalDesc": "Panga madarasa, simamia kozi, pitia muhtasari wa AI",
+    "studentAccount": "Akaunti ya Mwanafunzi",
+    "studentAccountDesc": "Fikia kozi, madarasa na vipakuliwa nje ya mtandao",
+    "teacherAccount": "Akaunti ya Mwalimu",
+    "teacherAccountDesc": "Panga madarasa, simamia vifaa na kazi",
+    "alreadyRegistered": "Tayari umejisajili?",
+    "signInHere": "Ingia hapa"
+  },
+  "language": {
+    "switchLabel": "Lugha"
+  }
+}

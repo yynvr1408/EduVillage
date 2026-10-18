@@ -1,8 +1,17 @@
 from app.db.models.assignment import Assignment, AssignmentSubmission, SubmissionAttachment, SubmissionRevision
 from app.db.models.classroom import Class, ClassParticipant, ClassRecording, ClassSection, RecordingProgress, RecordingSection
-from app.db.models.college import College, CollegeBranch, CollegeCodeHistory, CollegeSection, UserBranchAssignment, UserCollegeSection
+from app.db.models.college import (
+    College,
+    CollegeAdministrator,
+    CollegeBranch,
+    CollegeCodeHistory,
+    CollegeSection,
+    UserBranchAssignment,
+    UserCollegeSection,
+)
 from app.db.models.course import Course, CourseEnrollment, CourseTeacher
 from app.db.models.lesson import LearningResource, Lesson, ResourceSection
+from app.db.models.rate_limit import RateLimitBucket
 from app.db.models.section import Section, SectionMember
 from app.db.models.summary import BackgroundJob, LectureSummary, LectureTranscript
 from app.db.models.sync_operation import AuditEvent, SyncOperation
@@ -10,6 +19,7 @@ from app.db.models.user import PasswordResetToken, User, UserSession
 
 __all__ = [
     "College",
+    "CollegeAdministrator",
     "CollegeCodeHistory",
     "CollegeBranch",
     "CollegeSection",
@@ -38,6 +48,7 @@ __all__ = [
     "LectureTranscript",
     "AuditEvent",
     "SyncOperation",
+    "RateLimitBucket",
     "PasswordResetToken",
     "User",
     "UserSession",

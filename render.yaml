@@ -65,12 +65,12 @@ services:
       - key: EMAILJS_SERVICE_ID
         sync: false
       - key: EMAILJS_TEMPLATE_ID
-        sync: false # password-reset OTP wording: "{{otp}} is your EduVillage password reset code"
+        sync: false # password-reset OTP wording: "{{otp}} is your LanternEd password reset code"
       - key: EMAILJS_LOGIN_TEMPLATE_ID
         sync: false # optional: a separate template for the new-device-login-approval OTP (falls
         # back to EMAILJS_TEMPLATE_ID if left unset)
       - key: EMAILJS_REGISTRATION_TEMPLATE_ID
-        sync: false # optional: a separate template ("Verify Your EduVillage Email Address") for
+        sync: false # optional: a separate template ("Verify Your LanternEd Email Address") for
         # the registration email-verification OTP (falls back to EMAILJS_TEMPLATE_ID if unset)
       - key: EMAILJS_REGISTRATION_SERVICE_ID
         sync: false # optional: all three REGISTRATION_* vars together route registration OTP

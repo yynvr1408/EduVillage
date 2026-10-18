@@ -8,7 +8,7 @@ import pytest
 @pytest.fixture
 def mock_livekit(monkeypatch):
     """Same fake as test_classes.py: only LiveKit's network calls are faked (no real server
-    reachable in the test run); EduVillage's own authorization/room-name/token-identity logic
+    reachable in the test run); LanternEd's own authorization/room-name/token-identity logic
     below this boundary is real and is exactly what this file verifies."""
     from app.integrations import livekit
 

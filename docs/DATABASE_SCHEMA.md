@@ -2,7 +2,7 @@
 
 Generated from the SQLAlchemy models by `backend/scripts/generate_docs.py`; do not edit by hand. Migrations live in `backend/alembic/versions/` (one linear chain; `alembic heads` shows one head). Production uses PostgreSQL (Neon); development and most tests use SQLite.
 
-34 tables. Primary keys are 36-character UUID strings. Timestamps are stored as naive UTC.
+36 tables. Primary keys are 36-character UUID strings. Timestamps are stored as naive UTC.
 
 ## `assignment_submissions`
 
@@ -46,7 +46,7 @@ Constraints: unique (assignment_id, student_id).
 | `action` | VARCHAR(120) | no |  |
 | `resource_type` | VARCHAR(80) | no |  |
 | `resource_id` | VARCHAR(36) | yes |  |
-| `created_at` | DATETIME | no |  |
+| `created_at` | DATETIME | no | indexed |
 | `id` | VARCHAR(36) | no | primary key |
 
 ## `background_jobs`
@@ -121,6 +121,18 @@ Constraints: unique (assignment_id, student_id).
 | `created_at` | DATETIME | no |  |
 | `updated_at` | DATETIME | no |  |
 
+## `college_administrators`
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `user_id` | VARCHAR(36) | no | -> `users.id`, indexed |
+| `college_id` | VARCHAR(36) | no | -> `colleges.id`, indexed |
+| `assigned_by` | VARCHAR(36) | yes | -> `users.id` |
+| `assigned_at` | DATETIME | no |  |
+| `id` | VARCHAR(36) | no | primary key |
+
+Constraints: unique (user_id, college_id).
+
 ## `college_branches`
 
 | Column | Type | Null | Notes |
@@ -134,7 +146,7 @@ Constraints: unique (assignment_id, student_id).
 | `created_at` | DATETIME | no |  |
 | `updated_at` | DATETIME | no |  |
 
-Constraints: unique (id, college_id); unique (college_id, name_key).
+Constraints: unique (college_id, name_key); unique (id, college_id).
 
 ## `college_code_history`
 
@@ -316,6 +328,14 @@ Constraints: unique (course_id, teacher_id).
 | `revoked_at` | DATETIME | yes |  |
 | `created_at` | DATETIME | no |  |
 | `id` | VARCHAR(36) | no | primary key |
+
+## `rate_limit_buckets`
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `key` | VARCHAR(300) | no | primary key |
+| `count` | INTEGER | no |  |
+| `created_at` | DATETIME | no | indexed |
 
 ## `recording_progress`
 

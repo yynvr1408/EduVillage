@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "मुख्यपृष्ठ",
+    "dashboard": "डॅशबोर्ड",
+    "classes": "वर्ग",
+    "recordedLessons": "रेकॉर्ड केलेले धडे",
+    "coursesAndLessons": "अभ्यासक्रम आणि धडे",
+    "myCourses": "माझे अभ्यासक्रम",
+    "assignments": "असाइनमेंट",
+    "teachingResources": "शिक्षण साहित्य",
+    "aiSummaries": "AI सारांश",
+    "downloads": "डाउनलोड्स",
+    "profile": "प्रोफाइल",
+    "institutionAdmin": "संस्था प्रशासक"
+  },
+  "navMobile": {
+    "recorded": "रेकॉर्ड केलेले",
+    "tasks": "कामे",
+    "offline": "ऑफलाइन"
+  },
+  "auth": {
+    "tagline": "कमी बँडविड्थ असलेल्या भागांत विश्वासार्ह शिक्षणासाठी ऑफलाइन-फर्स्ट शैक्षणिक व्यासपीठ.",
+    "howSigningIn": "तुम्ही कसे साइन इन करत आहात?",
+    "whatAccount": "तुम्हाला कोणत्या प्रकारचे खाते हवे आहे?",
+    "studentPortal": "विद्यार्थी पोर्टल",
+    "studentPortalDesc": "वर्गांना उपस्थित राहा, ऑफलाइन अभ्यास पूर्ण करा, असाइनमेंट सबमिट करा",
+    "teacherPortal": "शिक्षक पोर्टल",
+    "teacherPortalDesc": "वर्गांचे नियोजन करा, अभ्यासक्रम व्यवस्थापित करा, AI सारांश पाहा",
+    "studentAccount": "विद्यार्थी खाते",
+    "studentAccountDesc": "अभ्यासक्रम, वर्ग आणि ऑफलाइन डाउनलोड्समध्ये प्रवेश मिळवा",
+    "teacherAccount": "शिक्षक खाते",
+    "teacherAccountDesc": "वर्गांचे नियोजन करा, साहित्य आणि असाइनमेंट व्यवस्थापित करा",
+    "alreadyRegistered": "आधीच नोंदणी केली आहे?",
+    "signInHere": "इथे साइन इन करा"
+  },
+  "language": {
+    "switchLabel": "भाषा"
+  }
+}

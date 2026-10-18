@@ -1,7 +1,9 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { GraduationCap, BookOpen, ArrowRight } from 'lucide-react'
 import { Logo } from '../../components/ui/Logo'
+import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher'
 
 /**
  * Landing step before either role's registration form. Keeps /register/student and
@@ -9,18 +11,20 @@ import { Logo } from '../../components/ui/Logo'
  * rather than a single generic form with a role picker.
  */
 export const RegisterChoicePage: React.FC = () => {
+  const { t } = useTranslation()
   return (
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-lg px-4">
+        <div className="flex justify-end mb-4">
+          <LanguageSwitcher />
+        </div>
         <div className="flex flex-col items-center text-center mb-8">
           <Logo size={48} className="mb-3" />
-          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">EduVillage</h1>
-          <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
-            Offline-first educational learning platform for reliable learning in low-bandwidth regions.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">LanternEd</h1>
+          <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">{t('auth.tagline')}</p>
         </div>
 
-        <p className="text-center text-sm font-semibold text-[#202B2A] mb-4">What kind of account do you need?</p>
+        <p className="text-center text-sm font-semibold text-[#202B2A] mb-4">{t('auth.whatAccount')}</p>
 
         <div className="flex flex-col gap-3">
           <Link
@@ -31,8 +35,8 @@ export const RegisterChoicePage: React.FC = () => {
               <GraduationCap className="w-6 h-6" />
             </div>
             <div className="flex-1 text-left">
-              <h2 className="text-sm font-bold text-[#202B2A]">Student Account</h2>
-              <p className="text-xs text-[#687775]">Access courses, classes and offline downloads</p>
+              <h2 className="text-sm font-bold text-[#202B2A]">{t('auth.studentAccount')}</h2>
+              <p className="text-xs text-[#687775]">{t('auth.studentAccountDesc')}</p>
             </div>
             <ArrowRight className="w-4 h-4 text-[#CBD7D1] group-hover:text-[#0F5B57] transition-colors shrink-0" />
           </Link>
@@ -45,17 +49,17 @@ export const RegisterChoicePage: React.FC = () => {
               <BookOpen className="w-6 h-6" />
             </div>
             <div className="flex-1 text-left">
-              <h2 className="text-sm font-bold text-[#202B2A]">Teacher Account</h2>
-              <p className="text-xs text-[#687775]">Schedule classes, manage materials and assignments</p>
+              <h2 className="text-sm font-bold text-[#202B2A]">{t('auth.teacherAccount')}</h2>
+              <p className="text-xs text-[#687775]">{t('auth.teacherAccountDesc')}</p>
             </div>
             <ArrowRight className="w-4 h-4 text-[#CBD7D1] group-hover:text-[#0F5B57] transition-colors shrink-0" />
           </Link>
         </div>
 
         <p className="text-center text-xs text-[#687775] mt-6">
-          Already registered?{' '}
+          {t('auth.alreadyRegistered')}{' '}
           <Link to="/login" className="font-semibold text-[#0F5B57] hover:underline">
-            Sign in here
+            {t('auth.signInHere')}
           </Link>
         </p>
       </div>

@@ -6,7 +6,7 @@ export interface LogoMarkProps {
 
 /**
  * Open book + a broadcast arc reaching it: education transmitted across distance, for places
- * where the connection is weak or intermittent — the actual premise of EduVillage. Single
+ * where the connection is weak or intermittent — the actual premise of LanternEd. Single
  * currentColor stroke so it drops into any colored badge (the teal app icon, a header mark, etc.)
  * without extra props.
  */

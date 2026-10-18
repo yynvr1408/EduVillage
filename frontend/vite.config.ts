@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'EduVillage',
-        short_name: 'EduVillage',
+        name: 'LanternEd',
+        short_name: 'LanternEd',
         description: 'Offline-First Low-Bandwidth Learning Platform',
         theme_color: '#0F5B57',
         background_color: '#FFFFFF',

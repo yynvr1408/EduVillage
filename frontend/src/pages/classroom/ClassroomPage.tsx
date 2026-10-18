@@ -10,7 +10,7 @@ import {
   useRoomContext,
   ConnectionStateToast,
 } from '@livekit/components-react'
-import { Track, ConnectionState, ConnectionQuality, RoomEvent } from 'livekit-client'
+import { Track, ConnectionState, ConnectionQuality, RoomEvent, AudioPresets, VideoPresets } from 'livekit-client'
 import {
   Video,
   VideoOff,
@@ -53,6 +53,34 @@ import { useScreenShares } from '../../hooks/useScreenShares'
 import { useBackgroundBlur } from '../../hooks/useBackgroundBlur'
 import { SummaryViewer } from '../../components/summary/SummaryViewer'
 import { Sheet, Badge, Button, LoadingState, ErrorState } from '../../components/ui'
+
+/**
+ * Low-bandwidth-first room config. LiveKit's own defaults are tuned for a general video-call
+ * product, not this app's "works on a weak rural connection" mandate, so every knob here is
+ * deliberately overridden rather than left at the SDK default:
+ *  - adaptiveStream/dynacast default to OFF in the SDK. Without them, simulcast layers are
+ *    published and sit unused: a struggling subscriber is never moved down to a lower layer,
+ *    and the teacher's device keeps encoding (and the network keeps carrying) layers nobody is
+ *    actually watching. Turning both on is what makes simulcast a real degradation ladder.
+ *  - audioPreset defaults to AudioPresets.music (48kbps) — reasonable for a music app, wasteful
+ *    for a lecture that's entirely speech. `speech` (24kbps) halves audio bandwidth with no
+ *    audible loss for voice.
+ *  - videoCaptureDefaults caps the camera itself at 360p so a low-end device never captures (and
+ *    then has to simulcast-downscale) a needlessly large frame in the first place.
+ */
+const LOW_BANDWIDTH_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: true,
+  publishDefaults: {
+    audioPreset: AudioPresets.speech,
+    dtx: true,
+    red: true,
+    videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
+  },
+  videoCaptureDefaults: {
+    resolution: VideoPresets.h360.resolution,
+  },
+}
 
 /**
  * Teacher-only roster: who has joined, their name/email, and a way to remove a student
@@ -350,7 +378,7 @@ const ClassroomStage: React.FC<{
     if (recoveryRequired) onNeedFreshToken()
   }, [recoveryRequired, onNeedFreshToken])
 
-  // Three separate signals: the device, the EduVillage API, and the live media connection.
+  // Three separate signals: the device, the LanternEd API, and the live media connection.
   const { isBrowserOnline, isServerReachable } = useNetworkStatus()
   const diagnosis = diagnoseConnectivity({ browserOnline: isBrowserOnline, apiReachable: isServerReachable, liveKitState: connectionStateStr })
 
@@ -391,9 +419,28 @@ const ClassroomStage: React.FC<{
     }
   }
 
+  // For when the TEACHER's own connection is the weak one, not a student's — the existing
+  // "Save Data" control only stops a student's incoming video, it can't help an outgoing stream.
+  // Caps the teacher's own camera capture (and so its simulcast ceiling) to 180p/~160kbps instead
+  // of the room's normal 360p baseline. Re-applied immediately if the camera is already on.
+  const [lowBandwidthBroadcast, setLowBandwidthBroadcast] = useState(false)
+
   const handleToggleCamera = async () => {
     if (localParticipant && isTeacher) {
-      await localParticipant.setCameraEnabled(!isCameraEnabled)
+      await localParticipant.setCameraEnabled(
+        !isCameraEnabled,
+        !isCameraEnabled && lowBandwidthBroadcast ? { resolution: VideoPresets.h180.resolution } : undefined
+      )
+    }
+  }
+
+  const handleToggleLowBandwidth = async () => {
+    const next = !lowBandwidthBroadcast
+    setLowBandwidthBroadcast(next)
+    if (localParticipant && isCameraEnabled) {
+      await localParticipant.setCameraEnabled(true, {
+        resolution: next ? VideoPresets.h180.resolution : VideoPresets.h360.resolution,
+      })
     }
   }
 
@@ -522,7 +569,7 @@ const ClassroomStage: React.FC<{
                 <TextFallbackPanel classId={classroom.id} />
               </div>
             ) : hasContent ? (
-              <div className={`w-full flex flex-col gap-3 ${currentKey === 'board' ? '' : 'max-w-5xl'}`}>
+              <div className={`w-full flex flex-col gap-3 ${currentKey === 'board' ? 'h-full' : 'max-w-5xl'}`}>
                 {views.length > 1 && (
                   <div className="flex flex-wrap gap-2" role="tablist" aria-label="Shared content">
                     {views.map((v) => (
@@ -546,7 +593,9 @@ const ClassroomStage: React.FC<{
                 )}
 
                 {currentKey === 'board' ? (
-                  <Whiteboard board={board} {...(isTeacher ? { onAction: dispatch, applyLocal, send } : {})} />
+                  <div className="flex-1 min-h-0">
+                    <Whiteboard board={board} {...(isTeacher ? { onAction: dispatch, applyLocal, send } : {})} />
+                  </div>
                 ) : (
                   <div className={currentKey === 'all' ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : ''}>
                     {shares
@@ -790,6 +839,8 @@ const ClassroomStage: React.FC<{
                 blurOn: wantBlur,
                 blurSupported: blur.supported,
                 onToggleBlur: () => setWantBlur((v) => !v),
+                lowBandwidthOn: lowBandwidthBroadcast,
+                onToggleLowBandwidth: handleToggleLowBandwidth,
               }
             : undefined
         }
@@ -990,6 +1041,7 @@ export const ClassroomPage: React.FC = () => {
         connect={true}
         video={isTeacher}
         audio={joinData.is_publisher}
+        options={LOW_BANDWIDTH_ROOM_OPTIONS}
         className="flex-1 flex flex-col h-full overflow-hidden"
       >
         <ClassroomStage

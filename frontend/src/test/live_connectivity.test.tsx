@@ -176,7 +176,7 @@ describe('connectivity diagnosis keeps device, API and live media separate', () 
     const r = d(true, true, 'disconnected')
     expect(r.cause).toBe('media_unreachable')
     expect(r.canRejoinLive).toBe(true)
-    expect(r.guidance).toMatch(/internet and EduVillage are working/i)
+    expect(r.guidance).toMatch(/internet and LanternEd are working/i)
   })
 
   it('API down but live media healthy: the class is NOT reported as lost', () => {

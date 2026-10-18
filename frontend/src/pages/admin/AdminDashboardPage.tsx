@@ -299,7 +299,7 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Logo size={36} />
-            <h1 className="text-base sm:text-lg font-bold text-[#202B2A] truncate">EduVillage Administration</h1>
+            <h1 className="text-base sm:text-lg font-bold text-[#202B2A] truncate">LanternEd Administration</h1>
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline text-xs text-[#687775]">{username}</span>

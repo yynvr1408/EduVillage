@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "ہوم",
+    "dashboard": "ڈیش بورڈ",
+    "classes": "کلاسیں",
+    "recordedLessons": "ریکارڈ شدہ اسباق",
+    "coursesAndLessons": "کورسز اور اسباق",
+    "myCourses": "میرے کورسز",
+    "assignments": "اسائنمنٹس",
+    "teachingResources": "تدریسی وسائل",
+    "aiSummaries": "AI خلاصے",
+    "downloads": "ڈاؤن لوڈز",
+    "profile": "پروفائل",
+    "institutionAdmin": "ادارہ ایڈمن"
+  },
+  "navMobile": {
+    "recorded": "ریکارڈ شدہ",
+    "tasks": "کام",
+    "offline": "آف لائن"
+  },
+  "auth": {
+    "tagline": "کم بینڈوڈتھ والے علاقوں میں قابل اعتماد تعلیم کے لیے آف لائن فرسٹ تعلیمی پلیٹ فارم۔",
+    "howSigningIn": "آپ کس طرح سائن ان کر رہے ہیں؟",
+    "whatAccount": "آپ کو کس قسم کے اکاؤنٹ کی ضرورت ہے؟",
+    "studentPortal": "طالب علم پورٹل",
+    "studentPortalDesc": "کلاسز میں شرکت کریں، آف لائن پڑھائی مکمل کریں، اسائنمنٹس جمع کریں",
+    "teacherPortal": "استاد پورٹل",
+    "teacherPortalDesc": "کلاسز کا شیڈول بنائیں، کورسز کا انتظام کریں، AI خلاصے دیکھیں",
+    "studentAccount": "طالب علم اکاؤنٹ",
+    "studentAccountDesc": "کورسز، کلاسز اور آف لائن ڈاؤن لوڈز تک رسائی حاصل کریں",
+    "teacherAccount": "استاد اکاؤنٹ",
+    "teacherAccountDesc": "کلاسز کا شیڈول بنائیں، مواد اور اسائنمنٹس کا انتظام کریں",
+    "alreadyRegistered": "پہلے سے رجسٹرڈ ہیں؟",
+    "signInHere": "یہاں سائن ان کریں"
+  },
+  "language": {
+    "switchLabel": "زبان"
+  }
+}

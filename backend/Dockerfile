@@ -17,4 +17,7 @@ EXPOSE 8000
 # Migrations run on every container start (same pattern as compose.yaml's api service) rather than
 # as a separate pre-deploy step, since Render's free tier doesn't support preDeployCommand.
 # alembic upgrade head is idempotent — already-applied migrations are a fast no-op.
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# --workers reads WEB_CONCURRENCY (which Render already sets from the instance's CPU count, but a
+# plain `uvicorn` with no --workers flag never actually reads it) so a bigger plan automatically
+# runs more worker processes — purely a config change, not a code change, when moving to one.
+CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}

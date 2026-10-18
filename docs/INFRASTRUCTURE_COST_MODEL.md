@@ -1,6 +1,6 @@
-# EduVillage infrastructure cost model
+# LanternEd infrastructure cost model
 
-Prices checked: **2026-10-16**, from the official provider pages listed in [Sources](#sources). Workload figures are **assumptions made for planning, not measurements**: EduVillage has no production analytics yet, so nothing below is measured capacity. The numbers are reproducible with [`cost_model.py`](cost_model.py) (`python docs/cost_model.py`), which is the single source for every figure in this file, in the [README](../README.md) and in the other planning documents ([architecture](SCALABILITY_ARCHITECTURE.md), [roadmap](DEPLOYMENT_UPGRADE_ROADMAP.md), [evaluation answers](SCALABILITY_EVALUATION_ANSWERS.md), [capacity test plan](CAPACITY_TEST_PLAN.md)).
+Prices checked: **2026-10-16**, from the official provider pages listed in [Sources](#sources). Workload figures are **assumptions made for planning, not measurements**: LanternEd has no production analytics yet, so nothing below is measured capacity. The numbers are reproducible with [`cost_model.py`](cost_model.py) (`python docs/cost_model.py`), which is the single source for every figure in this file, in the [README](../README.md) and in the other planning documents ([architecture](SCALABILITY_ARCHITECTURE.md), [roadmap](DEPLOYMENT_UPGRADE_ROADMAP.md), [evaluation answers](SCALABILITY_EVALUATION_ANSWERS.md), [capacity test plan](CAPACITY_TEST_PLAN.md)).
 
 Contents: [1. Verified pricing](#1-verified-pricing) · [2. What is actually used](#2-what-is-actually-used) · [3. Method](#3-method-and-assumptions) · [4. Results](#4-results) · [5. What drives cost](#5-what-drives-cost) · [6. Caveats](#6-caveats-and-unknowns) · [Sources](#sources)
 
@@ -15,7 +15,7 @@ Contents: [1. Verified pricing](#1-verified-pricing) · [2. What is actually use
 | **EmailJS** (OTP email) | Free $0: 200 requests/month, 2 templates. | Personal $9: 2,000 · Professional $15: 5,000 · Business $40: 25,000 (the page also shows larger figures for Professional/Business; the lower, clearly attributable value is used). | REST API limit: **1 request/second**. Whether the free plan allows server-side (non-browser) calls is not stated on the pages read: UNKNOWN, confirm in the account. |
 | **Groq** (AI: summaries and speech-to-text) | A free tier exists; its exact per-model limits could not be confirmed (the rate-limit page shows "base" limits of 30 RPM / 1K RPD / 8K TPM / 200K TPD for `openai/gpt-oss-120b` and 20 RPM / 2K RPD / 7.2K audio-seconds per hour / 28.8K per day for `whisper-large-v3-turbo`; which plan they belong to is ambiguous). | `openai/gpt-oss-120b`: $0.15 / $0.60 per 1M input / output tokens. `whisper-large-v3-turbo`: $0.04 per audio hour, 10 s minimum per request. Developer-plan limits: 1K RPM / 250K TPM (LLM), 400 RPM / 400K audio-s per hour (Whisper). | Third-party aggregators were used to cross-check the per-token prices; confirm in the Groq console. |
 | **Cloudflare R2** (recordings, uploads) | Free: 10 GB-month, 1M Class A, 10M Class B operations per month. | Standard $0.015/GB-month; Class A $4.50/1M; Class B $0.36/1M; **egress free**. Infrequent Access $0.01/GB-month (30-day minimum). | — |
-| **GitHub** | Source control (repository `yynvr1408/EduVillage`). No GitHub Actions workflows exist in the repository. | — | — |
+| **GitHub** | Source control (repository `yynvr1408/LanternEd`). No GitHub Actions workflows exist in the repository. | — | — |
 
 ## 2. What is actually used
 

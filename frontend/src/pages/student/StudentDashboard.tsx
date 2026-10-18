@@ -127,7 +127,7 @@ export const StudentDashboard: React.FC = () => {
           </h1>
           <p className="text-xs sm:text-sm text-[#687775] mt-1 leading-relaxed">
             {isOnline
-              ? `Connected to EduVillage. Latency: ${latencyMs}ms (${quality}). All features active.`
+              ? `Connected to LanternEd. Latency: ${latencyMs}ms (${quality}). All features active.`
               : 'Working offline. Saved downloads and local assignment drafts remain fully accessible.'}
           </p>
         </div>

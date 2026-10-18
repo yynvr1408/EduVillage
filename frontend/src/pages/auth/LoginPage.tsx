@@ -136,7 +136,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ portal }) => {
         <div className="flex flex-col items-center text-center mb-6">
           <Logo size={48} className="mb-3" />
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">
-            EduVillage
+            LanternEd
           </h1>
           <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
             Offline-first educational learning platform for reliable learning in low-bandwidth regions.

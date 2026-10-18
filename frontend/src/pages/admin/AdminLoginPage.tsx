@@ -33,7 +33,7 @@ export const AdminLoginPage: React.FC<{ onSignedIn: (username: string) => void }
       <div className="mx-auto w-full max-w-md">
         <div className="flex flex-col items-center text-center mb-6">
           <Logo size={48} className="mb-3" />
-          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">EduVillage Administration</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">LanternEd Administration</h1>
         </div>
         <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-2xl p-6 sm:p-8 shadow-xs">
           <h2 className="text-lg font-bold text-[#202B2A] mb-5 flex items-center gap-2">

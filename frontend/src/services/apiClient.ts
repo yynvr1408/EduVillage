@@ -113,7 +113,7 @@ export async function apiRequest<T>(endpoint: string, options: ApiRequestOptions
         continue
       }
       // Network failure (server down, offline, DNS failure, timeout, etc.)
-      throw new ApiError('Unable to connect to EduVillage server. Operating in offline mode.', 0, true)
+      throw new ApiError('Unable to connect to LanternEd server. Operating in offline mode.', 0, true)
     } finally {
       if (timer) clearTimeout(timer)
     }

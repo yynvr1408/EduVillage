@@ -56,7 +56,7 @@ async function mockAdminApi(page: Page, opts: { signedIn?: boolean } = {}) {
 
 test('/admin loads directly, shows sign-in, and survives a refresh once signed in', async ({ page }) => {
   await mockAdminApi(page)
-  const response = await page.goto('/admin')
+  const response = await page.goto('/platform-console')
   expect(response?.status()).toBe(200)
   await expect(page.getByRole('heading', { name: 'Admin Sign In' })).toBeVisible()
 
@@ -86,7 +86,7 @@ test('there is no admin link anywhere in the public or student/teacher navigatio
 
 test('create a college and see its code', async ({ page }) => {
   await mockAdminApi(page, { signedIn: true })
-  await page.goto('/admin')
+  await page.goto('/platform-console')
   await page.getByRole('button', { name: 'Create college' }).first().click()
   await page.fill('#college-name', 'Hill Valley Polytechnic')
   await page.getByRole('dialog').getByRole('button', { name: 'Create college' }).click()
@@ -105,7 +105,7 @@ for (const vp of VIEWPORTS) {
   test(`admin pages have no horizontal overflow at ${vp.name}`, async ({ page }) => {
     await page.setViewportSize({ width: vp.width, height: vp.height })
     await mockAdminApi(page)
-    await page.goto('/admin')
+    await page.goto('/platform-console')
     const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     expect(await overflow()).toBeLessThanOrEqual(0)
     await page.screenshot({ path: `${SHOTS}/admin-login-${vp.name}.png` })

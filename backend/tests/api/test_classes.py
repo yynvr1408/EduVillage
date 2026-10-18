@@ -4,7 +4,7 @@ import pytest
 @pytest.fixture
 def mock_livekit(monkeypatch):
     """LiveKit needs real credentials to reach a real server; these tests only need to
-    verify EduVillage's own authorization and lifecycle logic, so the SDK calls are faked."""
+    verify LanternEd's own authorization and lifecycle logic, so the SDK calls are faked."""
     from app.integrations import livekit
 
     async def fake_ensure_room(room_name: str) -> None:

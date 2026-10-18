@@ -1,4 +1,4 @@
-# EduVillage scalability architecture
+# LanternEd scalability architecture
 
 Audit date: **2026-10-16**. Source of truth for behaviour is the repository (`main`); pricing comes from official provider pages (see [INFRASTRUCTURE_COST_MODEL.md](INFRASTRUCTURE_COST_MODEL.md)). Every statement is tagged with one of: **Implemented and verified** (a test that was run exercises it), **Implemented, not verified in production**, **Partially implemented**, **Configured, not deployed**, **Planned**, **Missing**, **Unknown**.
 
@@ -27,7 +27,7 @@ The browser downloads static files from Vercel and then talks to the API **direc
 | Recording / uploads | **Cloudflare R2** | S3-compatible via boto3, presigned PUT/GET | Cloudflare | UNKNOWN (assumed free) | 10 GB, 1M Class A, 10M Class B, free egress | $0.015/GB-month | GB stored, operations | Not verified against real R2 in tests (moto emulator) except the owner's real-service runs | `backend/app/integrations/object_storage.py`, `docs/RECORDING_VERIFICATION.md` | Add a retention policy |
 | OTP email | **EmailJS** (REST, server-side via httpx) | OTP for password reset and second-device sign-in | EmailJS | UNKNOWN; **not configured locally** | 200 requests/month, 1 request/s | Personal $9 .. Business $40 | Requests/month | Quota and rate far below a college's login volume at scale | `backend/app/integrations/email.py`, `backend/app/config.py` | Confirm free-plan server-side policy; budget Personal at pilot |
 | AI | **Groq** (OpenAI-compatible API) in `render.yaml`; local FreeLLMAPI proxy in the developer's `.env` | `openai` SDK with `base_url`, summaries + Whisper chunks | Render (Groq); FreeLLMAPI: local only | Free tier per Groq console | See cost model (limits ambiguous) | Pay-per-token | Tokens, audio hours | Free limits are small per day; no fallback provider coded | `backend/app/integrations/llm_provider.py`, `speech_to_text.py`, `render.yaml` | Keep AI optional; quotas per teacher |
-| Source control | **GitHub** | `yynvr1408/EduVillage`, `main` branch | GitHub | Free | - | - | - | **No CI workflows** (no `.github/`) | repository root | Add a test workflow |
+| Source control | **GitHub** | `yynvr1408/LanternEd`, `main` branch | GitHub | Free | - | - | - | **No CI workflows** (no `.github/`) | repository root | Add a test workflow |
 | Monitoring | Provider dashboards + stdout logs | JSON-less text logs with request id; `/health`, `/ready` | - | - | - | - | - | No error tracking, no alerts configured | `backend/app/core/logging.py`, `backend/app/main.py` | Provider alerts first |
 
 ## 3. Answers to the audit questions

@@ -34,7 +34,7 @@ export const TeacherProfilePage: React.FC = () => {
                 <Mail className="w-3.5 h-3.5 text-[#0F5B57]" /> {user?.email}
               </p>
               <p className="text-xs text-[#84908D] mt-1">
-                Role Authorized by EduVillage Administrative Core
+                Role Authorized by LanternEd Administrative Core
               </p>
             </div>
           </CardContent>

@@ -1,6 +1,6 @@
 # Codebase structure: one backend, one API, one data layer
 
-EduVillage was consolidated into a single backend with no parallel implementations. This note records the structure that results, so new work reuses it instead of adding a second path.
+LanternEd was consolidated into a single backend with no parallel implementations. This note records the structure that results, so new work reuses it instead of adding a second path.
 
 | Concern | The one implementation |
 |---|---|

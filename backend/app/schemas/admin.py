@@ -141,6 +141,21 @@ class CollegeSectionOut(BaseModel):
     status: CollegeStatus
 
 
+class CollegeAdministratorCreate(BaseModel):
+    user_id: str = Field(min_length=1)
+
+
+class CollegeAdministratorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    college_id: str
+    full_name: str
+    email: str
+    assigned_at: UtcDatetime
+
+
 class PublicBranchOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

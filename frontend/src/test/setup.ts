@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import 'fake-indexeddb/auto'
+import '../i18n' // tests render components directly, bypassing main.tsx - i18next must still init
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

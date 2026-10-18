@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Download, Eraser, PenLine, Trash2, Type, Undo2 } from 'lucide-react'
 import { BOARD_H, BOARD_W, COLORS, draw, chunkSegment, type BoardState, type Message } from './protocol'
 
@@ -23,7 +23,13 @@ export const Whiteboard: React.FC<{
   send?: (m: Message) => void
 }> = ({ board, onAction, applyLocal, send }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // stageRef: the naturally-flexed box whose available size we measure (width AND height).
+  // wrapRef: sized to exactly fit within it (letterboxed to the board's 16:9), holding the canvas
+  // and the text-entry overlay, so the overlay's percentage-based position lines up with the
+  // canvas's actual box even when it's narrower than the stage (height-constrained screens).
+  const stageRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const [boxSize, setBoxSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
   const [tool, setTool] = useState<'pen' | 'eraser' | 'text'>('pen')
   const [color, setColor] = useState<string>(COLORS[0])
   const [width, setWidth] = useState<number>(WIDTHS[1].value)
@@ -35,13 +41,22 @@ export const Whiteboard: React.FC<{
 
   const render = useCallback(() => {
     const canvas = canvasRef.current
-    const wrap = wrapRef.current
-    if (!canvas || !wrap) return
+    const stage = stageRef.current
+    if (!canvas || !stage) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const cssW = wrap.clientWidth
-    const cssH = Math.round(cssW * (BOARD_H / BOARD_W))
-    canvas.style.height = `${cssH}px`
-    if (canvas.width !== Math.round(cssW * dpr)) {
+    // Fit the 16:9 board within whatever box the stage actually has, in both dimensions (like
+    // object-fit: contain) — sizing from width alone let the board grow taller than a short,
+    // wide viewport, forcing the page to scroll instead of the board ever just fitting the screen.
+    const availW = stage.clientWidth
+    const availH = stage.clientHeight
+    let cssW = availW
+    let cssH = Math.round(cssW * (BOARD_H / BOARD_W))
+    if (availH > 0 && cssH > availH) {
+      cssH = availH
+      cssW = Math.round(cssH * (BOARD_W / BOARD_H))
+    }
+    setBoxSize((prev) => (prev.w === cssW && prev.h === cssH ? prev : { w: cssW, h: cssH }))
+    if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
       canvas.width = Math.round(cssW * dpr)
       canvas.height = Math.round(cssH * dpr)
     }
@@ -49,14 +64,14 @@ export const Whiteboard: React.FC<{
     if (ctx) draw(ctx, board.items, canvas.width, canvas.height)
   }, [board.items])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     render()
   }, [render])
   useEffect(() => {
-    const wrap = wrapRef.current
-    if (!wrap || typeof ResizeObserver === 'undefined') return
+    const stage = stageRef.current
+    if (!stage || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(render)
-    ro.observe(wrap)
+    ro.observe(stage)
     return () => ro.disconnect()
   }, [render])
 
@@ -146,7 +161,7 @@ export const Whiteboard: React.FC<{
     `p-2 rounded-lg border cursor-pointer ${active ? 'bg-[#0F5B57] border-[#0F5B57] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#CBD7D1] text-[#202B2A] hover:bg-[#DDF3EA]'}`
 
   return (
-    <div className="w-full flex flex-col gap-2" data-testid="whiteboard">
+    <div className="w-full h-full flex flex-col gap-2" data-testid="whiteboard">
       {editable && (
         <div className="flex flex-wrap items-center gap-2 bg-[#F8FAF7] border border-[#E1E8E4] rounded-xl p-2 text-[#202B2A]" role="toolbar" aria-label="Whiteboard tools">
           <button type="button" className={toolBtn(tool === 'pen')} onClick={() => setTool('pen')} aria-label="Pen" aria-pressed={tool === 'pen'}>
@@ -198,44 +213,50 @@ export const Whiteboard: React.FC<{
         </div>
       )}
 
-      <div ref={wrapRef} className="relative w-full rounded-xl overflow-hidden border border-[#CBD7D1] bg-[#FFFFFF] shadow-xl">
-        <canvas
-          ref={canvasRef}
-          className={`block w-full touch-none ${editable ? (tool === 'text' ? 'cursor-text' : 'cursor-crosshair') : ''}`}
-          onPointerDown={onDown}
-          onMouseDown={(e) => tool === 'text' && e.preventDefault()}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
-          aria-label={editable ? 'Whiteboard: draw or type for your students' : 'Teacher whiteboard (view only)'}
-          role="img"
-        />
-        {textAt && editable && (
-          <textarea
-            autoFocus
-            value={textValue}
-            onChange={(e) => setTextValue(e.target.value)}
-            onBlur={commitText}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                setTextAt(null)
-                setTextValue('')
-              } else if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                commitText()
-              }
-            }}
-            aria-label="Type text for the board"
-            placeholder="Type, then press Enter"
-            className="absolute bg-[#FFFFFF]/90 border border-[#0F5B57] rounded px-1 text-[#202B2A] outline-none resize-none"
-            style={{ left: `${(textAt.x / BOARD_W) * 100}%`, top: `${(textAt.y / BOARD_H) * 100}%`, width: '40%', minHeight: '2.5rem' }}
+      <div ref={stageRef} className="relative w-full flex-1 min-h-0 flex items-center justify-center">
+        <div
+          ref={wrapRef}
+          className="relative max-w-full max-h-full rounded-xl overflow-hidden border border-[#CBD7D1] bg-[#FFFFFF] shadow-xl"
+          style={boxSize.w > 0 && boxSize.h > 0 ? { width: boxSize.w, height: boxSize.h } : { width: '100%', aspectRatio: `${BOARD_W} / ${BOARD_H}` }}
+        >
+          <canvas
+            ref={canvasRef}
+            className={`block w-full h-full touch-none ${editable ? (tool === 'text' ? 'cursor-text' : 'cursor-crosshair') : ''}`}
+            onPointerDown={onDown}
+            onMouseDown={(e) => tool === 'text' && e.preventDefault()}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+            aria-label={editable ? 'Whiteboard: draw or type for your students' : 'Teacher whiteboard (view only)'}
+            role="img"
           />
-        )}
-        {board.items.length === 0 && (
-          <p className="absolute inset-0 flex items-center justify-center text-sm text-[#687775] pointer-events-none">
-            {editable ? 'Write or type here: your students see it live.' : 'The teacher has not written anything yet.'}
-          </p>
-        )}
+          {textAt && editable && (
+            <textarea
+              autoFocus
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              onBlur={commitText}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setTextAt(null)
+                  setTextValue('')
+                } else if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  commitText()
+                }
+              }}
+              aria-label="Type text for the board"
+              placeholder="Type, then press Enter"
+              className="absolute bg-[#FFFFFF]/90 border border-[#0F5B57] rounded px-1 text-[#202B2A] outline-none resize-none"
+              style={{ left: `${(textAt.x / BOARD_W) * 100}%`, top: `${(textAt.y / BOARD_H) * 100}%`, width: '40%', minHeight: '2.5rem' }}
+            />
+          )}
+          {board.items.length === 0 && (
+            <p className="absolute inset-0 flex items-center justify-center text-sm text-[#687775] pointer-events-none">
+              {editable ? 'Write or type here: your students see it live.' : 'The teacher has not written anything yet.'}
+            </p>
+          )}
+        </div>
       </div>
       {!editable && (
         <button type="button" onClick={savePng} className="self-end inline-flex items-center gap-2 text-xs font-semibold text-[#DDF3EA] hover:text-[#FFFFFF] cursor-pointer">

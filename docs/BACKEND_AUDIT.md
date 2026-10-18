@@ -1,6 +1,6 @@
 # Backend overview
 
-How the EduVillage backend is built and how it behaves today. Companion documents: [API reference](API_CONTRACTS.md) · [database schema](DATABASE_SCHEMA.md) · [setup](BACKEND_SETUP.md) · [requirements matrix](BACKEND_REQUIREMENTS_MATRIX.md) · [verification status](FINAL_AUDIT.md).
+How the LanternEd backend is built and how it behaves today. Companion documents: [API reference](API_CONTRACTS.md) · [database schema](DATABASE_SCHEMA.md) · [setup](BACKEND_SETUP.md) · [requirements matrix](BACKEND_REQUIREMENTS_MATRIX.md) · [verification status](FINAL_AUDIT.md).
 
 ## Shape
 

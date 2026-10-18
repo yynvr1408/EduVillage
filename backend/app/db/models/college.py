@@ -1,10 +1,11 @@
 from datetime import datetime
 
 from sqlalchemy import Enum, ForeignKey, ForeignKeyConstraint, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
 from app.db.models.enums import CollegeStatus
+from app.db.models.user import User
 
 
 class College(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -103,3 +104,31 @@ class UserBranchAssignment(UUIDPrimaryKeyMixin, Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     branch_id: Mapped[str] = mapped_column(String(36), ForeignKey("college_branches.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
+
+
+class CollegeAdministrator(UUIDPrimaryKeyMixin, Base):
+    """A teacher delegated to manage ONE college's own branches/sections/code — so routine
+    institutional setup (adding a branch, regenerating a leaked code, ...) doesn't bottleneck on
+    the one platform admin for every single institution. Entirely separate from the platform
+    admin's own auth system (UserRole.admin, a different session/cookie): this is checked as an
+    additional permission layered on top of an ordinary teacher session. Granting/revoking it
+    stays a platform-admin-only action (see college_service.assign_college_admin) — a teacher can
+    never make themselves one."""
+
+    __tablename__ = "college_administrators"
+    __table_args__ = (UniqueConstraint("user_id", "college_id", name="uq_college_administrator"),)
+
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    college_id: Mapped[str] = mapped_column(String(36), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    assigned_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    assigned_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
+
+    user: Mapped["User"] = relationship(lazy="selectin", foreign_keys=[user_id])
+
+    @property
+    def full_name(self) -> str:
+        return self.user.full_name
+
+    @property
+    def email(self) -> str:
+        return self.user.email

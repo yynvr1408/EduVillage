@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "होम",
+    "dashboard": "डैशबोर्ड",
+    "classes": "कक्षाएं",
+    "recordedLessons": "रिकॉर्ड की गई पाठ",
+    "coursesAndLessons": "कोर्स और पाठ",
+    "myCourses": "मेरे कोर्स",
+    "assignments": "असाइनमेंट",
+    "teachingResources": "शिक्षण संसाधन",
+    "aiSummaries": "AI सारांश",
+    "downloads": "डाउनलोड",
+    "profile": "प्रोफ़ाइल",
+    "institutionAdmin": "संस्थान प्रशासक"
+  },
+  "navMobile": {
+    "recorded": "रिकॉर्डेड",
+    "tasks": "कार्य",
+    "offline": "ऑफ़लाइन"
+  },
+  "auth": {
+    "tagline": "कम बैंडविड्थ वाले क्षेत्रों में भरोसेमंद शिक्षा के लिए ऑफ़लाइन-फर्स्ट शिक्षण प्लेटफ़ॉर्म।",
+    "howSigningIn": "आप किस तरह साइन इन कर रहे हैं?",
+    "whatAccount": "आपको किस प्रकार का खाता चाहिए?",
+    "studentPortal": "छात्र पोर्टल",
+    "studentPortalDesc": "कक्षाओं में भाग लें, ऑफ़लाइन पढ़ाई पूरी करें, असाइनमेंट जमा करें",
+    "teacherPortal": "शिक्षक पोर्टल",
+    "teacherPortalDesc": "कक्षाएं निर्धारित करें, कोर्स प्रबंधित करें, AI सारांश देखें",
+    "studentAccount": "छात्र खाता",
+    "studentAccountDesc": "कोर्स, कक्षाओं और ऑफ़लाइन डाउनलोड तक पहुंचें",
+    "teacherAccount": "शिक्षक खाता",
+    "teacherAccountDesc": "कक्षाएं निर्धारित करें, सामग्री और असाइनमेंट प्रबंधित करें",
+    "alreadyRegistered": "पहले से रजिस्टर्ड हैं?",
+    "signInHere": "यहां साइन इन करें"
+  },
+  "language": {
+    "switchLabel": "भाषा"
+  }
+}

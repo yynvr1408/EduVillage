@@ -14,7 +14,7 @@ export interface ExportBlock {
 
 export function buildSummaryBlocks(summary: Summary, classTitle?: string): ExportBlock[] {
   const blocks: ExportBlock[] = [
-    { kind: 'title', text: 'EduVillage Lecture Summary' },
+    { kind: 'title', text: 'LanternEd Lecture Summary' },
     { kind: 'meta', text: classTitle ? `Class: ${classTitle}` : `Class session: ${summary.class_id}` },
     { kind: 'meta', text: `Date: ${new Date(summary.created_at).toLocaleDateString()}` },
     { kind: 'heading', text: 'Overview' },

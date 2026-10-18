@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "होम",
+    "dashboard": "डैशबोर्ड",
+    "classes": "कक्षा",
+    "recordedLessons": "रेकॉर्ड कएल पाठ",
+    "coursesAndLessons": "कोर्स आ पाठ",
+    "myCourses": "हमर कोर्स",
+    "assignments": "असाइनमेंट",
+    "teachingResources": "शिक्षण संसाधन",
+    "aiSummaries": "AI सारांश",
+    "downloads": "डाउनलोड",
+    "profile": "प्रोफाइल",
+    "institutionAdmin": "संस्थान प्रशासक"
+  },
+  "navMobile": {
+    "recorded": "रेकॉर्ड कएल",
+    "tasks": "काज",
+    "offline": "ऑफलाइन"
+  },
+  "auth": {
+    "tagline": "कम बैंडविड्थ वाला क्षेत्रमे भरोसायोग्य शिक्षाक लेल ऑफलाइन-फर्स्ट शिक्षा मंच।",
+    "howSigningIn": "अहाँ कोना साइन इन करि रहल छी?",
+    "whatAccount": "अहाँक कोन प्रकारक खाता चाही?",
+    "studentPortal": "छात्र पोर्टल",
+    "studentPortalDesc": "कक्षामे शामिल होउ, ऑफलाइन पढ़ाइ पूरा करू, असाइनमेंट जमा करू",
+    "teacherPortal": "शिक्षक पोर्टल",
+    "teacherPortalDesc": "कक्षाक समय निर्धारित करू, कोर्स प्रबंधित करू, AI सारांश देखू",
+    "studentAccount": "छात्र खाता",
+    "studentAccountDesc": "कोर्स, कक्षा आ ऑफलाइन डाउनलोड प्राप्त करू",
+    "teacherAccount": "शिक्षक खाता",
+    "teacherAccountDesc": "कक्षाक समय निर्धारित करू, सामग्री आ असाइनमेंट प्रबंधित करू",
+    "alreadyRegistered": "पहिनेसँ पंजीकृत छी?",
+    "signInHere": "एतय साइन इन करू"
+  },
+  "language": {
+    "switchLabel": "भाषा"
+  }
+}

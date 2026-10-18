@@ -20,39 +20,35 @@ from app.db.base import utcnow
 from app.db.models.college import UserBranchAssignment, UserCollegeSection
 from app.db.models.enums import UserRole, UserStatus
 from app.db.models.user import PasswordResetOtpChallenge, PasswordResetToken, RegistrationOtpChallenge, User, UserSession
-from app.services import audit_service
+from app.services import audit_service, rate_limit_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Login/reset attempts are rate-limited in-process; swap for a Redis-backed limiter under real load.
-_login_attempts: dict[str, list] = {}
+# Login/reset attempts are rate-limited via the shared, database-backed limiter (correct no
+# matter how many app processes/instances are running) — see app/services/rate_limit_service.py.
 _MAX_ATTEMPTS = 10
 _WINDOW = timedelta(minutes=15)
 # A per-IP budget for password-reset requests is deliberately looser than the per-email one:
-# EduVillage is explicitly used from shared community/school devices (see the "shared device"
+# LanternEd is explicitly used from shared community/school devices (see the "shared device"
 # login option), where one public IP legitimately serves many different students resetting
 # their own, different accounts — a tight per-IP limit would lock all of them out together.
 _RESET_IP_MAX_ATTEMPTS = 30
 _RESET_IP_WINDOW = timedelta(minutes=15)
 
 
-def _check_rate_limit(key: str, *, max_attempts: int | None = None, window: timedelta | None = None) -> None:
+def _check_rate_limit(db: Session, key: str, *, max_attempts: int | None = None, window: timedelta | None = None) -> None:
     # Resolved from the module globals at call time (not as default-argument values), so tests
     # can monkeypatch _MAX_ATTEMPTS / _WINDOW and have it actually take effect.
     max_attempts = _MAX_ATTEMPTS if max_attempts is None else max_attempts
     window = _WINDOW if window is None else window
-    now = utcnow()
-    attempts = [t for t in _login_attempts.get(key, []) if now - t < window]
-    if len(attempts) >= max_attempts:
+    if rate_limit_service.record(db, key, window) > max_attempts:
         raise UnauthorizedError("Too many attempts. Please try again later.", code="RATE_LIMITED", status_code=429)
-    attempts.append(now)
-    _login_attempts[key] = attempts
 
 
 def reset_rate_limits() -> None:
-    """Test-only: clears every in-process rate-limit bucket (login + password-reset)."""
-    _login_attempts.clear()
+    """Test-only: clears every rate-limit bucket (login + password-reset, and admin's own)."""
+    rate_limit_service.reset_all()
 
 
 def _assert_may_register_as(role: UserRole, invite_code: str | None) -> None:
@@ -124,7 +120,7 @@ def register_user(
 
 def authenticate_user(db: Session, *, email: str, password: str) -> User:
     normalized_email = email.strip().lower()
-    _check_rate_limit(normalized_email)
+    _check_rate_limit(db, normalized_email)
 
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if not user or not verify_password(password, user.password_hash):
@@ -293,9 +289,9 @@ def request_password_reset(db: Session, email: str, *, ip: str | None = None) ->
     from app.integrations import email as email_integration
 
     normalized_email = email.strip().lower()
-    _check_rate_limit(f"reset-email:{normalized_email}")
+    _check_rate_limit(db, f"reset-email:{normalized_email}")
     if ip:
-        _check_rate_limit(f"reset-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+        _check_rate_limit(db, f"reset-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
 
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if not user or user.role == UserRole.admin or user.status != UserStatus.active:
@@ -350,9 +346,9 @@ def verify_reset_otp(db: Session, *, email: str, otp: str, ip: str | None = None
     AUTHORIZATION (an opaque token, stored the same way the old reset-link token was) that
     `reset_password` requires. Never starts a session and never returns user details."""
     normalized_email = email.strip().lower()
-    _check_rate_limit(f"reset-otp-email:{normalized_email}")
+    _check_rate_limit(db, f"reset-otp-email:{normalized_email}")
     if ip:
-        _check_rate_limit(f"reset-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+        _check_rate_limit(db, f"reset-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
 
     now = utcnow()
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
@@ -476,9 +472,9 @@ def request_login_otp(db: Session, user: User, *, ip: str | None = None) -> tupl
     from app.core.exceptions import ServiceUnavailableError
     from app.integrations import email as email_integration
 
-    _check_rate_limit(f"login-otp-req-email:{user.email}")
+    _check_rate_limit(db, f"login-otp-req-email:{user.email}")
     if ip:
-        _check_rate_limit(f"login-otp-req-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+        _check_rate_limit(db, f"login-otp-req-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
 
     now = utcnow()
     latest = db.execute(
@@ -524,9 +520,9 @@ def verify_login_otp(db: Session, *, email: str, otp: str, ip: str | None = None
     """Redeems the approval code. On success the account's other sessions are ended and the caller (who just
     proved control of the mailbox) is the one who gets the session - the router creates it."""
     normalized_email = email.strip().lower()
-    _check_rate_limit(f"login-otp-email:{normalized_email}")
+    _check_rate_limit(db, f"login-otp-email:{normalized_email}")
     if ip:
-        _check_rate_limit(f"login-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+        _check_rate_limit(db, f"login-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
     user = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if not user or user.role not in (UserRole.student, UserRole.teacher) or user.status != UserStatus.active:
         raise _GENERIC_OTP_ERROR()
@@ -556,9 +552,9 @@ def request_registration_otp(db: Session, email: str, *, ip: str | None = None) 
     normalized_email = email.strip().lower()
     if normalized_email in settings.blocked_registration_emails:
         raise ForbiddenError("This email address cannot be used to register an account.", code="EMAIL_NOT_ALLOWED")
-    _check_rate_limit(f"register-otp-req-email:{normalized_email}")
+    _check_rate_limit(db, f"register-otp-req-email:{normalized_email}")
     if ip:
-        _check_rate_limit(f"register-otp-req-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+        _check_rate_limit(db, f"register-otp-req-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
 
     existing = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if existing:
@@ -611,9 +607,9 @@ def verify_registration_otp(db: Session, *, email: str, otp: str, ip: str | None
     verification token that register_user() requires. Atomic attempt-claim and verified-claim,
     same pattern as _claim_otp, just against RegistrationOtpChallenge (email-keyed, not user-keyed)."""
     normalized_email = email.strip().lower()
-    _check_rate_limit(f"register-otp-email:{normalized_email}")
+    _check_rate_limit(db, f"register-otp-email:{normalized_email}")
     if ip:
-        _check_rate_limit(f"register-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
+        _check_rate_limit(db, f"register-otp-ip:{ip}", max_attempts=_RESET_IP_MAX_ATTEMPTS, window=_RESET_IP_WINDOW)
 
     now = utcnow()
     challenge = db.execute(

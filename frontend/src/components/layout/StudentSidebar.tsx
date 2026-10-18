@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard,
   BookOpen,
@@ -11,16 +12,17 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/student/dashboard', label: 'Home', icon: LayoutDashboard },
-  { to: '/student/classes', label: 'Classes', icon: Video },
-  { to: '/student/recorded-lessons', label: 'Recorded Lessons', icon: PlayCircle },
-  { to: '/student/courses', label: 'Courses & Lessons', icon: BookOpen },
-  { to: '/student/assignments', label: 'Assignments', icon: FileText },
-  { to: '/student/downloads', label: 'Downloads', icon: DownloadCloud },
-  { to: '/student/profile', label: 'Profile', icon: User },
-]
+  { to: '/student/dashboard', labelKey: 'nav.home', icon: LayoutDashboard },
+  { to: '/student/classes', labelKey: 'nav.classes', icon: Video },
+  { to: '/student/recorded-lessons', labelKey: 'nav.recordedLessons', icon: PlayCircle },
+  { to: '/student/courses', labelKey: 'nav.coursesAndLessons', icon: BookOpen },
+  { to: '/student/assignments', labelKey: 'nav.assignments', icon: FileText },
+  { to: '/student/downloads', labelKey: 'nav.downloads', icon: DownloadCloud },
+  { to: '/student/profile', labelKey: 'nav.profile', icon: User },
+] as const
 
 export const StudentSidebar: React.FC = () => {
+  const { t } = useTranslation()
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-[#F8FAF7] border-r border-[#E1E8E4] shrink-0 min-h-[calc(100vh-4rem)] p-4">
       <div className="text-xs font-bold text-[#687775] uppercase tracking-wider px-3 mb-2">
@@ -43,7 +45,7 @@ export const StudentSidebar: React.FC = () => {
               }
             >
               <Icon className="w-4.5 h-4.5 shrink-0" />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </NavLink>
           )
         })}

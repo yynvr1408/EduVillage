@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "Главная",
+    "dashboard": "Панель",
+    "classes": "Занятия",
+    "recordedLessons": "Записанные уроки",
+    "coursesAndLessons": "Курсы и уроки",
+    "myCourses": "Мои курсы",
+    "assignments": "Задания",
+    "teachingResources": "Учебные материалы",
+    "aiSummaries": "Сводки ИИ",
+    "downloads": "Загрузки",
+    "profile": "Профиль",
+    "institutionAdmin": "Администратор учреждения"
+  },
+  "navMobile": {
+    "recorded": "Записи",
+    "tasks": "Задания",
+    "offline": "Офлайн"
+  },
+  "auth": {
+    "tagline": "Образовательная платформа с приоритетом офлайн-доступа для надёжного обучения в регионах с низкой пропускной способностью.",
+    "howSigningIn": "Как вы хотите войти?",
+    "whatAccount": "Какой тип учётной записи вам нужен?",
+    "studentPortal": "Портал студента",
+    "studentPortalDesc": "Посещайте занятия, занимайтесь офлайн, сдавайте задания",
+    "teacherPortal": "Портал преподавателя",
+    "teacherPortalDesc": "Планируйте занятия, управляйте курсами, просматривайте сводки ИИ",
+    "studentAccount": "Учётная запись студента",
+    "studentAccountDesc": "Доступ к курсам, занятиям и офлайн-загрузкам",
+    "teacherAccount": "Учётная запись преподавателя",
+    "teacherAccountDesc": "Планируйте занятия, управляйте материалами и заданиями",
+    "alreadyRegistered": "Уже зарегистрированы?",
+    "signInHere": "Войти здесь"
+  },
+  "language": {
+    "switchLabel": "Язык"
+  }
+}

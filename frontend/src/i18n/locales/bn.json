@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "হোম",
+    "dashboard": "ড্যাশবোর্ড",
+    "classes": "ক্লাস",
+    "recordedLessons": "রেকর্ড করা পাঠ",
+    "coursesAndLessons": "কোর্স ও পাঠ",
+    "myCourses": "আমার কোর্স",
+    "assignments": "অ্যাসাইনমেন্ট",
+    "teachingResources": "শিক্ষণ উপকরণ",
+    "aiSummaries": "AI সারসংক্ষেপ",
+    "downloads": "ডাউনলোড",
+    "profile": "প্রোফাইল",
+    "institutionAdmin": "প্রতিষ্ঠান প্রশাসক"
+  },
+  "navMobile": {
+    "recorded": "রেকর্ড করা",
+    "tasks": "কাজ",
+    "offline": "অফলাইন"
+  },
+  "auth": {
+    "tagline": "কম ব্যান্ডউইথ অঞ্চলে নির্ভরযোগ্য শিক্ষার জন্য অফলাইন-ফার্স্ট শিক্ষা প্ল্যাটফর্ম।",
+    "howSigningIn": "আপনি কীভাবে সাইন ইন করছেন?",
+    "whatAccount": "আপনার কোন ধরনের অ্যাকাউন্ট প্রয়োজন?",
+    "studentPortal": "শিক্ষার্থী পোর্টাল",
+    "studentPortalDesc": "ক্লাসে যোগ দিন, অফলাইনে পড়া সম্পন্ন করুন, অ্যাসাইনমেন্ট জমা দিন",
+    "teacherPortal": "শিক্ষক পোর্টাল",
+    "teacherPortalDesc": "ক্লাস নির্ধারণ করুন, কোর্স পরিচালনা করুন, AI সারসংক্ষেপ পর্যালোচনা করুন",
+    "studentAccount": "শিক্ষার্থী অ্যাকাউন্ট",
+    "studentAccountDesc": "কোর্স, ক্লাস এবং অফলাইন ডাউনলোড অ্যাক্সেস করুন",
+    "teacherAccount": "শিক্ষক অ্যাকাউন্ট",
+    "teacherAccountDesc": "ক্লাস নির্ধারণ করুন, উপকরণ ও অ্যাসাইনমেন্ট পরিচালনা করুন",
+    "alreadyRegistered": "ইতিমধ্যে নিবন্ধিত?",
+    "signInHere": "এখানে সাইন ইন করুন"
+  },
+  "language": {
+    "switchLabel": "ভাষা"
+  }
+}

@@ -1,6 +1,6 @@
 # Requirements matrix
 
-What EduVillage does, where it is implemented, and which tests exercise it. Test files are under `backend/tests/` (pytest) and `frontend/` (Vitest and Playwright). Where a test replaces an external service (LiveKit's network calls, S3, an AI provider) with a fake it proves EduVillage's own logic around that boundary; real-service runs are listed in [FINAL_AUDIT.md](FINAL_AUDIT.md).
+What LanternEd does, where it is implemented, and which tests exercise it. Test files are under `backend/tests/` (pytest) and `frontend/` (Vitest and Playwright). Where a test replaces an external service (LiveKit's network calls, S3, an AI provider) with a fake it proves LanternEd's own logic around that boundary; real-service runs are listed in [FINAL_AUDIT.md](FINAL_AUDIT.md).
 
 Related: [backend overview](BACKEND_AUDIT.md) · [API reference](API_CONTRACTS.md) · [README](../README.md)
 

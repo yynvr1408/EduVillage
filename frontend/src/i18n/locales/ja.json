@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "ホーム",
+    "dashboard": "ダッシュボード",
+    "classes": "クラス",
+    "recordedLessons": "録画授業",
+    "coursesAndLessons": "コース&レッスン",
+    "myCourses": "マイコース",
+    "assignments": "課題",
+    "teachingResources": "教材リソース",
+    "aiSummaries": "AI要約",
+    "downloads": "ダウンロード",
+    "profile": "プロフィール",
+    "institutionAdmin": "機関管理者"
+  },
+  "navMobile": {
+    "recorded": "録画",
+    "tasks": "課題",
+    "offline": "オフライン"
+  },
+  "auth": {
+    "tagline": "低帯域地域でも確実に学習できる、オフラインファーストの教育プラットフォーム。",
+    "howSigningIn": "どの方法でサインインしますか?",
+    "whatAccount": "どのタイプのアカウントが必要ですか?",
+    "studentPortal": "学生ポータル",
+    "studentPortalDesc": "授業に参加し、オフラインで学習を進め、課題を提出",
+    "teacherPortal": "教師ポータル",
+    "teacherPortalDesc": "授業を予定し、コースを管理し、AI要約を確認",
+    "studentAccount": "学生アカウント",
+    "studentAccountDesc": "コース、授業、オフラインダウンロードにアクセス",
+    "teacherAccount": "教師アカウント",
+    "teacherAccountDesc": "授業を予定し、教材と課題を管理",
+    "alreadyRegistered": "すでに登録済みですか?",
+    "signInHere": "こちらからサインイン"
+  },
+  "language": {
+    "switchLabel": "言語"
+  }
+}

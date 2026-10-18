@@ -1,4 +1,4 @@
-"""EduVillage infrastructure cost model. All provider prices verified 2026-10-16 from official pages (see
+"""LanternEd infrastructure cost model. All provider prices verified 2026-10-16 from official pages (see
 docs/INFRASTRUCTURE_COST_MODEL.md). Workload numbers are ASSUMPTIONS. Run: python costmodel.py [md|json]"""
 import json, math, sys
 

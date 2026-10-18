@@ -1,0 +1,20 @@
+{$DOMAIN} {
+	encode gzip
+
+	# Signed upload/download URLs for local storage, the health check, and the whole API.
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	# Everything else is the SPA; unknown paths fall back to index.html so client-side routes
+	# (e.g. /student/dashboard) survive a hard refresh.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -2,7 +2,7 @@
 
 The current test results and the real-service runs behind them. Companion: [BACKEND_REQUIREMENTS_MATRIX.md](BACKEND_REQUIREMENTS_MATRIX.md) (what is tested where) and [RECORDING_VERIFICATION.md](RECORDING_VERIFICATION.md).
 
-Results are from runs on the developer machine on 2026-10-16. "Faked" means an external boundary was replaced in the test; a fake proves EduVillage's own logic around it, so real-service runs are listed separately.
+Results are from runs on the developer machine on 2026-10-16. "Faked" means an external boundary was replaced in the test; a fake proves LanternEd's own logic around it, so real-service runs are listed separately.
 
 ## Automated suites
 

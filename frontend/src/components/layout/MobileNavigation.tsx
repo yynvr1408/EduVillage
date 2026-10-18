@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard,
   BookOpen,
@@ -12,34 +13,45 @@ import {
   FolderOpen,
   FileCheck,
   User,
+  Building2,
 } from 'lucide-react'
 import { Sheet } from '../ui/Sheet'
 import { useAuth } from '../../context/AuthContext'
+import { useIsInstitutionAdmin } from '../../hooks/useIsInstitutionAdmin'
 
 const studentMobileNav = [
-  { to: '/student/dashboard', label: 'Home', icon: LayoutDashboard },
-  { to: '/student/classes', label: 'Classes', icon: Video },
-  { to: '/student/recorded-lessons', label: 'Recorded', icon: PlayCircle },
-  { to: '/student/assignments', label: 'Tasks', icon: FileText },
-  { to: '/student/downloads', label: 'Offline', icon: DownloadCloud },
-]
+  { to: '/student/dashboard', labelKey: 'nav.home', icon: LayoutDashboard },
+  { to: '/student/classes', labelKey: 'nav.classes', icon: Video },
+  { to: '/student/recorded-lessons', labelKey: 'navMobile.recorded', icon: PlayCircle },
+  { to: '/student/assignments', labelKey: 'navMobile.tasks', icon: FileText },
+  { to: '/student/downloads', labelKey: 'navMobile.offline', icon: DownloadCloud },
+] as const
 
 const teacherNavItems = [
-  { to: '/teacher/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/teacher/courses', label: 'My Courses', icon: BookOpen },
-  { to: '/teacher/classes', label: 'Classes', icon: Video },
-  { to: '/teacher/recorded-lessons', label: 'Recorded Lessons', icon: PlayCircle },
-  { to: '/teacher/materials', label: 'Teaching Resources', icon: FolderOpen },
-  { to: '/teacher/assignments', label: 'Assignments', icon: FileCheck },
-  { to: '/teacher/summaries', label: 'AI Summaries', icon: Sparkles },
-  { to: '/teacher/profile', label: 'Profile', icon: User },
-]
+  { to: '/teacher/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { to: '/teacher/courses', labelKey: 'nav.myCourses', icon: BookOpen },
+  { to: '/teacher/classes', labelKey: 'nav.classes', icon: Video },
+  { to: '/teacher/recorded-lessons', labelKey: 'nav.recordedLessons', icon: PlayCircle },
+  { to: '/teacher/materials', labelKey: 'nav.teachingResources', icon: FolderOpen },
+  { to: '/teacher/assignments', labelKey: 'nav.assignments', icon: FileCheck },
+  { to: '/teacher/summaries', labelKey: 'nav.aiSummaries', icon: Sparkles },
+  { to: '/teacher/profile', labelKey: 'nav.profile', icon: User },
+] as const
 
 export const MobileNavigation: React.FC<{
   isTeacherMenuOpen?: boolean
   onCloseTeacherMenu?: () => void
 }> = ({ isTeacherMenuOpen = false, onCloseTeacherMenu }) => {
+  const { t } = useTranslation()
   const { isStudent, isTeacher } = useAuth()
+  const isInstitutionAdmin = useIsInstitutionAdmin()
+  const teacherItems = isInstitutionAdmin
+    ? [
+        ...teacherNavItems.slice(0, -1),
+        { to: '/teacher/institution', labelKey: 'nav.institutionAdmin', icon: Building2 } as const,
+        teacherNavItems[teacherNavItems.length - 1],
+      ]
+    : teacherNavItems
 
   if (isStudent) {
     return (
@@ -62,7 +74,7 @@ export const MobileNavigation: React.FC<{
                 }
               >
                 <Icon className="w-5 h-5 mb-0.5" />
-                <span className="text-xs leading-tight">{item.label}</span>
+                <span className="text-xs leading-tight">{t(item.labelKey)}</span>
               </NavLink>
             )
           })}
@@ -80,7 +92,7 @@ export const MobileNavigation: React.FC<{
         position="bottom"
       >
         <div className="flex flex-col gap-1.5 pb-4">
-          {teacherNavItems.map((item) => {
+          {teacherItems.map((item) => {
             const Icon = item.icon
             return (
               <NavLink
@@ -97,7 +109,7 @@ export const MobileNavigation: React.FC<{
                 }
               >
                 <Icon className="w-5 h-5 shrink-0" />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </NavLink>
             )
           })}

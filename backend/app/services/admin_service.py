@@ -16,11 +16,12 @@ from app.core.security import hash_password, hash_token, verify_password
 from app.db.base import utcnow
 from app.db.models.enums import UserRole, UserStatus
 from app.db.models.user import User, UserSession
-from app.services import audit_service, auth_service
+from app.services import audit_service, auth_service, rate_limit_service
 
 logger = logging.getLogger(__name__)
 
-_attempts: dict[str, list] = {}
+# Backed by the same database-wide rate_limit_service as auth_service, keyed under "user:"/"ip:"
+# so it never collides with that module's own keys (including its bare-email login-throttle key).
 _WINDOW = timedelta(minutes=15)
 # Verified against when the username is unknown so a miss costs the same time as a wrong password.
 _DUMMY_HASH = hash_password("not-the-admin-password")
@@ -65,22 +66,18 @@ def bootstrap_admin(db: Session) -> None:
         logger.info("Administrator account updated from configuration.")
 
 
-def _assert_not_locked(key: str) -> None:
-    now = utcnow()
-    recent = [t for t in _attempts.get(key, []) if now - t < _WINDOW]
-    _attempts[key] = recent
-    if len(recent) >= get_settings().admin_login_max_attempts:
+def _assert_not_locked(db: Session, key: str) -> None:
+    if rate_limit_service.current_count(db, key, _WINDOW) >= get_settings().admin_login_max_attempts:
         raise UnauthorizedError("Too many attempts. Please try again later.", code="RATE_LIMITED", status_code=429)
 
 
-def _register_failure(*keys: str) -> None:
-    now = utcnow()
+def _register_failure(db: Session, *keys: str) -> None:
     for key in keys:
-        _attempts.setdefault(key, []).append(now)
+        rate_limit_service.record(db, key, _WINDOW)
 
 
 def reset_rate_limits() -> None:
-    _attempts.clear()
+    rate_limit_service.reset_all()
 
 
 def _active_admin_session(db: Session, admin_id: str) -> UserSession | None:
@@ -111,12 +108,12 @@ def authenticate_admin(db: Session, *, username: str, password: str, client_ip: 
     key = _admin_key(username)
     keys = (f"user:{key}", f"ip:{client_ip or 'unknown'}")
     for k in keys:  # only FAILED attempts count, so a legitimate sign-in never uses up the allowance
-        _assert_not_locked(k)
+        _assert_not_locked(db, k)
 
     admin = db.execute(select(User).where(User.email == key, User.role == UserRole.admin)).scalar_one_or_none()
     valid = verify_password(password, admin.password_hash if admin else _DUMMY_HASH)
     if not admin or not valid or admin.status != UserStatus.active:
-        _register_failure(*keys)
+        _register_failure(db, *keys)
         audit_service.record(db, actor_id=None, action="admin_login_failed", resource_type="admin")
         raise UnauthorizedError("Incorrect username or password.", code="INVALID_CREDENTIALS")
 
@@ -129,7 +126,7 @@ def authenticate_admin(db: Session, *, username: str, password: str, client_ip: 
 
     ttl = timedelta(minutes=get_settings().admin_session_ttl_minutes)
     token = auth_service.create_session(db, admin, ttl=ttl)
-    _attempts.pop(f"user:{key}", None)
+    rate_limit_service.clear(db, f"user:{key}", _WINDOW)
     audit_service.record(db, actor_id=admin.id, action="admin_login", resource_type="admin", resource_id=admin.id)
     return admin, token
 

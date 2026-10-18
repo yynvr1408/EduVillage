@@ -91,7 +91,7 @@ The **capacity of one Render Standard instance** is the highest step that meets 
 
 ## 8. Known limitations of this plan
 
-* A single load generator cannot reproduce rural mobile network conditions; use throttling (for example 3G profiles in browsers) for the browser journeys.
+* A single load generator cannot reproduce real-world weak mobile network conditions; use throttling (for example 3G profiles in browsers) for the browser journeys.
 * Real LiveKit media quality cannot be judged by synthetic devices.
 * The free tiers of Render and Neon change behaviour under load (suspension, quotas); results from a free-tier staging environment do not transfer to paid plans. Test the plan you intend to run.
 * In-process rate limits make multi-instance results differ from a single instance.

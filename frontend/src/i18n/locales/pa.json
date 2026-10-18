@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "ਹੋਮ",
+    "dashboard": "ਡੈਸ਼ਬੋਰਡ",
+    "classes": "ਕਲਾਸਾਂ",
+    "recordedLessons": "ਰਿਕਾਰਡ ਕੀਤੇ ਪਾਠ",
+    "coursesAndLessons": "ਕੋਰਸ ਅਤੇ ਪਾਠ",
+    "myCourses": "ਮੇਰੇ ਕੋਰਸ",
+    "assignments": "ਅਸਾਈਨਮੈਂਟ",
+    "teachingResources": "ਅਧਿਆਪਨ ਸਰੋਤ",
+    "aiSummaries": "AI ਸਾਰਾਂਸ਼",
+    "downloads": "ਡਾਊਨਲੋਡ",
+    "profile": "ਪ੍ਰੋਫਾਈਲ",
+    "institutionAdmin": "ਸੰਸਥਾ ਪ੍ਰਸ਼ਾਸਕ"
+  },
+  "navMobile": {
+    "recorded": "ਰਿਕਾਰਡ ਕੀਤੇ",
+    "tasks": "ਕੰਮ",
+    "offline": "ਆਫਲਾਈਨ"
+  },
+  "auth": {
+    "tagline": "ਘੱਟ ਬੈਂਡਵਿਡਥ ਵਾਲੇ ਖੇਤਰਾਂ ਵਿੱਚ ਭਰੋਸੇਯੋਗ ਸਿੱਖਿਆ ਲਈ ਆਫਲਾਈਨ-ਫਰਸਟ ਸਿੱਖਿਆ ਪਲੇਟਫਾਰਮ।",
+    "howSigningIn": "ਤੁਸੀਂ ਕਿਵੇਂ ਸਾਈਨ ਇਨ ਕਰ ਰਹੇ ਹੋ?",
+    "whatAccount": "ਤੁਹਾਨੂੰ ਕਿਸ ਕਿਸਮ ਦਾ ਖਾਤਾ ਚਾਹੀਦਾ ਹੈ?",
+    "studentPortal": "ਵਿਦਿਆਰਥੀ ਪੋਰਟਲ",
+    "studentPortalDesc": "ਕਲਾਸਾਂ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ, ਆਫਲਾਈਨ ਪੜ੍ਹਾਈ ਪੂਰੀ ਕਰੋ, ਅਸਾਈਨਮੈਂਟ ਜਮ੍ਹਾਂ ਕਰੋ",
+    "teacherPortal": "ਅਧਿਆਪਕ ਪੋਰਟਲ",
+    "teacherPortalDesc": "ਕਲਾਸਾਂ ਦਾ ਸਮਾਂ ਤੈਅ ਕਰੋ, ਕੋਰਸਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ, AI ਸਾਰਾਂਸ਼ ਵੇਖੋ",
+    "studentAccount": "ਵਿਦਿਆਰਥੀ ਖਾਤਾ",
+    "studentAccountDesc": "ਕੋਰਸ, ਕਲਾਸਾਂ ਅਤੇ ਆਫਲਾਈਨ ਡਾਊਨਲੋਡ ਤੱਕ ਪਹੁੰਚ ਕਰੋ",
+    "teacherAccount": "ਅਧਿਆਪਕ ਖਾਤਾ",
+    "teacherAccountDesc": "ਕਲਾਸਾਂ ਦਾ ਸਮਾਂ ਤੈਅ ਕਰੋ, ਸਮੱਗਰੀ ਅਤੇ ਅਸਾਈਨਮੈਂਟ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ",
+    "alreadyRegistered": "ਪਹਿਲਾਂ ਹੀ ਰਜਿਸਟਰਡ ਹੋ?",
+    "signInHere": "ਇੱਥੇ ਸਾਈਨ ਇਨ ਕਰੋ"
+  },
+  "language": {
+    "switchLabel": "ਭਾਸ਼ਾ"
+  }
+}

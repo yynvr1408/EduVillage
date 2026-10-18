@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -42,7 +43,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="EduVillage API", lifespan=lifespan)
+app = FastAPI(title="LanternEd API", lifespan=lifespan)
 
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
@@ -55,6 +56,9 @@ app.add_middleware(
     # downloads need Content-Range to learn a file's real size and verify each chunk.
     expose_headers=["Content-Range", "Accept-Ranges", "X-Request-ID"],
 )
+# Every JSON response (class/course lists, summaries, ...) goes out compressed on a slow link.
+# minimum_size skips the overhead on tiny payloads where compression wouldn't pay for itself.
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.add_exception_handler(AppError, app_error_handler)
 

@@ -27,7 +27,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         <div className="flex items-center justify-between p-3.5 bg-[#F1F5F2] border border-[#E1E8E4] rounded-xl">
           <div>
             <p className="text-xs font-semibold text-[#202B2A]">
-              Status: {isOnline ? 'Connected to EduVillage Server' : 'Offline (Local Only)'}
+              Status: {isOnline ? 'Connected to LanternEd Server' : 'Offline (Local Only)'}
             </p>
             <p className="text-xs text-[#687775]">
               {lastSyncTime ? `Last synced: ${lastSyncTime.toLocaleTimeString()}` : 'No sync recorded yet this session'}

@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "classes": "Classes",
+    "recordedLessons": "Recorded Lessons",
+    "coursesAndLessons": "Courses & Lessons",
+    "myCourses": "My Courses",
+    "assignments": "Assignments",
+    "teachingResources": "Teaching Resources",
+    "aiSummaries": "AI Summaries",
+    "downloads": "Downloads",
+    "profile": "Profile",
+    "institutionAdmin": "Institution Admin"
+  },
+  "navMobile": {
+    "recorded": "Recorded",
+    "tasks": "Tasks",
+    "offline": "Offline"
+  },
+  "auth": {
+    "tagline": "Offline-first educational learning platform for reliable learning in low-bandwidth regions.",
+    "howSigningIn": "How are you signing in?",
+    "whatAccount": "What kind of account do you need?",
+    "studentPortal": "Student Portal",
+    "studentPortalDesc": "Attend classes, catch up offline, submit assignments",
+    "teacherPortal": "Teacher Portal",
+    "teacherPortalDesc": "Schedule classes, manage courses, review AI summaries",
+    "studentAccount": "Student Account",
+    "studentAccountDesc": "Access courses, classes and offline downloads",
+    "teacherAccount": "Teacher Account",
+    "teacherAccountDesc": "Schedule classes, manage materials and assignments",
+    "alreadyRegistered": "Already registered?",
+    "signInHere": "Sign in here"
+  },
+  "language": {
+    "switchLabel": "Language"
+  }
+}

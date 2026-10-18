@@ -16,10 +16,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.db.base import utcnow
-from app.db.models.college import College, CollegeCodeHistory
-from app.db.models.enums import CollegeStatus
+from app.db.models.college import College, CollegeAdministrator, CollegeCodeHistory
+from app.db.models.enums import CollegeStatus, UserRole
+from app.db.models.user import User
 from app.services import audit_service
 
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 32 symbols: letters without I/O, digits 2-9
@@ -366,3 +367,97 @@ def validate_registration_target(
     if section.status != CollegeStatus.active:
         raise ConflictError("This section is not available.", code="SECTION_INACTIVE")
     return college, branch, section
+
+
+# ---- college administrators (delegated, scoped institution management) -------------------------
+#
+# A teacher can be delegated to manage ONE college's own branches/sections/code, so routine
+# institutional setup doesn't bottleneck on the one platform admin for every single institution.
+# Granting/revoking this is itself a platform-admin-only action (assign_college_admin /
+# remove_college_admin below) — a teacher can never make themselves or anyone else one. Once
+# granted, the teacher manages their college through app/api/v1/institution_admin.py, using their
+# ordinary teacher session — this is checked as an extra permission on top of that, never a
+# separate login.
+
+
+def is_college_admin(db: Session, user_id: str, college_id: str) -> bool:
+    return (
+        db.execute(
+            select(CollegeAdministrator.id).where(
+                CollegeAdministrator.user_id == user_id, CollegeAdministrator.college_id == college_id
+            )
+        ).first()
+        is not None
+    )
+
+
+def assert_can_manage_college(db: Session, user: User, college: College) -> None:
+    """For the teacher-session self-serve routes only. The platform admin router never calls this —
+    it's gated by its own, separate get_current_admin dependency and always has full access."""
+    if not is_college_admin(db, user.id, college.id):
+        raise ForbiddenError("You are not an administrator of this institution.")
+
+
+def list_colleges_administered_by(db: Session, user_id: str) -> list[College]:
+    stmt = (
+        select(College)
+        .join(CollegeAdministrator, CollegeAdministrator.college_id == College.id)
+        .where(CollegeAdministrator.user_id == user_id)
+        .order_by(College.name_key)
+    )
+    return list(db.execute(stmt).scalars())
+
+
+def list_college_admins(db: Session, college_id: str) -> list[CollegeAdministrator]:
+    stmt = select(CollegeAdministrator).where(CollegeAdministrator.college_id == college_id)
+    return list(db.execute(stmt).scalars())
+
+
+def assign_college_admin(db: Session, platform_admin_id: str, college: College, *, user_id: str) -> CollegeAdministrator:
+    """Platform-admin-only. Idempotent: delegating to an already-delegated teacher just returns
+    the existing record rather than erroring."""
+    target = db.get(User, user_id)
+    if target is None:
+        raise NotFoundError("User not found.")
+    if target.role != UserRole.teacher:
+        raise ValidationFailedError("Only a teacher can be made an institution administrator.", code="NOT_A_TEACHER")
+
+    existing = db.execute(
+        select(CollegeAdministrator).where(
+            CollegeAdministrator.user_id == user_id, CollegeAdministrator.college_id == college.id
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+
+    admin_link = CollegeAdministrator(user_id=user_id, college_id=college.id, assigned_by=platform_admin_id)
+    db.add(admin_link)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()  # a concurrent request granted the same delegation first
+        return db.execute(
+            select(CollegeAdministrator).where(
+                CollegeAdministrator.user_id == user_id, CollegeAdministrator.college_id == college.id
+            )
+        ).scalar_one()
+    db.refresh(admin_link)
+    audit_service.record(
+        db, actor_id=platform_admin_id, action="college_administrator_assigned", resource_type="college", resource_id=college.id
+    )
+    return admin_link
+
+
+def remove_college_admin(db: Session, platform_admin_id: str, college: College, *, user_id: str) -> None:
+    existing = db.execute(
+        select(CollegeAdministrator).where(
+            CollegeAdministrator.user_id == user_id, CollegeAdministrator.college_id == college.id
+        )
+    ).scalar_one_or_none()
+    if not existing:
+        raise NotFoundError("This user is not an administrator of this college.")
+    db.delete(existing)
+    db.commit()
+    audit_service.record(
+        db, actor_id=platform_admin_id, action="college_administrator_removed", resource_type="college", resource_id=college.id
+    )

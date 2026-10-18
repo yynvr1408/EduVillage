@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard,
   BookOpen,
@@ -9,27 +10,37 @@ import {
   FileCheck,
   Sparkles,
   User,
+  Building2,
 } from 'lucide-react'
+import { useIsInstitutionAdmin } from '../../hooks/useIsInstitutionAdmin'
 
 const navItems = [
-  { to: '/teacher/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/teacher/courses', label: 'My Courses', icon: BookOpen },
-  { to: '/teacher/classes', label: 'Classes', icon: Video },
-  { to: '/teacher/recorded-lessons', label: 'Recorded Lessons', icon: PlayCircle },
-  { to: '/teacher/materials', label: 'Teaching Resources', icon: FolderOpen },
-  { to: '/teacher/assignments', label: 'Assignments', icon: FileCheck },
-  { to: '/teacher/summaries', label: 'AI Summaries', icon: Sparkles },
-  { to: '/teacher/profile', label: 'Profile', icon: User },
-]
+  { to: '/teacher/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { to: '/teacher/courses', labelKey: 'nav.myCourses', icon: BookOpen },
+  { to: '/teacher/classes', labelKey: 'nav.classes', icon: Video },
+  { to: '/teacher/recorded-lessons', labelKey: 'nav.recordedLessons', icon: PlayCircle },
+  { to: '/teacher/materials', labelKey: 'nav.teachingResources', icon: FolderOpen },
+  { to: '/teacher/assignments', labelKey: 'nav.assignments', icon: FileCheck },
+  { to: '/teacher/summaries', labelKey: 'nav.aiSummaries', icon: Sparkles },
+  { to: '/teacher/profile', labelKey: 'nav.profile', icon: User },
+] as const
 
 export const TeacherSidebar: React.FC = () => {
+  const { t } = useTranslation()
+  const isInstitutionAdmin = useIsInstitutionAdmin()
+  // Shown only for the small number of teachers delegated to administer a college - hidden,
+  // not disabled, for everyone else (see useIsInstitutionAdmin).
+  const items = isInstitutionAdmin
+    ? [...navItems.slice(0, -1), { to: '/teacher/institution', labelKey: 'nav.institutionAdmin', icon: Building2 } as const, navItems[navItems.length - 1]]
+    : navItems
+
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-[#F8FAF7] border-r border-[#E1E8E4] shrink-0 min-h-[calc(100vh-4rem)] p-4">
       <div className="text-xs font-bold text-[#687775] uppercase tracking-wider px-3 mb-2">
         Teacher Console
       </div>
       <nav className="flex flex-col gap-1.5" aria-label="Teacher Navigation">
-        {navItems.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon
           return (
             <NavLink
@@ -45,7 +56,7 @@ export const TeacherSidebar: React.FC = () => {
               }
             >
               <Icon className="w-4.5 h-4.5 shrink-0" />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </NavLink>
           )
         })}

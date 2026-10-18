@@ -116,18 +116,24 @@ def remove_co_teacher(db: Session, owner: User, course: Course, *, teacher_id: s
     )
 
 
+def course_ids_for_user(user: User):
+    """The course ids a user can see, as an un-executed SELECT — not a Python list, so a caller
+    that needs to filter another table by course_id (e.g. classes) can use it directly as a
+    subquery instead of first materializing every Course row up to some arbitrary cap."""
+    if user.role == UserRole.teacher:
+        co_taught_ids = select(CourseTeacher.course_id).where(CourseTeacher.teacher_id == user.id)
+        return select(Course.id).where((Course.teacher_id == user.id) | Course.id.in_(co_taught_ids))
+    return (
+        select(Course.id)
+        .join(CourseEnrollment, CourseEnrollment.course_id == Course.id)
+        .where(CourseEnrollment.student_id == user.id, CourseEnrollment.status == EnrollmentStatus.active)
+    )
+
+
 def list_courses_for_user(db: Session, user: User, *, limit: int = 50, offset: int = 0) -> list[Course]:
     from app.utils.pagination import paginate
 
-    if user.role == UserRole.teacher:
-        co_taught_ids = select(CourseTeacher.course_id).where(CourseTeacher.teacher_id == user.id)
-        stmt = select(Course).where((Course.teacher_id == user.id) | Course.id.in_(co_taught_ids))
-    else:
-        stmt = (
-            select(Course)
-            .join(CourseEnrollment, CourseEnrollment.course_id == Course.id)
-            .where(CourseEnrollment.student_id == user.id, CourseEnrollment.status == EnrollmentStatus.active)
-        )
+    stmt = select(Course).where(Course.id.in_(course_ids_for_user(user)))
     return paginate(db, stmt.order_by(Course.created_at.desc()), limit=limit, offset=offset)
 
 

@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "الرئيسية",
+    "dashboard": "لوحة التحكم",
+    "classes": "الحصص",
+    "recordedLessons": "الحصص المسجلة",
+    "coursesAndLessons": "الدورات والدروس",
+    "myCourses": "دوراتي",
+    "assignments": "الواجبات",
+    "teachingResources": "مصادر التدريس",
+    "aiSummaries": "ملخصات الذكاء الاصطناعي",
+    "downloads": "التنزيلات",
+    "profile": "الملف الشخصي",
+    "institutionAdmin": "مسؤول المؤسسة"
+  },
+  "navMobile": {
+    "recorded": "المسجلة",
+    "tasks": "المهام",
+    "offline": "غير متصل"
+  },
+  "auth": {
+    "tagline": "منصة تعليمية تعتمد أولاً على وضع عدم الاتصال، لتعلم موثوق في المناطق ذات النطاق الترددي المنخفض.",
+    "howSigningIn": "كيف تريد تسجيل الدخول؟",
+    "whatAccount": "أي نوع من الحساب تحتاج؟",
+    "studentPortal": "بوابة الطالب",
+    "studentPortalDesc": "حضور الحصص، المتابعة دون اتصال، تسليم الواجبات",
+    "teacherPortal": "بوابة المعلم",
+    "teacherPortalDesc": "جدولة الحصص، إدارة الدورات، مراجعة ملخصات الذكاء الاصطناعي",
+    "studentAccount": "حساب طالب",
+    "studentAccountDesc": "الوصول إلى الدورات والحصص والتنزيلات دون اتصال",
+    "teacherAccount": "حساب معلم",
+    "teacherAccountDesc": "جدولة الحصص، إدارة المواد والواجبات",
+    "alreadyRegistered": "هل سجلت من قبل؟",
+    "signInHere": "سجّل الدخول هنا"
+  },
+  "language": {
+    "switchLabel": "اللغة"
+  }
+}

@@ -1,7 +1,7 @@
 /**
  * Three different questions, three different signals - never collapsed into one boolean:
  *   1. Is the device online at all?            -> the browser's online/offline events
- *   2. Can we reach the EduVillage API?        -> the /health heartbeat (NetworkContext)
+ *   2. Can we reach the LanternEd API?        -> the /health heartbeat (NetworkContext)
  *   3. Is the live media connection healthy?   -> LiveKit's own connection state
  * A browser can report "online" while WebRTC is broken, and the media can stay healthy while the API
  * heartbeat fails, so each combination gets its own, accurate guidance.
@@ -41,7 +41,7 @@ export function diagnoseConnectivity({ browserOnline, apiReachable, liveKitState
         cause: 'api_down_media_ok',
         headline: 'You are still in the class',
         guidance:
-          'The live audio and video are working, but EduVillage cannot be reached right now. Submitting work and loading new pages will wait until it is back.',
+          'The live audio and video are working, but LanternEd cannot be reached right now. Submitting work and loading new pages will wait until it is back.',
         canRejoinLive: true,
       }
     }
@@ -72,7 +72,7 @@ export function diagnoseConnectivity({ browserOnline, apiReachable, liveKitState
       cause: 'network_unstable',
       headline: 'Your connection is too weak',
       guidance:
-        'Your device reports being online, but neither the live class nor EduVillage can be reached. The signal may be very weak or blocked. Moving to a better spot may help; your downloaded lessons still work.',
+        'Your device reports being online, but neither the live class nor LanternEd can be reached. The signal may be very weak or blocked. Moving to a better spot may help; your downloaded lessons still work.',
       canRejoinLive: false,
     }
   }
@@ -81,7 +81,7 @@ export function diagnoseConnectivity({ browserOnline, apiReachable, liveKitState
     cause: 'media_unreachable',
     headline: 'The live class connection was lost',
     guidance:
-      'Your internet and EduVillage are working, but the live video server cannot be reached. This is usually temporary. You can wait, or study your downloaded lessons and rejoin later.',
+      'Your internet and LanternEd are working, but the live video server cannot be reached. This is usually temporary. You can wait, or study your downloaded lessons and rejoin later.',
     canRejoinLive: true,
   }
 }

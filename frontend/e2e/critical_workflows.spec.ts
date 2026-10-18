@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test'
 
-test.describe('EduVillage Critical Workflows', () => {
+test.describe('LanternEd Critical Workflows', () => {
   test('student authentication, dashboard rendering, and mobile bottom navigation', async ({ page }) => {
     await page.goto('/login')
 
-    // Expect brand name EduVillage
-    await expect(page.locator('h1')).toContainText('EduVillage')
+    // Expect brand name LanternEd
+    await expect(page.locator('h1')).toContainText('LanternEd')
 
     // Quick fill Student demo
     await page.click('text=Student Demo')

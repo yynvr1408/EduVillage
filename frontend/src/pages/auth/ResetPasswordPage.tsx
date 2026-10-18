@@ -65,7 +65,7 @@ export const ResetPasswordPage: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">Reset Your Password</h1>
           {!isDone && (
             <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
-              Choose a new password for your EduVillage account.
+              Choose a new password for your LanternEd account.
             </p>
           )}
         </div>

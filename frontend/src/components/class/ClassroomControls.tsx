@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Mic,
   MicOff,
@@ -14,6 +14,9 @@ import {
   PencilLine,
   Droplet,
   Hand,
+  SignalLow,
+  Wrench,
+  Check,
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -49,6 +52,10 @@ export interface ClassroomControlsProps {
     blurOn: boolean
     blurSupported: boolean
     onToggleBlur: () => void
+    /** Caps the teacher's own camera upload to a much lower resolution/bitrate - for when the
+     * teacher's own connection, not a student's, is the weak link. */
+    lowBandwidthOn: boolean
+    onToggleLowBandwidth: () => void
     notice?: string | null
   }
 }
@@ -70,6 +77,11 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
   connectionState,
   teacherTools,
 }) => {
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const anyToolActive = Boolean(
+    teacherTools && (teacherTools.isSharingScreen || teacherTools.isBoardOpen || teacherTools.blurOn || teacherTools.lowBandwidthOn)
+  )
+
   return (
     <div className="bg-[#121A19] text-[#FFFFFF] border-t border-[#202B2A] p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 safe-bottom">
       {/* Left: Connection State & Mode Badges */}
@@ -149,79 +161,112 @@ export const ClassroomControls: React.FC<ClassroomControlsProps> = ({
           </button>
         )}
 
-        {/* Audio-Only Mode Toggle (Stops video packets to conserve low bandwidth) */}
-        <button
-          type="button"
-          onClick={onToggleAudioOnly}
-          className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors cursor-pointer border ${
-            isAudioOnly
-              ? 'bg-[#2364AA] text-[#FFFFFF] border-[#2364AA]'
-              : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
-          }`}
-          title="Toggle Audio-Only mode to conserve bandwidth"
-          aria-label="Toggle Audio-Only mode"
-        >
-          {isAudioOnly ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          <span className="hidden sm:inline">
-            {isAudioOnly ? 'Audio Only (Active)' : 'Save Data'}
-          </span>
-        </button>
+        {/* Audio-Only Mode Toggle (Stops video packets to conserve low bandwidth). Student-only:
+            it unsubscribes from a REMOTE participant's video, and a teacher never subscribes to
+            one in this app's model, so showing it to the teacher would just be a dead button. */}
+        {!teacherTools && (
+          <button
+            type="button"
+            onClick={onToggleAudioOnly}
+            className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors cursor-pointer border ${
+              isAudioOnly
+                ? 'bg-[#2364AA] text-[#FFFFFF] border-[#2364AA]'
+                : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
+            }`}
+            title="Toggle Audio-Only mode to conserve bandwidth"
+            aria-label="Toggle Audio-Only mode"
+          >
+            {isAudioOnly ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            <span className="hidden sm:inline">
+              {isAudioOnly ? 'Audio Only (Active)' : 'Save Data'}
+            </span>
+          </button>
+        )}
 
+        {/* Teacher-only presentation tools, grouped behind one "Tools" button instead of four
+            separate pills always on screen - the live class view already competes for space with
+            the stage, roster, notes and speak-request banners. */}
         {teacherTools && (
-          <>
+          <div className="relative">
             <button
               type="button"
-              onClick={teacherTools.onAddScreen}
-              disabled={!teacherTools.canShareScreen}
-              className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors border ${
-                teacherTools.isSharingScreen
-                  ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
-                  : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
-              } ${teacherTools.canShareScreen ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
-              title={
-                teacherTools.canShareScreen
-                  ? teacherTools.isSharingScreen
-                    ? 'Share another screen or window with the class'
-                    : 'Share your screen with the class'
-                  : 'Screen sharing is not supported on this device'
-              }
-              aria-label={teacherTools.isSharingScreen ? 'Share another screen' : 'Share screen'}
-            >
-              <MonitorUp className="w-4 h-4" />
-              <span className="hidden sm:inline">{teacherTools.isSharingScreen ? 'Add screen' : 'Share screen'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={teacherTools.onToggleBoard}
-              aria-pressed={teacherTools.isBoardOpen}
+              onClick={() => setToolsOpen((v) => !v)}
+              aria-expanded={toolsOpen}
+              aria-haspopup="true"
               className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors cursor-pointer border ${
-                teacherTools.isBoardOpen
+                toolsOpen || anyToolActive
                   ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
                   : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
               }`}
-              title="Open the whiteboard for the class"
-              aria-label="Whiteboard"
+              title="Presentation tools: screen share, whiteboard, blur, low bandwidth"
+              aria-label="Tools"
             >
-              <PencilLine className="w-4 h-4" />
-              <span className="hidden sm:inline">Whiteboard</span>
+              <Wrench className="w-4 h-4" />
+              <span className="hidden sm:inline">Tools</span>
+              {anyToolActive && <span className="w-1.5 h-1.5 rounded-full bg-[#F2A516]" aria-hidden="true" data-testid="tools-active-indicator" />}
             </button>
-            <button
-              type="button"
-              onClick={teacherTools.onToggleBlur}
-              disabled={!teacherTools.blurSupported}
-              aria-pressed={teacherTools.blurOn}
-              className={`px-3 py-2 sm:px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 touch-target transition-colors border ${
-                teacherTools.blurOn
-                  ? 'bg-[#0F5B57] text-[#FFFFFF] border-[#0F5B57]'
-                  : 'bg-[#202B2A] text-[#FFFFFF] border-[#374947] hover:bg-[#374947]'
-              } ${teacherTools.blurSupported ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
-              title={teacherTools.blurSupported ? 'Blur your background' : 'Background blur is not supported in this browser'}
-              aria-label="Blur background"
-            >
-              <Droplet className="w-4 h-4" />
-              <span className="hidden sm:inline">Blur</span>
-            </button>
-          </>
+
+            {toolsOpen && (
+              <>
+                {/* Click-outside-to-close backdrop. */}
+                <div className="fixed inset-0 z-40" data-testid="tools-menu-backdrop" onClick={() => setToolsOpen(false)} />
+                <div
+                  role="group"
+                  aria-label="Presentation tools"
+                  className="absolute bottom-full left-0 mb-2 z-50 w-60 bg-[#202B2A] border border-[#374947] rounded-xl shadow-2xl p-1.5 flex flex-col gap-0.5"
+                >
+                  <button
+                    type="button"
+                    onClick={teacherTools.onAddScreen}
+                    disabled={!teacherTools.canShareScreen}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-colors ${
+                      teacherTools.canShareScreen ? 'cursor-pointer hover:bg-[#2B3A38] text-[#FFFFFF]' : 'opacity-50 cursor-not-allowed text-[#687775]'
+                    }`}
+                    title={teacherTools.canShareScreen ? undefined : 'Screen sharing is not supported on this device'}
+                  >
+                    <MonitorUp className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">{teacherTools.isSharingScreen ? 'Add another screen' : 'Share screen'}</span>
+                    {teacherTools.isSharingScreen && <Check className="w-4 h-4 text-[#2DBE8B] shrink-0" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={teacherTools.onToggleBoard}
+                    aria-pressed={teacherTools.isBoardOpen}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-colors cursor-pointer hover:bg-[#2B3A38] text-[#FFFFFF]"
+                  >
+                    <PencilLine className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">Whiteboard</span>
+                    {teacherTools.isBoardOpen && <Check className="w-4 h-4 text-[#2DBE8B] shrink-0" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={teacherTools.onToggleBlur}
+                    disabled={!teacherTools.blurSupported}
+                    aria-pressed={teacherTools.blurOn}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-colors ${
+                      teacherTools.blurSupported ? 'cursor-pointer hover:bg-[#2B3A38] text-[#FFFFFF]' : 'opacity-50 cursor-not-allowed text-[#687775]'
+                    }`}
+                    title={teacherTools.blurSupported ? undefined : 'Background blur is not supported in this browser'}
+                  >
+                    <Droplet className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">Blur my background</span>
+                    {teacherTools.blurOn && <Check className="w-4 h-4 text-[#2DBE8B] shrink-0" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={teacherTools.onToggleLowBandwidth}
+                    aria-pressed={teacherTools.lowBandwidthOn}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-colors cursor-pointer hover:bg-[#2B3A38] text-[#FFFFFF]"
+                    title="Lower your own camera resolution and bitrate - for when your connection, not a student's, is weak"
+                  >
+                    <SignalLow className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">Low bandwidth broadcast</span>
+                    {teacherTools.lowBandwidthOn && <Check className="w-4 h-4 text-[#2DBE8B] shrink-0" />}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {/* Summary side panel toggle */}

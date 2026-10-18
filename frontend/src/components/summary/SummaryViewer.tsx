@@ -9,12 +9,18 @@ import {
   BookMarked,
   Lightbulb,
   FileText,
+  Layers,
+  Volume2,
+  StopCircle,
 } from 'lucide-react'
 import type { Summary } from '../../types'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card, CardHeader, CardContent } from '../ui/Card'
-import { exportSummary } from '../../utils/summaryExport'
+import { Dialog } from '../ui/Dialog'
+import { Flashcards } from './Flashcards'
+import { useReadAloud } from '../../hooks/useReadAloud'
+import { exportSummary, buildSummaryBlocks } from '../../utils/summaryExport'
 
 export interface SummaryViewerProps {
   summary: Summary
@@ -35,6 +41,16 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
 
   const [exporting, setExporting] = React.useState(false)
   const [exportError, setExportError] = React.useState<string | null>(null)
+  const [flashcardsOpen, setFlashcardsOpen] = React.useState(false)
+  const hasFlashcards = Boolean(summary.definitions && summary.definitions.length > 0)
+  const reader = useReadAloud()
+  const handleToggleReadAloud = () => {
+    if (reader.isReading) {
+      reader.stop()
+    } else {
+      reader.read(buildSummaryBlocks(summary).map((b) => b.text).join('. '))
+    }
+  }
 
   const handleDownload = async () => {
     setExporting(true)
@@ -68,6 +84,26 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {reader.supported && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleToggleReadAloud}
+              icon={reader.isReading ? <StopCircle className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+            >
+              {reader.isReading ? 'Stop Reading' : 'Read Aloud'}
+            </Button>
+          )}
+          {hasFlashcards && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setFlashcardsOpen(true)}
+              icon={<Layers className="w-3.5 h-3.5" />}
+            >
+              Study Flashcards
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -172,6 +208,12 @@ export const SummaryViewer: React.FC<SummaryViewerProps> = ({
             </ol>
           </CardContent>
         </Card>
+      )}
+
+      {hasFlashcards && (
+        <Dialog isOpen={flashcardsOpen} onClose={() => setFlashcardsOpen(false)} title="Study Flashcards" maxWidth="md">
+          <Flashcards cards={summary.definitions!} />
+        </Dialog>
       )}
     </div>
   )

@@ -58,17 +58,13 @@ def assert_teaches_class(db: Session, user: User, cls: Class) -> None:
     raise ForbiddenError("Only the assigned teacher or a co-teacher on this course can manage this class.")
 
 
-MAX_COURSES_FOR_CLASS_LOOKUP = 200  # enough to cover any real teacher/student's course load
-
-
 def list_classes_for_user(db: Session, user: User, *, limit: int = 50, offset: int = 0) -> list[Class]:
     from app.utils.pagination import paginate
 
-    courses = course_service.list_courses_for_user(db, user, limit=MAX_COURSES_FOR_CLASS_LOOKUP)
-    course_ids = [c.id for c in courses]
-    if not course_ids:
-        return []
-    stmt = select(Class).where(Class.course_id.in_(course_ids))
+    # A subquery, not a pre-fetched-and-capped list of course ids: correct no matter how many
+    # courses a teacher/student ends up on as the platform grows, and it's one round trip instead
+    # of two.
+    stmt = select(Class).where(Class.course_id.in_(course_service.course_ids_for_user(user)))
     if user.role == UserRole.student:
         # Branch-wide classes only for students of that branch, and only while the teacher still covers the branch.
         mine = teaching_scope_service.student_branch_ids(db, user) or {""}

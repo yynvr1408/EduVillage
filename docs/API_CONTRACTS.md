@@ -2,7 +2,7 @@
 
 Generated from the running application by `backend/scripts/generate_docs.py`; do not edit by hand. Interactive documentation is served by the backend at `/docs` (Swagger) and `/openapi.json`.
 
-130 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
+145 operations. All application routes are under `/api/v1`. Errors always have the shape `{ "error": { "code", "message", "request_id", "details" } }`.
 
 **Authentication.** Students and teachers authenticate with an httpOnly session cookie (`eduvillage_session`). The administrator uses a separate cookie (`eduvillage_admin_session`) and must send `X-EduVillage-Admin: 1` on every request that changes data. "public" means no session is required.
 
@@ -22,6 +22,9 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 | POST | `/api/v1/admin/colleges` | administrator session | create college |
 | GET | `/api/v1/admin/colleges/{college_id}` | administrator session | get college |
 | PATCH | `/api/v1/admin/colleges/{college_id}` | administrator session | update college |
+| GET | `/api/v1/admin/colleges/{college_id}/administrators` | administrator session | list college administrators |
+| POST | `/api/v1/admin/colleges/{college_id}/administrators` | administrator session | add college administrator |
+| DELETE | `/api/v1/admin/colleges/{college_id}/administrators/{user_id}` | administrator session | remove college administrator |
 | GET | `/api/v1/admin/colleges/{college_id}/branches` | administrator session | list branches |
 | POST | `/api/v1/admin/colleges/{college_id}/branches` | administrator session | create branch |
 | POST | `/api/v1/admin/colleges/{college_id}/regenerate-code` | administrator session | regenerate code |
@@ -123,6 +126,23 @@ Generated from the running application by `backend/scripts/generate_docs.py`; do
 |---|---|---|---|
 | GET | `/health` | public | health |
 | GET | `/ready` | public | ready |
+
+## institution-admin
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| PATCH | `/api/v1/institution-admin/branches/{branch_id}` | signed-in user | update my branch |
+| GET | `/api/v1/institution-admin/branches/{branch_id}/sections` | signed-in user | list my branch sections |
+| POST | `/api/v1/institution-admin/branches/{branch_id}/sections` | signed-in user | create my branch section |
+| POST | `/api/v1/institution-admin/branches/{branch_id}/status` | signed-in user | change my branch status |
+| GET | `/api/v1/institution-admin/colleges` | signed-in user | The colleges this teacher is delegated to administer — empty for almost every teacher. |
+| GET | `/api/v1/institution-admin/colleges/{college_id}` | signed-in user | get my college |
+| PATCH | `/api/v1/institution-admin/colleges/{college_id}` | signed-in user | update my college |
+| GET | `/api/v1/institution-admin/colleges/{college_id}/branches` | signed-in user | list my branches |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/branches` | signed-in user | create my branch |
+| POST | `/api/v1/institution-admin/colleges/{college_id}/regenerate-code` | signed-in user | regenerate my college code |
+| PATCH | `/api/v1/institution-admin/sections/{section_id}` | signed-in user | update my section |
+| POST | `/api/v1/institution-admin/sections/{section_id}/status` | signed-in user | change my section status |
 
 ## recordings
 

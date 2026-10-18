@@ -3,6 +3,20 @@ import { ChevronRight, Layers, Pencil, Plus, Power, Search } from 'lucide-react'
 import { Badge, Button, Dialog, FormField, Input, LoadingState } from '../../components/ui'
 import { adminApi, type College, type CollegeBranch, type CollegeSection, type CollegeStatus } from '../../services/adminApi'
 
+/** The slice of adminApi this dialog actually needs - lets a delegated institution admin (a
+ * regular teacher session, see institutionAdminApi) reuse this exact component by passing a
+ * different implementation, instead of duplicating the whole branch/section management UI. */
+export interface CollegeStructureApi {
+  listBranches: (collegeId: string, search?: string) => Promise<CollegeBranch[]>
+  createBranch: (collegeId: string, name: string, shortCode?: string) => Promise<CollegeBranch>
+  updateBranch: (id: string, input: { name?: string; short_code?: string | null }) => Promise<CollegeBranch>
+  setBranchStatus: (id: string, status: CollegeStatus) => Promise<CollegeBranch>
+  listSections: (branchId: string, search?: string) => Promise<CollegeSection[]>
+  createSection: (branchId: string, name: string) => Promise<CollegeSection>
+  updateSection: (id: string, name: string) => Promise<CollegeSection>
+  setSectionStatus: (id: string, status: CollegeStatus) => Promise<CollegeSection>
+}
+
 type Item = { id: string; name: string; status: CollegeStatus; short_code?: string | null }
 
 interface ListProps {
@@ -145,11 +159,14 @@ const ManageList: React.FC<ListProps> = ({ noun, items, search, onSearch, onAdd,
 }
 
 /** Colleges -> (this dialog) Branches -> Sections. Everything is read from and written to the backend. */
-export const CollegeStructureDialog: React.FC<{ college: College | null; onClose: () => void; onSessionExpired: () => void }> = ({
-  college,
-  onClose,
-  onSessionExpired,
-}) => {
+export const CollegeStructureDialog: React.FC<{
+  college: College | null
+  onClose: () => void
+  onSessionExpired: () => void
+  /** Defaults to the platform admin's own transport; a delegated institution admin passes
+   * institutionAdminApi instead, which rides their ordinary teacher session. */
+  api?: CollegeStructureApi
+}> = ({ college, onClose, onSessionExpired, api = adminApi }) => {
   const [branch, setBranch] = useState<CollegeBranch | null>(null)
   const [branches, setBranches] = useState<CollegeBranch[] | null>(null)
   const [sections, setSections] = useState<CollegeSection[] | null>(null)
@@ -171,20 +188,20 @@ export const CollegeStructureDialog: React.FC<{ college: College | null; onClose
   const loadBranches = useCallback(async () => {
     if (!college) return
     try {
-      setBranches(await adminApi.listBranches(college.id, branchSearch))
+      setBranches(await api.listBranches(college.id, branchSearch))
     } catch (err) {
       fail(err)
     }
-  }, [college, branchSearch, fail])
+  }, [college, branchSearch, fail, api])
 
   const loadSections = useCallback(async () => {
     if (!branch) return
     try {
-      setSections(await adminApi.listSections(branch.id, sectionSearch))
+      setSections(await api.listSections(branch.id, sectionSearch))
     } catch (err) {
       fail(err)
     }
-  }, [branch, sectionSearch, fail])
+  }, [branch, sectionSearch, fail, api])
 
   useEffect(() => {
     setBranch(null)
@@ -225,7 +242,7 @@ export const CollegeStructureDialog: React.FC<{ college: College | null; onClose
   const doToggle = (kind: 'branch' | 'section', item: Item) => {
     const next: CollegeStatus = item.status === 'active' ? 'inactive' : 'active'
     void run(
-      () => (kind === 'branch' ? adminApi.setBranchStatus(item.id, next) : adminApi.setSectionStatus(item.id, next)),
+      () => (kind === 'branch' ? api.setBranchStatus(item.id, next) : api.setSectionStatus(item.id, next)),
       `${item.name} is now ${next}.`,
       kind === 'branch' ? loadBranches : loadSections,
     ).catch(() => undefined)
@@ -276,8 +293,8 @@ export const CollegeStructureDialog: React.FC<{ college: College | null; onClose
             search={branchSearch}
             onSearch={setBranchSearch}
             busy={busy}
-            onAdd={(name, code) => run(() => adminApi.createBranch(college!.id, name, code), `Branch ${name} added.`, loadBranches)}
-            onRename={(it, name, code) => run(() => adminApi.updateBranch(it.id, { name, short_code: code || null }), 'Branch updated.', loadBranches)}
+            onAdd={(name, code) => run(() => api.createBranch(college!.id, name, code), `Branch ${name} added.`, loadBranches)}
+            onRename={(it, name, code) => run(() => api.updateBranch(it.id, { name, short_code: code || null }), 'Branch updated.', loadBranches)}
             onToggle={(it) => requestToggle('branch', it)}
             onOpen={(it) => {
               setNotice(null)
@@ -293,8 +310,8 @@ export const CollegeStructureDialog: React.FC<{ college: College | null; onClose
             search={sectionSearch}
             onSearch={setSectionSearch}
             busy={busy}
-            onAdd={(name) => run(() => adminApi.createSection(branch.id, name), `Section ${name} added.`, loadSections)}
-            onRename={(it, name) => run(() => adminApi.updateSection(it.id, name), 'Section updated.', loadSections)}
+            onAdd={(name) => run(() => api.createSection(branch.id, name), `Section ${name} added.`, loadSections)}
+            onRename={(it, name) => run(() => api.updateSection(it.id, name), 'Section updated.', loadSections)}
             onToggle={(it) => requestToggle('section', it)}
           />
         )}

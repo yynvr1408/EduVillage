@@ -1,11 +1,11 @@
-# EduVillage
+# LanternEd
 
-**An offline-first, low-bandwidth learning platform for rural colleges: live classes that adapt to weak connections, recorded lessons, AI-assisted study notes, downloadable materials, and assignments that can be written and submitted without a connection.**
+**An offline-first, low-bandwidth learning platform for any institution where connectivity is unreliable — rural or urban, any country: live classes that adapt to weak connections, recorded lessons, AI-assisted study notes, downloadable materials, and assignments that can be written and submitted without a connection.**
 
-EduVillage gives a college everything it needs to teach students who have unreliable, expensive or slow internet and few devices: teachers run live classes (with a floating video window, a shared whiteboard, screen sharing and a blurred background), record them, and publish lessons with transcripts and AI summaries they approve; students join live, catch up from recordings, download material for offline study and submit work even when the network drops. Colleges, branches and sections are set up by an administrator, and registration is tied to a college code.
+LanternEd gives a college everything it needs to teach students who have unreliable, expensive or slow internet and few devices: teachers run live classes (with a floating video window, a shared whiteboard, screen sharing and a blurred background), record them, and publish lessons with transcripts and AI summaries they approve; students join live, catch up from recordings, download material for offline study and submit work even when the network drops. Colleges, branches and sections are set up by an administrator, and registration is tied to a college code.
 
 * **Live app:** frontend <https://edu-village-nine.vercel.app> · backend API <https://eduvillage-api.onrender.com> (`/health`, `/docs`)
-* **Documentation:** [Admin panel](docs/ADMIN_PANEL.md) · [Classroom and course tools](docs/CLASSROOM_AND_COURSE_TOOLS.md) · [API reference](docs/API_CONTRACTS.md) · [Database schema](docs/DATABASE_SCHEMA.md) · [Backend setup](docs/BACKEND_SETUP.md) · [Backend overview](docs/BACKEND_AUDIT.md) · [Requirements matrix](docs/BACKEND_REQUIREMENTS_MATRIX.md) · [Verification status](docs/FINAL_AUDIT.md) · [Recording pipeline](docs/RECORDING_VERIFICATION.md) · [Multi-college support](docs/MULTI_INSTITUTION_AUDIT.md) · [Codebase structure](docs/DEDUPLICATION_REPORT.md) · [Scalability architecture](docs/SCALABILITY_ARCHITECTURE.md) · [Infrastructure cost model](docs/INFRASTRUCTURE_COST_MODEL.md) · [Upgrade roadmap](docs/DEPLOYMENT_UPGRADE_ROADMAP.md) · [Evaluation answers](docs/SCALABILITY_EVALUATION_ANSWERS.md) · [Capacity test plan](docs/CAPACITY_TEST_PLAN.md) · [Frontend guide](frontend/README.md)
+* **Documentation:** [Admin panel](docs/ADMIN_PANEL.md) · [Classroom and course tools](docs/CLASSROOM_AND_COURSE_TOOLS.md) · [API reference](docs/API_CONTRACTS.md) · [Database schema](docs/DATABASE_SCHEMA.md) · [Backend setup](docs/BACKEND_SETUP.md) · [Backend overview](docs/BACKEND_AUDIT.md) · [Requirements matrix](docs/BACKEND_REQUIREMENTS_MATRIX.md) · [Verification status](docs/FINAL_AUDIT.md) · [Recording pipeline](docs/RECORDING_VERIFICATION.md) · [Multi-college support](docs/MULTI_INSTITUTION_AUDIT.md) · [Codebase structure](docs/DEDUPLICATION_REPORT.md) · [Scalability architecture](docs/SCALABILITY_ARCHITECTURE.md) · [Infrastructure cost model](docs/INFRASTRUCTURE_COST_MODEL.md) · [Upgrade roadmap](docs/DEPLOYMENT_UPGRADE_ROADMAP.md) · [Evaluation answers](docs/SCALABILITY_EVALUATION_ANSWERS.md) · [Capacity test plan](docs/CAPACITY_TEST_PLAN.md) · [Self-hosting](docs/SELF_HOSTING.md) · [Frontend guide](frontend/README.md)
 
 ## Table of contents
 
@@ -35,7 +35,7 @@ EduVillage gives a college everything it needs to teach students who have unreli
 
 A step-by-step tour of the product, in the order a college would use it. (Self-registration needs an administrator-issued college code, so the quickest way to click through everything yourself is the [local setup](#9-local-development): `alembic upgrade head` then `python -m app.seed` creates a college, branch, section and demo teacher and student.)
 
-1. **The administrator sets up the institution.** Sign in at `/admin`, create a college (a name is all that is needed) and a unique code like `EV-XXXX-XXXX` is generated; add branches (for example "Computer Science") and sections ("Section A", "Section B").
+1. **The administrator sets up the institution.** Sign in at `/platform-console`, create a college (a name is all that is needed) and a unique code like `EV-XXXX-XXXX` is generated; add branches (for example "Computer Science") and sections ("Section A", "Section B").
 2. **A teacher registers** at `/register/teacher`: choose college, branch and a section or **All Sections** (a branch-wide assignment), enter the college code, and you are signed in.
 3. **A student registers** at `/register/student` the same way. Registering does not enrol anyone in a course.
 4. **The teacher creates a course**, publishes it, and can **import the curriculum** by pasting lessons or uploading a text syllabus PDF, reviewing the proposed lessons before adding them. The teacher sees a live **roster** of enrolled students.
@@ -50,17 +50,19 @@ A step-by-step tour of the product, in the order a college would use it. (Self-r
 13. **Second-device protection.** Signing in on a new device while the account is signed in elsewhere requires an emailed code to approve it; once approved the older session ends.
 14. **Administrator protection.** The administrator account has one active session at a time and an idle timeout, and nobody can self-register with the administrator's email.
 15. **Course lifecycle.** A teacher can **Archive** a course (hidden from the catalogue, nothing deleted), **Restore** it, or **Permanently Delete** an archived course.
+16. **Institution delegation.** The administrator can hand day-to-day branch/section management of one college to a trusted teacher, who then manages it at `/teacher/institution` without needing the administrator for routine changes.
+17. **Language.** Anyone can switch the interface language at any time from the switcher on the sign-in, registration and navigation screens; the choice is remembered on that device and never requires a network request.
 
 ---
 
 ## 2. Problem and solution
 
-| Challenge in rural colleges | What EduVillage provides |
+| Challenge in connectivity-constrained institutions | What LanternEd provides |
 |---|---|
 | Weak or expensive internet | Adaptive audio-only mode in live classes; offline-first assignment drafts and sync; resumable downloads of recordings and materials; a whiteboard that works over a few hundred bytes per stroke |
 | Few devices, shared computers | Shared-device mode clears drafts, queue and downloads on sign-out; revocable server sessions |
 | Limited teaching staff | One recording or resource can be shared with many sections without copying; one branch-wide class reaches every student of a branch |
-| Hard to attend live classes | Recorded lessons, transcripts, teacher-reviewed AI summaries, notes as PDF or Word |
+| Hard to attend live classes | Recorded lessons, transcripts, teacher-reviewed AI summaries, study notes as Word, flashcards generated from the summary, and read-aloud for the text fallback |
 | Hard to submit work | Offline drafts, idempotent retrying sync, optional PDF/DOC/DOCX attachments, deadlines with an offline grace period |
 | Many colleges on one platform | Administrator-managed colleges, branches and sections; college codes; branch-level isolation of classes and recordings |
 
@@ -70,7 +72,9 @@ A step-by-step tour of the product, in the order a college would use it. (Self-r
 |---|---|
 | Accounts | Student and teacher registration against a college, its code, branch and section; email and password with argon2 hashing; server-side sessions; session list and revocation; shared-device mode |
 | Sign-in protection | Second-device sign-in needs an emailed one-time code and ends the older session; password recovery by emailed code |
-| Administrator panel | `/admin`: colleges with unique generated codes (regenerate, activate or deactivate), branches and sections per college, overview counts; separate cookie, CSRF header, rate limit, one active session with idle timeout |
+| Administrator panel | `/platform-console`: colleges with unique generated codes (regenerate, activate or deactivate), branches and sections per college, overview counts; separate cookie, CSRF header, rate limit, one active session with idle timeout |
+| Institution delegation | The administrator can delegate a teacher to manage one college's branches and sections at `/teacher/institution`, without granting access to college creation, activation or other colleges; revocable at any time |
+| Internationalisation | 21 bundled languages (not fetched over the network, so switching costs nothing on a slow connection): English, Mandarin Chinese, Hindi, Arabic, Bengali, Portuguese, Russian, Urdu, Indonesian, Swahili, Japanese, and ten further Indian languages (Telugu, Marathi, Tamil, Gujarati, Kannada, Odia, Malayalam, Punjabi, Assamese, Maithili); a language switcher on every auth and navigation surface |
 | Courses | Create, publish, archive, restore, permanently delete; catalogue with an Enroll button that becomes View Course; teacher roster; co-teachers; lessons; curriculum import (paste or syllabus PDF) |
 | Cohorts and scope | Course sections with membership; teachers assigned to one college section or to All Sections of a branch, which limits which cohorts they can address |
 | Live classes | Schedule, start, end, join with room-scoped tokens (students subscribe only); branch-wide classes with an Other Classes area; adaptive audio-only mode; connection recovery with offline fallbacks |
@@ -89,15 +93,15 @@ A step-by-step tour of the product, in the order a college would use it. (Self-r
 |---|---|---|
 | Student | Browse the catalogue, enrol, join classes they are authorised for (section or branch audience), watch published recordings, submit assignments with files, use offline features | Create courses or classes; see another branch's branch-wide classes; use any admin endpoint |
 | Teacher | Create courses, cohorts, classes, resources and assignments; record; review summaries; import curricula; address the cohorts within their assigned section or branch | Teach outside their assignment's scope; register as administrator; use admin endpoints |
-| Administrator | Manage colleges, codes, branches and sections at `/admin` | Use the student and teacher API (and vice versa) |
+| Administrator | Manage colleges, codes, branches and sections at `/platform-console`; delegate teachers as institution administrators | Use the student and teacher API (and vice versa) |
 
-Authorisation is decided in backend services from the server-side session; a client-supplied role, college, branch or section is always validated. College codes identify a college for registration and grant no privilege.
+Authorisation is decided in backend services from the server-side session; a client-supplied role, college, branch or section is always validated. College codes identify a college for registration and grant no privilege. A small number of teachers may additionally be delegated by the administrator as an **institution administrator** for one college — they gain access to that college's own branches and sections at `/teacher/institution`, but college creation and activation stay administrator-only, and the delegation is revocable at any time.
 
 ## 5. Technology stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, React Router 7, TanStack Query, React Hook Form and Zod, Dexie (IndexedDB), `vite-plugin-pwa` / Workbox, LiveKit client and components, `@livekit/track-processors`, `jspdf`, `docx` |
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, React Router 7, TanStack Query, React Hook Form and Zod, Dexie (IndexedDB), `vite-plugin-pwa` / Workbox, LiveKit client and components, `@livekit/track-processors`, `jspdf`, `docx`, `i18next` / `react-i18next` / `i18next-browser-languagedetector` (21 bundled locales) |
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, uvicorn, argon2-cffi, boto3, httpx, `openai` SDK (OpenAI-compatible APIs), `livekit-api`, `pypdf`, ffmpeg |
 | Database | PostgreSQL 18 on Neon (production); SQLite for development; PostgreSQL also used for tests |
 | Live classes | LiveKit Cloud (tokens, rooms, data channel, Egress, signed webhooks) |
@@ -105,7 +109,7 @@ Authorisation is decided in backend services from the server-side session; a cli
 | AI | OpenAI-compatible provider selected by configuration: Groq `openai/gpt-oss-120b` and `whisper-large-v3-turbo` in `render.yaml`; a labelled stub when unconfigured |
 | Storage | Cloudflare R2 (S3 API); local disk in development |
 | Hosting | Vercel (frontend), Render (backend Docker service), Neon, LiveKit Cloud, Cloudflare R2 |
-| Source control | GitHub (`yynvr1408/EduVillage`) |
+| Source control | GitHub (`yynvr1408/LanternEd`) |
 | Testing | pytest, Vitest with Testing Library, Playwright |
 | Tooling | oxlint, strict TypeScript build, Docker Compose for local PostgreSQL |
 
@@ -150,7 +154,7 @@ flowchart LR
 
 | Workflow | Steps |
 |---|---|
-| Institution setup | `/admin` sign-in, create college (code generated), add branches and sections, activate |
+| Institution setup | `/platform-console` sign-in, create college (code generated), add branches and sections, activate |
 | Registration | Student or Teacher portal, college, branch, section (teachers may choose All Sections), college code, account and session |
 | Sign-in | Password, then session; on an already signed-in account an emailed code approves the new device and ends the older session |
 | Password recovery | Email, code emailed, verify, new password, sign in again |
@@ -165,7 +169,7 @@ flowchart LR
 
 ## 8. Deployment
 
-* **Frontend: Vercel.** A static Vite build; `frontend/vercel.json` rewrites every path to `index.html` so `/admin` and other routes survive a refresh. There are no serverless or edge functions. `VITE_API_BASE_URL` is set in the Vercel project (build-time, public).
+* **Frontend: Vercel.** A static Vite build; `frontend/vercel.json` rewrites every path to `index.html` so `/platform-console` and other routes survive a refresh. There are no serverless or edge functions. `VITE_API_BASE_URL` is set in the Vercel project (build-time, public).
 * **Backend: Render**, a Docker web service defined in `render.yaml` (health check `/health`, secrets set in the dashboard). The container runs `alembic upgrade head` and then `uvicorn`.
 * **Database: Neon** PostgreSQL (`DATABASE_URL`, `sslmode=require`).
 * **LiveKit Cloud**, **Cloudflare R2**, **Groq** and **EmailJS** are reached from the backend and, for media and presigned URLs, from the browser.
@@ -181,13 +185,17 @@ flowchart LR
 | Groq | transcription and summaries configured in `render.yaml` |
 | R2 | recordings and uploads through the S3 API |
 
+**Self-hosting.** The centrally-hosted deployment above is the default, but institutions that
+want to keep their own data on their own infrastructure can run the same codebase themselves via
+`deploy/self-hosted/docker-compose.yml` — see [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
+
 ## 9. Local development
 
 **Prerequisites:** Python 3.12, Node.js 20+ with npm, Git. Docker is optional (`backend/compose.yaml` provides PostgreSQL 16).
 
 ```bash
-git clone https://github.com/yynvr1408/EduVillage.git
-cd EduVillage
+git clone https://github.com/yynvr1408/LanternEd.git
+cd LanternEd
 ```
 
 **Backend**
@@ -290,12 +298,12 @@ cd frontend && npm run test:e2e:real       # real backend + SQLite + built front
 cd frontend && npm run test:e2e:live       # real LiveKit Cloud (needs credentials in backend/.env)
 ```
 
-Latest results (2026-10-16): backend 421 passed on SQLite and 422 on PostgreSQL 18; frontend 179 unit tests; type-check and production build clean; real-stack browser suite 15 of 15; offline suite 12 of 12; layout suite 35 of 35; live LiveKit Cloud suite passes (classroom tools and multi-student join). Details of what each suite covers: [docs/BACKEND_REQUIREMENTS_MATRIX.md](docs/BACKEND_REQUIREMENTS_MATRIX.md) and [docs/FINAL_AUDIT.md](docs/FINAL_AUDIT.md).
+Latest results (2026-10-18): backend 459 passed, 12 skipped on SQLite (one summary-pipeline test needs the `ffmpeg` binary — it's bundled in the Docker image and passes there, but is a local-only failure on a dev machine without `ffmpeg` installed); frontend 224 unit tests (covering all 21 bundled languages); type-check and production build clean. Playwright suites (real-stack, offline, layout, live LiveKit Cloud) last verified 2026-10-16 — see [docs/BACKEND_REQUIREMENTS_MATRIX.md](docs/BACKEND_REQUIREMENTS_MATRIX.md) and [docs/FINAL_AUDIT.md](docs/FINAL_AUDIT.md) for what each suite covers.
 
 ## 15. Project structure
 
 ```
-EduVillage/
+LanternEd/
   README.md  render.yaml
   docs/                         guides, references, scalability and cost documents, cost_model.py
   backend/
@@ -309,9 +317,11 @@ EduVillage/
     alembic/versions/           migrations (linear chain)
     tests/                      api/, unit/, integration/
   frontend/
-    vercel.json  vite.config.ts  package.json  playwright.*.config.ts
+    Dockerfile  vercel.json  vite.config.ts  package.json  playwright.*.config.ts
     src/                        pages, components, context, services, hooks, db, utils, routes, test
+    src/i18n/                  i18next setup; 21 bundled locale JSON files (never fetched over the network)
     e2e/  e2e-offline/  e2e-layout/  e2e-real/  e2e-live/
+  deploy/self-hosted/           docker-compose.yml, Caddyfile, .env.example — see docs/SELF_HOSTING.md
 ```
 
 ## 16. Development workflow
@@ -329,12 +339,13 @@ Work is pushed to `main` on GitHub by several contributors. Before pushing: run 
 
 ## 18. Roadmap
 
-* Institution administrators and a membership approval workflow ([multi-college support](docs/MULTI_INSTITUTION_AUDIT.md)).
+* A self-service membership request/approval workflow for institution administrators (today, delegation is direct: the platform administrator assigns a teacher as a college's administrator — see [multi-college support](docs/MULTI_INSTITUTION_AUDIT.md)).
 * College-scoped course catalogues.
 * Grading, notifications and attendance reports.
 * Audio-only class recording for even lower data use.
 * GitHub Actions CI, error tracking and usage alerts.
 * Load testing against a staging environment ([plan](docs/CAPACITY_TEST_PLAN.md)).
+* Native-speaker review of the 21 bundled translations, and right-to-left layout support for Arabic and Urdu.
 
 ## 19. References
 

@@ -41,6 +41,7 @@ import { TeacherMaterialsPage } from '../pages/teacher/TeacherMaterialsPage'
 import { TeacherAssignmentsPage } from '../pages/teacher/TeacherAssignmentsPage'
 import { TeacherSummariesPage } from '../pages/teacher/TeacherSummariesPage'
 import { TeacherProfilePage } from '../pages/teacher/TeacherProfilePage'
+import { TeacherInstitutionAdminPage } from '../pages/teacher/TeacherInstitutionAdminPage'
 
 // Real-Time Classroom
 import { ClassroomPage } from '../pages/classroom/ClassroomPage'
@@ -130,11 +131,14 @@ export const AppRoutes: React.FC = () => {
         <Route path="materials" element={<TeacherMaterialsPage />} />
         <Route path="assignments" element={<TeacherAssignmentsPage />} />
         <Route path="summaries" element={<TeacherSummariesPage />} />
+        <Route path="institution" element={<TeacherInstitutionAdminPage />} />
         <Route path="profile" element={<TeacherProfilePage />} />
       </Route>
 
-      {/* Admin panel: outside the student/teacher guards; access is enforced by the backend session, not the URL */}
-      <Route path="/admin" element={<AdminApp />} />
+      {/* Admin panel: outside the student/teacher guards; access is enforced by the backend session, not the
+          URL. The path itself is just not a guessable word like "admin" — kept off public nav/links too, so
+          it isn't discoverable by Browse, only by whoever's told the URL. */}
+      <Route path="/platform-console" element={<AdminApp />} />
 
       {/* 404 Catch-All */}
       <Route path="*" element={<NotFoundPage />} />

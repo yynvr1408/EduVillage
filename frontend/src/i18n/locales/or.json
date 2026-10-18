@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "ହୋମ୍",
+    "dashboard": "ଡାସବୋର୍ଡ",
+    "classes": "ଶ୍ରେଣୀ",
+    "recordedLessons": "ରେକର୍ଡ ହୋଇଥିବା ପାଠ",
+    "coursesAndLessons": "କୋର୍ସ ଏବଂ ପାଠ",
+    "myCourses": "ମୋର କୋର୍ସ",
+    "assignments": "ଆସାଇନମେଣ୍ଟ",
+    "teachingResources": "ଶିକ୍ଷଣ ସମ୍ବଳ",
+    "aiSummaries": "AI ସାରାଂଶ",
+    "downloads": "ଡାଉନଲୋଡ୍",
+    "profile": "ପ୍ରୋଫାଇଲ",
+    "institutionAdmin": "ଅନୁଷ୍ଠାନ ଆଡମିନ"
+  },
+  "navMobile": {
+    "recorded": "ରେକର୍ଡ ହୋଇଥିବା",
+    "tasks": "କାର୍ଯ୍ୟ",
+    "offline": "ଅଫଲାଇନ"
+  },
+  "auth": {
+    "tagline": "କମ୍ ବ୍ୟାଣ୍ଡୱିଡଥ ଅଞ୍ଚଳରେ ବିଶ୍ୱାସଯୋଗ୍ୟ ଶିକ୍ଷଣ ପାଇଁ ଅଫଲାଇନ୍-ଫର୍ଷ୍ଟ ଶିକ୍ଷଣ ପ୍ଲାଟଫର୍ମ।",
+    "howSigningIn": "ଆପଣ କିପରି ସାଇନ୍ ଇନ୍ କରୁଛନ୍ତି?",
+    "whatAccount": "ଆପଣଙ୍କୁ କେଉଁ ପ୍ରକାରର ଖାତା ଆବଶ୍ୟକ?",
+    "studentPortal": "ଛାତ୍ର ପୋର୍ଟାଲ",
+    "studentPortalDesc": "ଶ୍ରେଣୀରେ ଯୋଗ ଦିଅନ୍ତୁ, ଅଫଲାଇନରେ ପଢ଼ା ସମ୍ପୂର୍ଣ୍ଣ କରନ୍ତୁ, ଆସାଇନମେଣ୍ଟ ଦାଖଲ କରନ୍ତୁ",
+    "teacherPortal": "ଶିକ୍ଷକ ପୋର୍ଟାଲ",
+    "teacherPortalDesc": "ଶ୍ରେଣୀ ନିର୍ଧାରଣ କରନ୍ତୁ, କୋର୍ସ ପରିଚାଳନା କରନ୍ତୁ, AI ସାରାଂଶ ଦେଖନ୍ତୁ",
+    "studentAccount": "ଛାତ୍ର ଖାତା",
+    "studentAccountDesc": "କୋର୍ସ, ଶ୍ରେଣୀ ଏବଂ ଅଫଲାଇନ ଡାଉନଲୋଡ୍ ପାଆନ୍ତୁ",
+    "teacherAccount": "ଶିକ୍ଷକ ଖାତା",
+    "teacherAccountDesc": "ଶ୍ରେଣୀ ନିର୍ଧାରଣ କରନ୍ତୁ, ସାମଗ୍ରୀ ଏବଂ ଆସାଇନମେଣ୍ଟ ପରିଚାଳନା କରନ୍ତୁ",
+    "alreadyRegistered": "ପୂର୍ବରୁ ପଞ୍ଜିକୃତ?",
+    "signInHere": "ଏଠାରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ"
+  },
+  "language": {
+    "switchLabel": "ଭାଷା"
+  }
+}

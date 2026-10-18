@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "Beranda",
+    "dashboard": "Dasbor",
+    "classes": "Kelas",
+    "recordedLessons": "Pelajaran Terekam",
+    "coursesAndLessons": "Kursus & Pelajaran",
+    "myCourses": "Kursus Saya",
+    "assignments": "Tugas",
+    "teachingResources": "Sumber Pengajaran",
+    "aiSummaries": "Ringkasan AI",
+    "downloads": "Unduhan",
+    "profile": "Profil",
+    "institutionAdmin": "Admin Institusi"
+  },
+  "navMobile": {
+    "recorded": "Terekam",
+    "tasks": "Tugas",
+    "offline": "Luring"
+  },
+  "auth": {
+    "tagline": "Platform pembelajaran yang mengutamakan mode luring untuk pembelajaran yang andal di wilayah berbandwidth rendah.",
+    "howSigningIn": "Bagaimana Anda ingin masuk?",
+    "whatAccount": "Jenis akun apa yang Anda butuhkan?",
+    "studentPortal": "Portal Siswa",
+    "studentPortalDesc": "Hadiri kelas, kejar materi secara luring, kirim tugas",
+    "teacherPortal": "Portal Guru",
+    "teacherPortalDesc": "Jadwalkan kelas, kelola kursus, tinjau ringkasan AI",
+    "studentAccount": "Akun Siswa",
+    "studentAccountDesc": "Akses kursus, kelas, dan unduhan luring",
+    "teacherAccount": "Akun Guru",
+    "teacherAccountDesc": "Jadwalkan kelas, kelola materi dan tugas",
+    "alreadyRegistered": "Sudah terdaftar?",
+    "signInHere": "Masuk di sini"
+  },
+  "language": {
+    "switchLabel": "Bahasa"
+  }
+}

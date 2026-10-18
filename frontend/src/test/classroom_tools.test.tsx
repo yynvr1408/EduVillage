@@ -146,28 +146,77 @@ describe('ClassroomControls teacher tools', () => {
     onLeave: () => {}, connectionState: 'connected',
   }
 
-  it('students do not get screen sharing, whiteboard or blur', () => {
+  it('students do not get a Tools menu, and the Save Data toggle is teacher-only hidden', () => {
     render(<ClassroomControls {...base} canPublishVideo={false} />)
-    expect(screen.queryByRole('button', { name: 'Whiteboard' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Share screen/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Blur background' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tools' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Toggle Audio-Only mode' })).toBeInTheDocument()
   })
 
-  it('teachers can share a screen (and add more), toggle the whiteboard and the blur', () => {
-    const t = { canShareScreen: true, isSharingScreen: false, onAddScreen: vi.fn(), isBoardOpen: false, onToggleBoard: vi.fn(), blurOn: true, blurSupported: true, onToggleBlur: vi.fn() }
+  it('teachers get a single Tools menu instead of separate pills, and it is hidden until opened', () => {
+    const t = {
+      canShareScreen: true, isSharingScreen: false, onAddScreen: vi.fn(), isBoardOpen: false, onToggleBoard: vi.fn(),
+      blurOn: true, blurSupported: true, onToggleBlur: vi.fn(), lowBandwidthOn: false, onToggleLowBandwidth: vi.fn(),
+    }
+    render(<ClassroomControls {...base} teacherTools={t} />)
+    // Save Data is a dead button for a teacher (it only unsubscribes a remote participant's video).
+    expect(screen.queryByRole('button', { name: 'Toggle Audio-Only mode' })).not.toBeInTheDocument()
+    // The four tools aren't on screen until the menu is opened.
+    expect(screen.queryByRole('button', { name: 'Share screen' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
+    expect(screen.getByRole('button', { name: 'Share screen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Whiteboard' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Blur my background' })).toBeInTheDocument()
+  })
+
+  it('teachers can share a screen (and add more), toggle the whiteboard and the blur from the Tools menu', () => {
+    const t = {
+      canShareScreen: true, isSharingScreen: false, onAddScreen: vi.fn(), isBoardOpen: false, onToggleBoard: vi.fn(),
+      blurOn: true, blurSupported: true, onToggleBlur: vi.fn(), lowBandwidthOn: false, onToggleLowBandwidth: vi.fn(),
+    }
     const { rerender } = render(<ClassroomControls {...base} teacherTools={t} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
     fireEvent.click(screen.getByRole('button', { name: 'Share screen' }))
     fireEvent.click(screen.getByRole('button', { name: 'Whiteboard' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Blur background' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Blur my background' }))
     expect(t.onAddScreen).toHaveBeenCalled()
     expect(t.onToggleBoard).toHaveBeenCalled()
     expect(t.onToggleBlur).toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Blur background' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Blur my background' })).toHaveAttribute('aria-pressed', 'true')
     rerender(<ClassroomControls {...base} teacherTools={{ ...t, isSharingScreen: true }} />)
-    expect(screen.getByRole('button', { name: 'Share another screen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add another screen' })).toBeInTheDocument()
     rerender(<ClassroomControls {...base} teacherTools={{ ...t, canShareScreen: false, blurSupported: false }} />)
-    expect(screen.getByRole('button', { name: 'Share screen' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Blur background' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Share screen|Add another screen/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Blur my background' })).toBeDisabled()
+  })
+
+  it('the Tools button shows an active-tool dot and closes when clicking outside', () => {
+    const t = {
+      canShareScreen: true, isSharingScreen: true, onAddScreen: vi.fn(), isBoardOpen: false, onToggleBoard: vi.fn(),
+      blurOn: false, blurSupported: true, onToggleBlur: vi.fn(), lowBandwidthOn: false, onToggleLowBandwidth: vi.fn(),
+    }
+    render(<ClassroomControls {...base} teacherTools={t} />)
+    expect(screen.getByTestId('tools-active-indicator')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
+    expect(screen.getByRole('group', { name: 'Presentation tools' })).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('tools-menu-backdrop'))
+    expect(screen.queryByRole('group', { name: 'Presentation tools' })).not.toBeInTheDocument()
+  })
+
+  it('teachers can switch their own broadcast to low bandwidth mode', () => {
+    const t = {
+      canShareScreen: true, isSharingScreen: false, onAddScreen: vi.fn(), isBoardOpen: false, onToggleBoard: vi.fn(),
+      blurOn: false, blurSupported: true, onToggleBlur: vi.fn(), lowBandwidthOn: false, onToggleLowBandwidth: vi.fn(),
+    }
+    const { rerender } = render(<ClassroomControls {...base} teacherTools={t} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
+    const toggle = screen.getByRole('button', { name: 'Low bandwidth broadcast' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle)
+    expect(t.onToggleLowBandwidth).toHaveBeenCalled()
+    // The menu stays open after a toggle click (so several tools can be flipped in one visit);
+    // the Tools button itself isn't clicked again here, since that would close it.
+    rerender(<ClassroomControls {...base} teacherTools={{ ...t, lowBandwidthOn: true }} />)
+    expect(screen.getByRole('button', { name: 'Low bandwidth broadcast' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('a student without mic permission sees "Request to Speak" instead of a mic toggle, which disables once sent', () => {

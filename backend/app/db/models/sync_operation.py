@@ -30,4 +30,6 @@ class AuditEvent(UUIDPrimaryKeyMixin, Base):
     action: Mapped[str] = mapped_column(String(120), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(80), nullable=False)
     resource_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow)
+    # Indexed: an unbounded table otherwise, and the only way anything ever queries it at scale
+    # is "recent events" / "prune anything older than X" (see audit_service.prune_expired).
+    created_at: Mapped[datetime] = mapped_column(nullable=False, default=utcnow, index=True)

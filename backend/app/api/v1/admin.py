@@ -8,6 +8,8 @@ from app.dependencies import get_current_admin, get_db, require_admin_csrf
 from app.schemas.admin import (
     AdminLoginRequest,
     AdminOut,
+    CollegeAdministratorCreate,
+    CollegeAdministratorOut,
     CollegeCreate,
     CollegeOut,
     CollegePage,
@@ -178,3 +180,31 @@ def change_section_status(
 ):
     section = college_service.get_section_or_404(db, section_id)
     return college_service.set_section_status(db, admin.id, section, payload.status)
+
+
+# ---- delegated institution administrators --------------------------------------------------------
+# Granting/revoking this delegation is itself a platform-admin-only decision — stays behind
+# get_current_admin like everything else in this router. The delegated teacher then manages their
+# own college through app/api/v1/institution_admin.py, via their ordinary teacher session.
+
+
+@router.get("/colleges/{college_id}/administrators", response_model=list[CollegeAdministratorOut])
+def list_college_administrators(college_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_admin)):
+    college_service.get_college_or_404(db, college_id)
+    return college_service.list_college_admins(db, college_id)
+
+
+@router.post("/colleges/{college_id}/administrators", response_model=CollegeAdministratorOut, status_code=201)
+def add_college_administrator(
+    college_id: str, payload: CollegeAdministratorCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)
+):
+    college = college_service.get_college_or_404(db, college_id)
+    return college_service.assign_college_admin(db, admin.id, college, user_id=payload.user_id)
+
+
+@router.delete("/colleges/{college_id}/administrators/{user_id}", status_code=204)
+def remove_college_administrator(
+    college_id: str, user_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)
+):
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.remove_college_admin(db, admin.id, college, user_id=user_id)

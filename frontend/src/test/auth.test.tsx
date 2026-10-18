@@ -13,7 +13,7 @@ describe('Authentication & Protected Routes', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders EduVillage login interface with monochrome styling and credentials inputs', () => {
+  it('renders LanternEd login interface with monochrome styling and credentials inputs', () => {
     const { container } = render(
       <BrowserRouter>
         <AuthProvider>
@@ -22,7 +22,7 @@ describe('Authentication & Protected Routes', () => {
       </BrowserRouter>
     )
 
-    expect(screen.getByRole('heading', { name: /EduVillage/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /LanternEd/i })).toBeInTheDocument()
     expect(container.querySelector('#email')).toBeInTheDocument()
     expect(container.querySelector('#password')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sign In/i })).toBeInTheDocument()

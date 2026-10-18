@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "હોમ",
+    "dashboard": "ડેશબોર્ડ",
+    "classes": "વર્ગો",
+    "recordedLessons": "રેકોર્ડ કરેલા પાઠ",
+    "coursesAndLessons": "કોર્સ અને પાઠ",
+    "myCourses": "મારા કોર્સ",
+    "assignments": "એસાઇનમેન્ટ",
+    "teachingResources": "શિક્ષણ સામગ્રી",
+    "aiSummaries": "AI સારાંશ",
+    "downloads": "ડાઉનલોડ",
+    "profile": "પ્રોફાઇલ",
+    "institutionAdmin": "સંસ્થા એડમિન"
+  },
+  "navMobile": {
+    "recorded": "રેકોર્ડ કરેલું",
+    "tasks": "કાર્યો",
+    "offline": "ઓફલાઇન"
+  },
+  "auth": {
+    "tagline": "ઓછી બેન્ડવિડ્થ ધરાવતા વિસ્તારોમાં ભરોસાપાત્ર શિક્ષણ માટે ઓફલાઇન-ફર્સ્ટ શૈક્ષણિક પ્લેટફોર્મ.",
+    "howSigningIn": "તમે કેવી રીતે સાઇન ઇન કરી રહ્યા છો?",
+    "whatAccount": "તમારે કયા પ્રકારનું ખાતું જોઈએ છે?",
+    "studentPortal": "વિદ્યાર્થી પોર્ટલ",
+    "studentPortalDesc": "વર્ગોમાં હાજરી આપો, ઓફલાઇન અભ્યાસ પૂર્ણ કરો, એસાઇનમેન્ટ સબમિટ કરો",
+    "teacherPortal": "શિક્ષક પોર્ટલ",
+    "teacherPortalDesc": "વર્ગોનું શેડ્યૂલ કરો, કોર્સનું સંચાલન કરો, AI સારાંશ જુઓ",
+    "studentAccount": "વિદ્યાર્થી ખાતું",
+    "studentAccountDesc": "કોર્સ, વર્ગો અને ઓફલાઇન ડાઉનલોડ્સ મેળવો",
+    "teacherAccount": "શિક્ષક ખાતું",
+    "teacherAccountDesc": "વર્ગોનું શેડ્યૂલ કરો, સામગ્રી અને એસાઇનમેન્ટનું સંચાલન કરો",
+    "alreadyRegistered": "પહેલેથી જ રજિસ્ટર્ડ છો?",
+    "signInHere": "અહીં સાઇન ઇન કરો"
+  },
+  "language": {
+    "switchLabel": "ભાષા"
+  }
+}

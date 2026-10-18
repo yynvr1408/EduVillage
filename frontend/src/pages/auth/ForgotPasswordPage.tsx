@@ -45,7 +45,7 @@ export const ForgotPasswordPage: React.FC = () => {
           <Logo size={48} className="mb-3" />
           <h1 className="text-2xl font-bold tracking-tight text-[#202B2A]">Forgot Your Password?</h1>
           <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
-            Enter the email address associated with your EduVillage account.
+            Enter the email address associated with your LanternEd account.
           </p>
         </div>
 

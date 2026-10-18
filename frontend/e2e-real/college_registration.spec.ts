@@ -11,7 +11,7 @@ const COLLEGE_B = `Beta Institute ${tag}`
 const state: { codeA?: string; codeB?: string } = {}
 
 async function adminLogin(page: Page) {
-  await page.goto('/admin')
+  await page.goto('/platform-console')
   // A still-valid admin session (cookie) goes straight to the dashboard, which is itself what we want to see.
   const form = page.locator('#admin-username')
   const dashboard = page.getByRole('heading', { name: 'Colleges', exact: true })

@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "হোম",
+    "dashboard": "ডাশবোর্ড",
+    "classes": "শ্ৰেণী",
+    "recordedLessons": "ৰেকর্ড কৰা পাঠ",
+    "coursesAndLessons": "পাঠ্যক্রম আৰু পাঠ",
+    "myCourses": "মোৰ পাঠ্যক্রম",
+    "assignments": "এসাইনমেণ্ট",
+    "teachingResources": "শিক্ষণ সামগ্ৰী",
+    "aiSummaries": "AI সাৰাংশ",
+    "downloads": "ডাউনলোড",
+    "profile": "প্ৰফাইল",
+    "institutionAdmin": "প্রতিষ্ঠান প্রশাসক"
+  },
+  "navMobile": {
+    "recorded": "ৰেকর্ড কৰা",
+    "tasks": "কাম",
+    "offline": "অফলাইন"
+  },
+  "auth": {
+    "tagline": "কম বেণ্ডৱিথৰ অঞ্চলত ভৰসাযোগ্য শিক্ষাৰ বাবে অফলাইন-ফাস্ট শিক্ষা প্লেটফর্ম।",
+    "howSigningIn": "আপুনি কেনেদৰে সাইন ইন কৰিছে?",
+    "whatAccount": "আপোনাক কি ধৰণৰ একাউণ্ট লাগে?",
+    "studentPortal": "ছাত্র পোর্টেল",
+    "studentPortalDesc": "শ্ৰেণীত উপস্থিত থাকক, অফলাইনত পাঠ সম্পূর্ণ কৰক, এসাইনমেণ্ট জমা দিয়ক",
+    "teacherPortal": "শিক্ষক পোর্টেল",
+    "teacherPortalDesc": "শ্ৰেণী নির্ধাৰণ কৰক, পাঠ্যক্রম পৰিচালনা কৰক, AI সাৰাংশ চাওক",
+    "studentAccount": "ছাত্র একাউণ্ট",
+    "studentAccountDesc": "পাঠ্যক্রম, শ্ৰেণী আৰু অফলাইন ডাউনলোড লাভ কৰক",
+    "teacherAccount": "শিক্ষক একাউণ্ট",
+    "teacherAccountDesc": "শ্ৰেণী নির্ধাৰণ কৰক, সামগ্ৰী আৰু এসাইনমেণ্ট পৰিচালনা কৰক",
+    "alreadyRegistered": "ইতিমধ্যে পঞ্জীয়নভুক্ত?",
+    "signInHere": "ইয়াত সাইন ইন কৰক"
+  },
+  "language": {
+    "switchLabel": "ভাষা"
+  }
+}

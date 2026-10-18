@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     admin_idle_timeout_seconds: int = 120
 
     database_url: str = "sqlite:///./dev.db"
+    # SQLAlchemy's own defaults (5 + 10 = 15 concurrent DB-bound requests per process) — fine for
+    # a single small-plan instance, a hard ceiling once traffic/instance count grows. Overridable
+    # by env var alone, with no code change, when moving to a bigger DB plan.
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    # Recycles a pooled connection after this long so a managed Postgres provider's own idle-connection
+    # timeout (which looks like a random "server closed the connection unexpectedly") never gets hit.
+    db_pool_recycle_seconds: int = 1800
 
     livekit_url: str | None = None
     livekit_api_key: str | None = None
@@ -72,6 +80,11 @@ class Settings(BaseSettings):
     # institution-wide kill switch. Recordings stay private until a teacher publishes them.
     recording_enabled: bool = True
     signed_url_ttl_seconds: int = 300
+
+    # Audit events (logins, class actions, admin actions, ...) accumulate forever by default —
+    # a security/investigation trail is more useful kept than lost. Set this to start pruning
+    # events older than N days (see audit_service.prune_expired, run by the worker).
+    audit_log_retention_days: int | None = None
 
 
     submission_max_mb: int = 20  # per attached file on an assignment submission

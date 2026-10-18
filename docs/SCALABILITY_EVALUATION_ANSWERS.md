@@ -2,7 +2,7 @@
 
 Short, defensible answers for reviews and demonstrations. Pricing checked 2026-10-16; all cost and capacity figures are **estimates from assumed workloads, not measurements** (see [INFRASTRUCTURE_COST_MODEL.md](INFRASTRUCTURE_COST_MODEL.md)). Detail: [architecture](SCALABILITY_ARCHITECTURE.md) · [roadmap](DEPLOYMENT_UPGRADE_ROADMAP.md) · [capacity test plan](CAPACITY_TEST_PLAN.md) · [README](../README.md).
 
-## How does EduVillage scale?
+## How does LanternEd scale?
 
 Component by component, each upgradeable on its own. The frontend is static files on **Vercel** (a CDN; registered users add bandwidth, not compute). The **FastAPI** backend is a modular monolith on Render that can first be given more CPU/memory and later more instances; sessions, background jobs and sync idempotency already live in PostgreSQL, so adding instances is possible. **Neon** PostgreSQL scales compute and storage by plan. **LiveKit Cloud** carries live media, so the API never proxies video. **Cloudflare R2** holds recordings and uploads with presigned URLs and free egress. Two things must be fixed before multiple instances are *accurate*: login/OTP rate limits are per-process memory, and migrations run on every container start. Nothing has been load-tested yet.
 
@@ -46,7 +46,7 @@ The frontend is a static React/Vite single-page app: a CDN is the simplest, chea
 
 Measured load does not need it: the system is one stateless-ish API plus managed services (database, media, storage, email, AI) that already scale independently, and the first four stages are covered by larger instances and a second instance. Kubernetes adds cost and operational burden for a small team without removing any current bottleneck. Revisit only after load tests show instance-count or deployment-complexity limits that Render cannot meet.
 
-## How does EduVillage support weak internet connections?
+## How does LanternEd support weak internet connections?
 
 **Implemented in the frontend and tested** (not field-tested): audio-only fallback in live classes when connection quality degrades; assignment drafts saved on the device (IndexedDB) and synchronised later through an idempotent queue (retrying cannot create a second submission); explicit downloads of recordings and resources for offline viewing; a PWA service worker; connectivity detection with clear banners. Limits: a connectivity heartbeat adds request volume, browsers cap storage, and real-network field testing has not been done.
 

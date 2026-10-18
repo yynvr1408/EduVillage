@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "首页",
+    "dashboard": "仪表盘",
+    "classes": "课堂",
+    "recordedLessons": "录播课程",
+    "coursesAndLessons": "课程与课时",
+    "myCourses": "我的课程",
+    "assignments": "作业",
+    "teachingResources": "教学资源",
+    "aiSummaries": "AI摘要",
+    "downloads": "下载",
+    "profile": "个人资料",
+    "institutionAdmin": "机构管理员"
+  },
+  "navMobile": {
+    "recorded": "录播",
+    "tasks": "任务",
+    "offline": "离线"
+  },
+  "auth": {
+    "tagline": "离线优先的教育学习平台,在低带宽地区提供可靠的学习体验。",
+    "howSigningIn": "您要如何登录?",
+    "whatAccount": "您需要哪种类型的账户?",
+    "studentPortal": "学生门户",
+    "studentPortalDesc": "参加课堂、离线补课、提交作业",
+    "teacherPortal": "教师门户",
+    "teacherPortalDesc": "安排课堂、管理课程、查看AI摘要",
+    "studentAccount": "学生账户",
+    "studentAccountDesc": "访问课程、课堂和离线下载内容",
+    "teacherAccount": "教师账户",
+    "teacherAccountDesc": "安排课堂、管理教材和作业",
+    "alreadyRegistered": "已经注册过了?",
+    "signInHere": "在此登录"
+  },
+  "language": {
+    "switchLabel": "语言"
+  }
+}

@@ -363,7 +363,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ portal }) => {
               ? 'Create Teacher Account'
               : portal === 'student'
               ? 'Create Student Account'
-              : 'Create EduVillage Account'}
+              : 'Create LanternEd Account'}
           </h1>
           <p className="text-xs sm:text-sm text-[#687775] mt-1 max-w-xs leading-relaxed">
             Join low-bandwidth classrooms and access downloadable offline curricula.

@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "home": "Início",
+    "dashboard": "Painel",
+    "classes": "Aulas",
+    "recordedLessons": "Aulas gravadas",
+    "coursesAndLessons": "Cursos e aulas",
+    "myCourses": "Meus cursos",
+    "assignments": "Tarefas",
+    "teachingResources": "Recursos de ensino",
+    "aiSummaries": "Resumos de IA",
+    "downloads": "Downloads",
+    "profile": "Perfil",
+    "institutionAdmin": "Administração da instituição"
+  },
+  "navMobile": {
+    "recorded": "Gravadas",
+    "tasks": "Tarefas",
+    "offline": "Offline"
+  },
+  "auth": {
+    "tagline": "Plataforma educacional offline-first para aprendizagem confiável em regiões de baixa conectividade.",
+    "howSigningIn": "Como você vai entrar?",
+    "whatAccount": "Que tipo de conta você precisa?",
+    "studentPortal": "Portal do aluno",
+    "studentPortalDesc": "Participe de aulas, recupere o conteúdo offline, envie tarefas",
+    "teacherPortal": "Portal do professor",
+    "teacherPortalDesc": "Agende aulas, gerencie cursos, revise resumos de IA",
+    "studentAccount": "Conta de aluno",
+    "studentAccountDesc": "Acesse cursos, aulas e downloads offline",
+    "teacherAccount": "Conta de professor",
+    "teacherAccountDesc": "Agende aulas, gerencie materiais e tarefas",
+    "alreadyRegistered": "Já tem uma conta?",
+    "signInHere": "Entre aqui"
+  },
+  "language": {
+    "switchLabel": "Idioma"
+  }
+}

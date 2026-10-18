@@ -15,7 +15,7 @@ const label = (page: Page, text: RegExp) => page.getByLabel(text)
 let code = ''
 
 async function adminCreate(page: Page) {
-  await page.goto('/admin')
+  await page.goto('/platform-console')
   await page.fill('#admin-username', username)
   await page.fill('#admin-password', password)
   await page.click('button:has-text("Sign In")')
