@@ -294,3 +294,47 @@ def test_a_non_delegated_teacher_cannot_touch_the_roster(college, teacher):
     tclient, _tuser = teacher
     resp = tclient.get(f"{INST_BASE}/colleges/{college['id']}/members")
     assert resp.status_code == 403
+
+
+def test_reassigning_a_member_moves_them_to_the_new_section(admin_client, college, teacher, db_session):
+    from sqlalchemy import select as sa_select
+    from app.db.models.college import UserCollegeSection
+
+    tclient, tuser = teacher
+    _delegate(admin_client, college["id"], tuser["id"])
+    branch, section_a = _branch_and_section(admin_client, college)
+    section_b = admin_client.post(f"{ADMIN_BASE}/branches/{branch['id']}/sections", json={"name": "Section B"})
+    assert section_b.status_code == 201, section_b.text
+    section_b = section_b.json()
+
+    _student_client, student_resp = register_active(college, section_a, role="student")
+    member_id = student_resp.json()["user"]["id"]
+
+    moved = tclient.post(
+        f"{INST_BASE}/colleges/{college['id']}/members/{member_id}/reassign",
+        json={"branch_id": branch["id"], "section_id": section_b["id"]},
+    )
+    assert moved.status_code == 200, moved.text
+
+    db_session.expire_all()
+    links = db_session.execute(sa_select(UserCollegeSection).where(UserCollegeSection.user_id == member_id)).scalars().all()
+    assert [l.college_section_id for l in links] == [section_b["id"]]  # moved, not duplicated
+
+    roster = tclient.get(f"{INST_BASE}/colleges/{college['id']}/members")
+    assert roster.status_code == 200 and len(roster.json()) == 1
+
+
+def test_a_student_cannot_be_reassigned_to_all_sections(admin_client, college, teacher):
+    tclient, tuser = teacher
+    _delegate(admin_client, college["id"], tuser["id"])
+    branch, section = _branch_and_section(admin_client, college)
+
+    _student_client, student_resp = register_active(college, section, role="student")
+    member_id = student_resp.json()["user"]["id"]
+
+    bad = tclient.post(
+        f"{INST_BASE}/colleges/{college['id']}/members/{member_id}/reassign",
+        json={"branch_id": branch["id"], "all_sections": True},
+    )
+    assert bad.status_code == 422
+    assert bad.json()["error"]["code"] == "INVALID_SECTION"

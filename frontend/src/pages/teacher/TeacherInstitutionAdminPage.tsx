@@ -1,10 +1,108 @@
 import React, { useEffect, useState } from 'react'
-import { Building2, Check, KeyRound, Layers, Mail, Pencil, PauseCircle, PlayCircle, ShieldAlert, UserMinus, Users, X } from 'lucide-react'
+import {
+  ArrowRightLeft,
+  Building2,
+  Check,
+  KeyRound,
+  Layers,
+  Mail,
+  Pencil,
+  PauseCircle,
+  PlayCircle,
+  ShieldAlert,
+  UserMinus,
+  Users,
+  X,
+} from 'lucide-react'
 import { PageContainer } from '../../components/layout/PageContainer'
-import { Card, CardContent, Badge, Button, Dialog, FormField, Input, LoadingState, ErrorState, EmptyState } from '../../components/ui'
+import { Card, CardContent, Badge, Button, Dialog, FormField, Input, Select, LoadingState, ErrorState, EmptyState } from '../../components/ui'
 import { CollegeStructureDialog } from '../admin/CollegeStructureDialog'
 import { institutionAdminApi, type CollegeDeletionRequest, type PendingUser } from '../../services/institutionAdminApi'
-import type { College } from '../../services/adminApi'
+import type { College, CollegeBranch, CollegeSection } from '../../services/adminApi'
+
+const ALL_SECTIONS = '__all_sections__'
+
+/** Moves an already-admitted student/teacher to a different branch/section of the same college —
+ * the one roster action that was still missing: previously the only fix for a mis-registered
+ * member was removing them and having them register again. */
+const ReassignDialog: React.FC<{ collegeId: string; member: PendingUser; onClose: () => void; onDone: () => void }> = ({
+  collegeId,
+  member,
+  onClose,
+  onDone,
+}) => {
+  const [branches, setBranches] = useState<CollegeBranch[]>([])
+  const [sections, setSections] = useState<CollegeSection[]>([])
+  const [branchId, setBranchId] = useState('')
+  const [sectionId, setSectionId] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void institutionAdminApi.listBranches(collegeId).then(setBranches)
+  }, [collegeId])
+
+  useEffect(() => {
+    setSectionId('')
+    if (branchId) void institutionAdminApi.listSections(branchId).then(setSections)
+    else setSections([])
+  }, [branchId])
+
+  const submit = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const allSections = member.role === 'teacher' && sectionId === ALL_SECTIONS
+      await institutionAdminApi.reassignMember(collegeId, member.id, {
+        branchId,
+        sectionId: allSections ? undefined : sectionId || undefined,
+        allSections,
+      })
+      onDone()
+    } catch (err: any) {
+      setError(err.message || 'Could not move this person.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog isOpen onClose={onClose} title="Move to a different branch/section" description={member.full_name}>
+      <div className="flex flex-col gap-4">
+        {error && <p className="text-xs text-[#B42318]">{error}</p>}
+        <FormField label="Branch" htmlFor="reassign-branch">
+          <Select
+            id="reassign-branch"
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+            options={[{ value: '', label: 'Select a branch' }, ...branches.map((b) => ({ value: b.id, label: b.name }))]}
+          />
+        </FormField>
+        <FormField label="Section" htmlFor="reassign-section">
+          <Select
+            id="reassign-section"
+            value={sectionId}
+            onChange={(e) => setSectionId(e.target.value)}
+            disabled={!branchId}
+            options={[
+              { value: '', label: !branchId ? 'Select a branch first' : 'Select a section' },
+              ...sections.map((s) => ({ value: s.id, label: s.name })),
+              ...(member.role === 'teacher' && branchId ? [{ value: ALL_SECTIONS, label: 'All Sections' }] : []),
+            ]}
+          />
+        </FormField>
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button variant="primary" isLoading={isSubmitting} disabled={!branchId || !sectionId} onClick={submit}>
+            Move
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  )
+}
 
 /** "Rural Science College" -> "RSC"; a single-word name falls back to its first few letters
  * ("Harvard" -> "HARV") rather than a single, meaningless initial. */
@@ -150,6 +248,7 @@ const MembersRosterSection: React.FC<{ collegeId: string; refreshKey: number }> 
   const [actingOn, setActingOn] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<PendingUser | null>(null)
+  const [reassigning, setReassigning] = useState<PendingUser | null>(null)
 
   const load = async () => {
     setError(null)
@@ -230,6 +329,15 @@ const MembersRosterSection: React.FC<{ collegeId: string; refreshKey: number }> 
                   size="sm"
                   variant="outline"
                   disabled={actingOn === m.id}
+                  onClick={() => setReassigning(m)}
+                  icon={<ArrowRightLeft className="w-3.5 h-3.5" />}
+                >
+                  Move
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={actingOn === m.id}
                   onClick={() => setRemoving(m)}
                   icon={<UserMinus className="w-3.5 h-3.5" />}
                 >
@@ -257,6 +365,18 @@ const MembersRosterSection: React.FC<{ collegeId: string; refreshKey: number }> 
           </div>
         </div>
       </Dialog>
+
+      {reassigning && (
+        <ReassignDialog
+          collegeId={collegeId}
+          member={reassigning}
+          onClose={() => setReassigning(null)}
+          onDone={() => {
+            setReassigning(null)
+            void load()
+          }}
+        />
+      )}
     </div>
   )
 }

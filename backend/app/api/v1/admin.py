@@ -8,6 +8,8 @@ from app.dependencies import get_current_admin, get_db, require_admin_csrf
 from app.schemas.admin import (
     AdminLoginRequest,
     AdminOut,
+    AuditEventOut,
+    AuditEventPage,
     CollegeAdministratorCreate,
     CollegeAdministratorOut,
     CollegeCreate,
@@ -26,7 +28,7 @@ from app.schemas.admin import (
     DecisionReject,
     OverviewOut,
 )
-from app.services import admin_service, auth_service, college_service
+from app.services import admin_service, audit_service, auth_service, college_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -255,3 +257,34 @@ def request_college_deletion(college_id: str, db: Session = Depends(get_db), adm
 def get_college_deletion_request(college_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_admin)):
     college_service.get_college_or_404(db, college_id)
     return college_service.get_pending_deletion_request(db, college_id)
+
+
+# ---- audit trail ------------------------------------------------------------------------------
+
+
+@router.get("/audit-events", response_model=AuditEventPage)
+def list_audit_events(
+    action: str | None = None,
+    resource_type: str | None = None,
+    actor_id: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    rows, total = audit_service.list_events(
+        db, action=action, resource_type=resource_type, actor_id=actor_id, limit=limit, offset=offset
+    )
+    items = [
+        AuditEventOut(
+            id=event.id,
+            actor_id=event.actor_id,
+            actor_email=actor_email,
+            action=event.action,
+            resource_type=event.resource_type,
+            resource_id=event.resource_id,
+            created_at=event.created_at,
+        )
+        for event, actor_email in rows
+    ]
+    return AuditEventPage(items=items, total=total, limit=limit, offset=offset)

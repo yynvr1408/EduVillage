@@ -12,12 +12,22 @@ from app.api.router import api_router
 from app.config import get_settings
 from app.core.exceptions import AppError, app_error_handler
 from app.core.logging import configure_logging
-from app.core.middleware import RequestIdMiddleware
+from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 
 configure_logging()
 logger = logging.getLogger("eduvillage")
 
 settings = get_settings()
+
+if settings.sentry_configured:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.app_env,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        send_default_pii=False,
+    )
 
 
 @asynccontextmanager
@@ -46,6 +56,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="LanternEd API", lifespan=lifespan)
 
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],

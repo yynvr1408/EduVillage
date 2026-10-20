@@ -82,6 +82,23 @@ export interface CollegeDeletionRequest {
   confirmed_at: string | null
 }
 
+export interface AuditEvent {
+  id: string
+  actor_id: string | null
+  actor_email: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  created_at: string
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export class AdminApiError extends Error {
   status: number
   code?: string
@@ -160,4 +177,11 @@ export const adminApi = {
   // ---- college deletion: the super admin may only REQUEST it -------------------------------
   requestCollegeDeletion: (collegeId: string) => request<CollegeDeletionRequest>('POST', `/colleges/${collegeId}/deletion-requests`),
   getDeletionRequestStatus: (collegeId: string) => request<CollegeDeletionRequest | null>('GET', `/colleges/${collegeId}/deletion-requests`),
+
+  // ---- audit trail ---------------------------------------------------------------------------
+  listAuditEvents: (p: { action?: string; resourceType?: string; actorId?: string; limit?: number; offset?: number }) =>
+    request<AuditEventPage>(
+      'GET',
+      `/audit-events${qs({ action: p.action, resource_type: p.resourceType, actor_id: p.actorId, limit: p.limit, offset: p.offset })}`
+    ),
 }

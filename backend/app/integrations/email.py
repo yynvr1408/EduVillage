@@ -112,6 +112,27 @@ def send_registration_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
     )
 
 
+def send_registration_decision_email(*, to: str, full_name: str, college_name: str, approved: bool, reason: str | None) -> bool:
+    """Notifies a student/teacher once their college administrator approves or rejects their
+    registration — a courtesy email only; the decision itself already took effect via the API
+    call that triggered this (see institution_admin.py's approve/reject_registration routes).
+    No fallback template: unlike the OTP sends above, there's nothing sensible to fall back to
+    for a status message, so this simply doesn't send (logged, not raised) when unconfigured."""
+    if not settings.emailjs_registration_decision_template_id:
+        logger.info("registration_decision_email_skipped reason=no_template_configured")
+        return False
+    return _send(
+        to_email=to,
+        template_id=settings.emailjs_registration_decision_template_id,
+        template_params={
+            "full_name": full_name,
+            "college_name": college_name,
+            "status": "approved" if approved else "declined",
+            "reason": reason or "",
+        },
+    )
+
+
 def send_college_deletion_otp_email(*, to: str, otp: str, ttl_minutes: int) -> bool:
     """College-deletion confirmation OTP, sent to the college's own registered contact address
     (not an account holder's email, unlike every other OTP in this module) as the second of two

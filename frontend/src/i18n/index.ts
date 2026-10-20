@@ -53,10 +53,26 @@ export const SUPPORTED_LANGUAGES = [
 
 export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]['code']
 
+// Arabic and Urdu read right-to-left. This flips text direction and most flow layout (the
+// browser's own `dir` handling), which covers the bulk of the reading experience; it does NOT
+// mirror every hardcoded left/right Tailwind utility across the app (icon order inside buttons,
+// fixed sidebar position, etc.) — that would mean converting physical utilities (ml-/pl-/left-)
+// to logical ones (ms-/ps-/start-) throughout the whole UI, which is a much larger pass this
+// does not attempt. Tracked as a known partial fix, not a complete one.
+const RTL_LANGUAGES = new Set<LanguageCode>(['ar', 'ur'])
+
+function applyDocumentDirection(lng: string | undefined): void {
+  if (typeof document === 'undefined' || !lng) return
+  document.documentElement.dir = RTL_LANGUAGES.has(lng as LanguageCode) ? 'rtl' : 'ltr'
+  document.documentElement.lang = lng
+}
+
 // Translations are bundled (imported as JSON, not fetched at runtime) on purpose: this app is
 // offline-first and low-bandwidth-first, so a language switch must never cost a network request
 // — every language is already in the JS bundle the user downloaded once.
-i18n
+// .init() resolves asynchronously (even with bundled resources, detection runs as part of it),
+// so direction is applied once the real resolved language is known, not assumed synchronous.
+void i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
@@ -94,5 +110,9 @@ i18n
       lookupLocalStorage: 'lanternEd:language',
     },
   })
+  .then(() => applyDocumentDirection(i18n.resolvedLanguage))
+
+// Also runs on every later switch, so changing to/from Arabic or Urdu mid-session updates direction live.
+i18n.on('languageChanged', applyDocumentDirection)
 
 export default i18n

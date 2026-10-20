@@ -30,6 +30,7 @@ from app.schemas.admin import (
     DecisionReject,
     DeletionOtpRequest,
     DeletionOtpVerify,
+    MemberReassign,
     PendingUserOut,
 )
 from app.services import college_service
@@ -167,11 +168,13 @@ def change_my_section_status(
 
 
 @router.get("/colleges/{college_id}/registrations", response_model=list[PendingUserOut])
-def list_pending_registrations(college_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_pending_registrations(
+    college_id: str, limit: int = 200, offset: int = 0, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
     _require_teacher(user)
     college = college_service.get_college_or_404(db, college_id)
     college_service.assert_can_manage_college(db, user, college)
-    return college_service.list_pending_registrations(db, college_id)
+    return college_service.list_pending_registrations(db, college_id, limit=limit, offset=offset)
 
 
 @router.post("/colleges/{college_id}/registrations/{user_id}/approve", response_model=PendingUserOut)
@@ -198,11 +201,13 @@ def reject_registration(
 
 
 @router.get("/colleges/{college_id}/members", response_model=list[PendingUserOut])
-def list_members(college_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_members(
+    college_id: str, limit: int = 200, offset: int = 0, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
     _require_teacher(user)
     college = college_service.get_college_or_404(db, college_id)
     college_service.assert_can_manage_college(db, user, college)
-    return college_service.list_college_members(db, college_id)
+    return college_service.list_college_members(db, college_id, limit=limit, offset=offset)
 
 
 @router.post("/colleges/{college_id}/members/{user_id}/suspend", response_model=PendingUserOut)
@@ -227,6 +232,18 @@ def remove_member(college_id: str, user_id: str, db: Session = Depends(get_db), 
     college = college_service.get_college_or_404(db, college_id)
     college_service.assert_can_manage_college(db, user, college)
     return college_service.remove_member_from_college(db, user.id, college_id, user_id)
+
+
+@router.post("/colleges/{college_id}/members/{user_id}/reassign", response_model=PendingUserOut)
+def reassign_member(
+    college_id: str, user_id: str, payload: MemberReassign, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _require_teacher(user)
+    college = college_service.get_college_or_404(db, college_id)
+    college_service.assert_can_manage_college(db, user, college)
+    return college_service.reassign_member(
+        db, user.id, college_id, user_id, branch_id=payload.branch_id, section_id=payload.section_id, all_sections=payload.all_sections
+    )
 
 
 # ---- college deletion: the delegated administrator's confirmation side --------------------------

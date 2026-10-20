@@ -1,6 +1,6 @@
 # Capacity test plan
 
-**Status: planned. No load test has been run.** Practical production capacity has not yet been established through representative load testing; the figures in [INFRASTRUCTURE_COST_MODEL.md](INFRASTRUCTURE_COST_MODEL.md) (including the planning figure of 40 requests/second per Render Standard instance) are estimates that this plan is meant to replace with measurements. Related: [architecture](SCALABILITY_ARCHITECTURE.md) · [roadmap](DEPLOYMENT_UPGRADE_ROADMAP.md) · [README](../README.md).
+**Status: planned. No load test has been run.** Practical production capacity has not yet been established through representative load testing; the figures in [INFRASTRUCTURE_COST_MODEL.md](INFRASTRUCTURE_COST_MODEL.md) (including the planning figure of 40 requests/second per Render Standard instance) are estimates that this plan is meant to replace with measurements. Related: [architecture](SCALABILITY_ARCHITECTURE.md) · [roadmap](DEPLOYMENT_UPGRADE_ROADMAP.md) · [README](../README.md). A starting k6 script for the baseline/ramp scenarios below exists at [`../load-tests/capacity_test.js`](../load-tests/capacity_test.js) — written, never run; read §7 before running it against anything.
 
 Terminology used throughout: **theoretical capacity** (what a provider advertises), **estimated capacity** (this repository's assumptions), **measured capacity** (results of this plan on staging), **verified production capacity** (measured plus observed in production). Only the last two may be quoted as capacity.
 

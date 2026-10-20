@@ -15,3 +15,4 @@ openai
 pytest
 httpx
 pypdf
+sentry-sdk[fastapi]

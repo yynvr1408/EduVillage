@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     # events older than N days (see audit_service.prune_expired, run by the worker).
     audit_log_retention_days: int | None = None
 
+    # Error tracking (Sentry). Unset in development and by default everywhere: the app runs
+    # identically either way (see main.py's lifespan, which only calls sentry_sdk.init() when
+    # this is set). Get a DSN from sentry.io (free tier is enough to start) and set this in the
+    # Render/production environment to activate it — no code change needed.
+    sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = 0.0  # performance tracing is opt-in and separate from error reporting
 
     submission_max_mb: int = 20  # per attached file on an assignment submission
     max_upload_mb: int = 500  # per file; large media is streamed to storage, never held in memory
@@ -143,6 +149,12 @@ class Settings(BaseSettings):
     emailjs_registration_service_id: str | None = None
     emailjs_registration_public_key: str | None = None
     emailjs_registration_private_key: str | None = None
+    # A fourth template ("your registration to {{college_name}} was {{status}}") for notifying a
+    # student/teacher once their college administrator decides on their registration. Distinct
+    # from the OTP templates above — not a code, a status message — so there's no sensible
+    # fallback to an OTP-shaped template; left unset, these notifications are simply not sent
+    # (the decision itself still takes effect either way, this is a courtesy email only).
+    emailjs_registration_decision_template_id: str | None = None
     otp_ttl_minutes: int = 5
     # A second sign-in to a student/teacher account that is already signed in elsewhere needs an emailed OTP.
     concurrent_login_otp: bool = True
@@ -166,6 +178,10 @@ class Settings(BaseSettings):
     @property
     def emailjs_configured(self) -> bool:
         return bool(self.emailjs_service_id and self.emailjs_template_id and self.emailjs_public_key)
+
+    @property
+    def sentry_configured(self) -> bool:
+        return bool(self.sentry_dsn)
 
 
 @lru_cache

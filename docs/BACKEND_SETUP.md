@@ -52,6 +52,8 @@ Copy `backend/.env.example` to `backend/.env`. The file holds placeholders only;
 | Email | `EMAILJS_SERVICE_ID`, `_TEMPLATE_ID`, `_PUBLIC_KEY`, `_PRIVATE_KEY` | unset | OTP emails through EmailJS's REST API (template variables `to_email`, `otp`, `ttl_minutes`); `_TEMPLATE_ID` is the password-reset wording |
 | | `EMAILJS_LOGIN_TEMPLATE_ID` | unset | optional separate template for the new-device sign-in approval code (falls back to `_TEMPLATE_ID`) |
 | | `OTP_TTL_MINUTES`, `OTP_MAX_ATTEMPTS`, `OTP_REQUEST_COOLDOWN_SECONDS`, `RESET_TOKEN_TTL_MINUTES` | 5, 5, 60, 10 | OTP behaviour |
+| Error tracking | `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE` | unset, 0.0 | Sentry error reporting; unset disables it entirely (no code change either way). The frontend has its own independent `VITE_SENTRY_DSN` build-time var. |
+| Audit log | `AUDIT_LOG_RETENTION_DAYS` | unset (kept forever) | set to start pruning audit events older than N days |
 
 With no EmailJS settings outside production the OTP is returned in the API response (`dev_otp`) so the flows can be used locally; in production it is only ever emailed.
 

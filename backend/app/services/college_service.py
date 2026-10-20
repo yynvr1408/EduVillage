@@ -9,8 +9,10 @@ Code guarantees:
     relationships keep pointing at the college id.
 """
 
+import logging
 import re
 import secrets
+from datetime import timedelta
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -30,7 +32,9 @@ from app.db.models.college import (
 )
 from app.db.models.enums import CollegeDeletionRequestStatus, CollegeRegistrationRequestStatus, CollegeStatus, UserRole, UserStatus
 from app.db.models.user import User
-from app.services import audit_service
+from app.services import audit_service, rate_limit_service
+
+logger = logging.getLogger(__name__)
 
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 32 symbols: letters without I/O, digits 2-9
 CODE_PREFIX = "EV"
@@ -567,6 +571,7 @@ def approve_college_request(db: Session, platform_admin_id: str, request: Colleg
     audit_service.record(
         db, actor_id=platform_admin_id, action="college_registration_approved", resource_type="college_registration_request", resource_id=request.id
     )
+    _notify_college_request_decision(request, approved=True, reason=None)
     return college
 
 
@@ -582,19 +587,38 @@ def reject_college_request(db: Session, platform_admin_id: str, request: College
     audit_service.record(
         db, actor_id=platform_admin_id, action="college_registration_rejected", resource_type="college_registration_request", resource_id=request.id
     )
+    _notify_college_request_decision(request, approved=False, reason=reason)
     return request
+
+
+def _notify_college_request_decision(request: CollegeRegistrationRequest, *, approved: bool, reason: str | None) -> None:
+    """Best-effort courtesy email to the founding admin who submitted a college registration
+    request — same "never block the real action on email delivery" rule as
+    _notify_registration_decision below, just addressed before any User row exists for this
+    person (the request itself carries their name/email)."""
+    from app.integrations import email as email_integration
+
+    try:
+        email_integration.send_registration_decision_email(
+            to=request.admin_email, full_name=request.admin_full_name, college_name=request.college_name,
+            approved=approved, reason=reason,
+        )
+    except Exception:
+        logger.exception("college_request_decision_email_failed request_id=%s", request.id)
 
 
 # ---- student/teacher registration approval (the college administrator's own queue) --------------
 
 
-def list_pending_registrations(db: Session, college_id: str) -> list[User]:
+def list_pending_registrations(db: Session, college_id: str, *, limit: int = 200, offset: int = 0) -> list[User]:
+    from app.utils.pagination import paginate
+
     stmt = (
         select(User)
         .where(User.college_id == college_id, User.status == UserStatus.pending)
         .order_by(User.created_at)
     )
-    return list(db.execute(stmt).scalars())
+    return paginate(db, stmt, limit=limit, offset=offset)
 
 
 def _get_pending_registration_or_404(db: Session, college_id: str, user_id: str) -> User:
@@ -604,22 +628,55 @@ def _get_pending_registration_or_404(db: Session, college_id: str, user_id: str)
     return user
 
 
+def _notify_registration_decision(db: Session, user: User, *, approved: bool, reason: str | None) -> None:
+    """Best-effort courtesy email — the decision already took effect regardless of whether this
+    send succeeds, same "never block the real action on email delivery" rule the OTP flows follow."""
+    from app.integrations import email as email_integration
+
+    college = db.get(College, user.college_id) if user.college_id else None
+    try:
+        email_integration.send_registration_decision_email(
+            to=user.email, full_name=user.full_name, college_name=college.name if college else "your institution",
+            approved=approved, reason=reason,
+        )
+    except Exception:
+        logger.exception("registration_decision_email_failed user_id=%s", user.id)
+
+
 def approve_registration(db: Session, college_admin_id: str, college_id: str, user_id: str) -> User:
+    _check_admin_action_rate_limit(db, college_admin_id)
     user = _get_pending_registration_or_404(db, college_id, user_id)
     user.status = UserStatus.active
     db.commit()
     db.refresh(user)
     audit_service.record(db, actor_id=college_admin_id, action="registration_approved", resource_type="user", resource_id=user.id)
+    _notify_registration_decision(db, user, approved=True, reason=None)
     return user
 
 
 def reject_registration(db: Session, college_admin_id: str, college_id: str, user_id: str, *, reason: str | None) -> User:
+    _check_admin_action_rate_limit(db, college_admin_id)
     user = _get_pending_registration_or_404(db, college_id, user_id)
     user.status = UserStatus.rejected
     db.commit()
     db.refresh(user)
     audit_service.record(db, actor_id=college_admin_id, action="registration_rejected", resource_type="user", resource_id=user.id)
+    _notify_registration_decision(db, user, approved=False, reason=reason)
     return user
+
+
+_ADMIN_ACTION_MAX = 60  # per college admin, per window
+_ADMIN_ACTION_WINDOW = timedelta(minutes=5)
+
+
+def _check_admin_action_rate_limit(db: Session, actor_id: str) -> None:
+    """A brake on the roster/registration mutation endpoints: a real admin doing a bulk approval
+    of, say, twenty students in a sitting is well within this; an automated/compromised session
+    hammering the endpoint is not. Generous on purpose — this is a courtesy limit on an already
+    authenticated, delegated session, not the primary defense."""
+    key = f"college-admin-action:{actor_id}"
+    if rate_limit_service.record(db, key, _ADMIN_ACTION_WINDOW) > _ADMIN_ACTION_MAX:
+        raise ConflictError("Too many actions in a short time. Please wait a moment and try again.", code="RATE_LIMITED")
 
 
 # ---- the college admin's student/teacher roster --------------------------------------------
@@ -629,13 +686,15 @@ def reject_registration(db: Session, college_admin_id: str, college_id: str, use
 # through here — that delegation is a platform-admin-only decision (see assign/remove_college_admin).
 
 
-def list_college_members(db: Session, college_id: str) -> list[User]:
+def list_college_members(db: Session, college_id: str, *, limit: int = 200, offset: int = 0) -> list[User]:
+    from app.utils.pagination import paginate
+
     stmt = (
         select(User)
         .where(User.college_id == college_id, User.status.in_([UserStatus.active, UserStatus.suspended]))
         .order_by(User.role, User.full_name)
     )
-    return list(db.execute(stmt).scalars())
+    return paginate(db, stmt, limit=limit, offset=offset)
 
 
 def _get_member_or_404(db: Session, college_id: str, user_id: str) -> User:
@@ -651,6 +710,7 @@ def _assert_not_self(acting_college_admin_id: str, target: User) -> None:
 
 
 def suspend_member(db: Session, college_admin_id: str, college_id: str, user_id: str) -> User:
+    _check_admin_action_rate_limit(db, college_admin_id)
     user = _get_member_or_404(db, college_id, user_id)
     _assert_not_self(college_admin_id, user)
     if user.status != UserStatus.suspended:
@@ -662,6 +722,7 @@ def suspend_member(db: Session, college_admin_id: str, college_id: str, user_id:
 
 
 def reactivate_member(db: Session, college_admin_id: str, college_id: str, user_id: str) -> User:
+    _check_admin_action_rate_limit(db, college_admin_id)
     user = _get_member_or_404(db, college_id, user_id)
     _assert_not_self(college_admin_id, user)
     if user.status != UserStatus.active:
@@ -677,6 +738,7 @@ def remove_member_from_college(db: Session, college_admin_id: str, college_id: s
     (courses, submissions, recordings, ...) are untouched; only the college/section/branch
     affiliation is cleared, exactly as a college deletion detaches everyone (see
     confirm_college_deletion)."""
+    _check_admin_action_rate_limit(db, college_admin_id)
     user = _get_member_or_404(db, college_id, user_id)
     _assert_not_self(college_admin_id, user)
     db.execute(delete(UserCollegeSection).where(UserCollegeSection.user_id == user.id))
@@ -685,6 +747,40 @@ def remove_member_from_college(db: Session, college_admin_id: str, college_id: s
     db.commit()
     db.refresh(user)
     audit_service.record(db, actor_id=college_admin_id, action="member_removed_from_college", resource_type="user", resource_id=user.id)
+    return user
+
+
+def reassign_member(
+    db: Session, college_admin_id: str, college_id: str, user_id: str, *, branch_id: str, section_id: str | None, all_sections: bool,
+) -> User:
+    """Moves an already-admitted student/teacher to a different branch/section of the SAME
+    college — the gap left by remove_member_from_college, which only detaches: a mis-registered
+    student previously had no fix short of removal and re-registration. Reuses
+    validate_registration_target with require_code=False: the acting college admin's own
+    delegation is already the authority here, not a second proof of the college's own code."""
+    _check_admin_action_rate_limit(db, college_admin_id)
+    user = _get_member_or_404(db, college_id, user_id)
+    _assert_not_self(college_admin_id, user)
+    if all_sections and user.role != UserRole.teacher:
+        raise ValidationFailedError("Only a teacher can be assigned to all sections of a branch.", code="INVALID_SECTION")
+
+    target = validate_registration_target(
+        db, college_id=college_id, branch_id=branch_id, section_id=section_id, all_sections=all_sections,
+        college_code=None, require_code=False, allow_all_sections=user.role == UserRole.teacher,
+    )
+    if target is None:
+        raise ValidationFailedError("Select a branch and section.", code="BRANCH_REQUIRED")
+    _, branch, section = target
+
+    db.execute(delete(UserCollegeSection).where(UserCollegeSection.user_id == user.id))
+    db.execute(delete(UserBranchAssignment).where(UserBranchAssignment.user_id == user.id))
+    if section is not None:
+        db.add(UserCollegeSection(user_id=user.id, college_section_id=section.id))
+    else:
+        db.add(UserBranchAssignment(user_id=user.id, branch_id=branch.id))
+    db.commit()
+    db.refresh(user)
+    audit_service.record(db, actor_id=college_admin_id, action="member_reassigned", resource_type="user", resource_id=user.id)
     return user
 
 

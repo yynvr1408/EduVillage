@@ -95,4 +95,9 @@ export const institutionAdminApi = {
     apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/members/${userId}/reactivate`, { method: 'POST' }),
   removeMember: (collegeId: string, userId: string) =>
     apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/members/${userId}/remove`, { method: 'POST' }),
+  reassignMember: (collegeId: string, userId: string, input: { branchId: string; sectionId?: string; allSections?: boolean }) =>
+    apiRequest<PendingUser>(`/institution-admin/colleges/${collegeId}/members/${userId}/reassign`, {
+      method: 'POST',
+      body: JSON.stringify({ branch_id: input.branchId, section_id: input.sectionId || null, all_sections: !!input.allSections }),
+    }),
 }

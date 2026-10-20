@@ -231,6 +231,14 @@ class DecisionReject(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class MemberReassign(BaseModel):
+    """Moves an already-admitted member to a different branch/section of the same college."""
+
+    branch_id: str = Field(min_length=1)
+    section_id: str | None = None
+    all_sections: bool = False  # teacher-only: branch-wide, mutually exclusive with section_id
+
+
 class PendingUserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -256,6 +264,23 @@ class DeletionOtpRequest(BaseModel):
     """The confirming college administrator's own password — step 1 of the two-step confirmation."""
 
     password: str = Field(min_length=1, max_length=256)
+
+
+class AuditEventOut(BaseModel):
+    id: str
+    actor_id: str | None
+    actor_email: str | None
+    action: str
+    resource_type: str
+    resource_id: str | None
+    created_at: UtcDatetime
+
+
+class AuditEventPage(BaseModel):
+    items: list[AuditEventOut]
+    total: int
+    limit: int
+    offset: int
 
 
 class DeletionOtpVerify(BaseModel):

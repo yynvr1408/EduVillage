@@ -23,6 +23,7 @@ import {
   adminApi,
   AdminApiError,
   type AdminOverview,
+  type AuditEvent,
   type College,
   type CollegeDeletionRequest,
   type CollegeInput,
@@ -266,6 +267,119 @@ const PendingCollegeRequests: React.FC<{ onDecided: () => void; guard: (err: unk
           </li>
         ))}
       </ul>
+    </section>
+  )
+}
+
+const AUDIT_PAGE_SIZE = 20
+
+const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+/** Read-only view of AuditEvent rows (logins, admin actions, registration decisions, ...) —
+ * previously captured but never surfaced anywhere. Collapsed by default: this is an
+ * investigation tool, not something an admin needs open on every visit. */
+const AuditLogSection: React.FC<{ guard: (err: unknown) => boolean }> = ({ guard }) => {
+  const [open, setOpen] = useState(false)
+  const [events, setEvents] = useState<AuditEvent[]>([])
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+  const [actionFilter, setActionFilter] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const page = await adminApi.listAuditEvents({ action: actionFilter.trim() || undefined, limit: AUDIT_PAGE_SIZE, offset })
+      setEvents(page.items)
+      setTotal(page.total)
+    } catch (err: any) {
+      if (!guard(err)) setError(err.message || 'Could not load the audit log.')
+    } finally {
+      setLoading(false)
+    }
+  }, [guard, actionFilter, offset])
+
+  useEffect(() => {
+    if (open) void load()
+  }, [open, load])
+
+  const pages = Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE))
+  const page = Math.floor(offset / AUDIT_PAGE_SIZE) + 1
+
+  return (
+    <section aria-label="Audit log" className="flex flex-col gap-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center justify-between text-left w-full"
+      >
+        <h2 className="text-lg font-bold text-[#202B2A]">Audit Log</h2>
+        <span className="text-xs text-[#687775]">{open ? 'Hide' : 'Show'}</span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3">
+          <Input
+            placeholder="Filter by action (e.g. college_registration_approved)"
+            value={actionFilter}
+            onChange={(e) => {
+              setOffset(0)
+              setActionFilter(e.target.value)
+            }}
+          />
+          {error && <ErrorState message={error} onRetry={load} />}
+          {loading ? (
+            <LoadingState />
+          ) : events.length === 0 ? (
+            <EmptyState title="No audit events" description="Nothing matches this filter yet." />
+          ) : (
+            <div className="bg-[#FFFFFF] border border-[#E1E8E4] rounded-xl overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#E1E8E4] text-left text-xs text-[#687775]">
+                    <th className="p-3">When</th>
+                    <th className="p-3">Actor</th>
+                    <th className="p-3">Action</th>
+                    <th className="p-3">Resource</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((e) => (
+                    <tr key={e.id} className="border-b border-[#E1E8E4] last:border-0">
+                      <td className="p-3 whitespace-nowrap text-[#687775]">{formatDateTime(e.created_at)}</td>
+                      <td className="p-3 break-all">{e.actor_email || '—'}</td>
+                      <td className="p-3 font-mono text-xs">{e.action}</td>
+                      <td className="p-3 text-[#687775]">
+                        {e.resource_type}
+                        {e.resource_id ? ` · ${e.resource_id.slice(0, 8)}` : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {total > AUDIT_PAGE_SIZE && (
+            <div className="flex items-center justify-between">
+              <Button size="sm" variant="outline" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - AUDIT_PAGE_SIZE))}>
+                Previous
+              </Button>
+              <span className="text-xs text-[#687775]">
+                Page {page} of {pages} · {total} events
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page >= pages || loading}
+                onClick={() => setOffset(offset + AUDIT_PAGE_SIZE)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }
@@ -605,6 +719,8 @@ export const AdminDashboardPage: React.FC<{ username: string; onSignedOut: () =>
             </Button>
           </div>
         </section>
+
+        <AuditLogSection guard={guard} />
       </main>
 
       <CollegeFormDialog
